@@ -1,0 +1,22 @@
+# RULESET: Furniture WMS Development Guidelines
+# Reference Document: SRS_Furniture_WMS.md
+
+## 1. Context & Architecture
+- Build a Warehouse Management System for Furniture with AI integration based on SRS_Furniture_WMS.md.
+- Architecture: Layered Architecture (Controller -> Service -> Domain -> Repository/DAL).
+- Single Source of Truth for stock: `stock_ledger` table. Never modify stock directly without going through the Inventory Service.
+
+## 2. Strict Business Rules
+- CBM Calculation: Calculate CBM automatically: `CBM = (length_mm * width_mm * height_mm) / 1,000,000,000`. Validate all 3 dimensions > 0.
+- Combo/BOM Stock: Do NOT store static stock for Combo items. Calculate dynamically: `MIN(floor(available_stock[i] / qty_per_set[i]))`.
+- Stock Status: Always distinguish `GOOD` and `DAMAGED` stock. Available stock for sales MUST exclude `DAMAGED` items.
+
+## 3. Concurrency & Locking Rules (Pessimistic Locking)
+- All operations modifying stock balance MUST use Pessimistic Locking (`SELECT ... FOR UPDATE`).
+- Multi-item locking (Combos or Transfers) MUST sort items by `sku_id` or `warehouse_id` ASCENDING before locking to prevent deadlocks.
+- Set `lock_timeout` (default 5-10s). Handle lock acquisition failure with error code `ERR-LOCK-001`.
+
+## 4. Security & Audit
+- Enforce Role-Based Access Control (RBAC) on every API endpoint.
+- Every CUD action on business entities MUST generate an entry in `audit_log`.
+- AI Engine operates in READ-ONLY mode. Proposals require human approval (`APPROVED` status) before creating official records.

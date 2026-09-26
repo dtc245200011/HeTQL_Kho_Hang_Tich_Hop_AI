@@ -1,0 +1,23 @@
+# Tệp môi trường chứa mật khẩu/chuỗi kết nối
+.env
+.env.*
+!.env.example
+
+# Thư mục tạm Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+
+# Thư mục môi trường ảo
+venv/
+.venv/
+env/
+
+# IDE & Cấu hình riêng
+.vscode/
+.idea/
+*.log
+# Thư mục tạm của Visual Studio / IDE
+.vs/
