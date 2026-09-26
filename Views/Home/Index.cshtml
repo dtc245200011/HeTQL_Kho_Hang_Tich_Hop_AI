@@ -1,0 +1,435 @@
+@model DuAnCode.Web.Models.ViewModels.HomeIndexViewModel
+@{
+    ViewData["Title"] = "Tổng quan";
+}
+
+<div class="container-fluid">
+    <form method="get" class="row g-2 mb-3" onsubmit="return false;">
+        <input type="hidden" name="tab" value="@Model.Tab" />
+        <div class="col-md-4">
+            <input type="text" name="search" value="@Model.Search" class="form-control" placeholder="Tìm tên hoặc SKU..." />
+        </div>
+
+<!-- Modals for full lists -->
+<div class="modal fade" id="modalAllInventory" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Danh sách Tồn kho Chi tiết</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2"><input id="invSearch" class="form-control" placeholder="Tìm trong danh sách..." /></div>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped" id="tableAllInventory">
+            <thead><tr><th>SKU</th><th>Tên Sản phẩm</th><th>Kho</th><th>Trạng thái</th><th>Số lượng</th></tr></thead>
+            <tbody id="modalInventoryTableBody">
+              @* Render server-side if Model contains full inventory; else will be loaded via JS *@
+              @* Preferred: render from Model.Inventory if available, else fall back to ViewBag or Model.AllInventory *@
+              @if (Model?.Inventory != null && Model.Inventory.Any())
+              {
+                  foreach (var item in Model.Inventory)
+                  {
+                      <tr>
+                          <td>@item.SkuId</td>
+                          <td>@item.ProductName</td>
+                          <td>@item.WarehouseId</td>
+                          <td>
+                              <span class="badge @(item.Status == "GOOD" ? "bg-success" : "bg-warning")">@item.Status</span>
+                          </td>
+                          <td><strong>@item.Quantity</strong></td>
+                      </tr>
+                  }
+              }
+              else if (ViewBag.AllInventory != null)
+              {
+                  foreach (var it in (IEnumerable<dynamic>)ViewBag.AllInventory)
+                  {
+                      <tr>
+                          <td>@it.SKU</td>
+                          <td>@it.ProductName</td>
+                          <td>@it.WarehouseName</td>
+                          <td><span class="badge bg-success">@it.Status</span></td>
+                          <td><strong>@it.Quantity</strong></td>
+                      </tr>
+                  }
+              }
+              else if (Model?.AllInventory != null)
+              {
+                  foreach (var it in Model.AllInventory)
+                  {
+                      <tr>
+                          <td>@it.SkuId</td>
+                          <td>@it.ProductName</td>
+                          <td>@it.WarehouseId</td>
+                          <td><span class="badge bg-success">@it.Status</span></td>
+                          <td><strong>@it.Quantity</strong></td>
+                      </tr>
+                  }
+              }
+              else
+              {
+                  <tr>
+                      <td colspan="5" class="text-center text-muted">Không có dữ liệu tồn kho</td>
+                  </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Utility to escape HTML when injecting rows
+  function escapeHtml(unsafe) {
+    return String(unsafe)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  async function populateModalIfEmpty(modalId, endpoint, tbodySelector) {
+    const modal = document.getElementById(modalId);
+    if(!modal) return;
+    modal.addEventListener('show.bs.modal', async function () {
+      const tbody = document.querySelector(tbodySelector);
+      if (!tbody) return;
+      if (tbody.children.length > 0) return; // already populated
+      try {
+        const res = await fetch(endpoint);
+        if (!res.ok) return;
+        const data = await res.json();
+        tbody.innerHTML = data.map(d => {
+          if (tbodySelector.includes('inventory')) {
+            return `<tr><td>${escapeHtml(d.SKU)}</td><td>${escapeHtml(d.ProductName)}</td><td>${escapeHtml(d.WarehouseName)}</td><td><span class=\"badge bg-success\">${escapeHtml(d.Status)}</span></td><td><strong>${escapeHtml(d.Quantity)}</strong></td></tr>`;
+          }
+          // inbound/outbound rows
+          return `<tr><td>${escapeHtml(d.MovementId)}</td><td>${escapeHtml(d.SkuId)}</td><td>${escapeHtml(d.QuantityDelta)}</td><td>${escapeHtml(d.PerformedBy)}</td><td>${new Date(d.CreatedAt).toLocaleString()}</td><td>${escapeHtml(d.Reference || '')}</td></tr>`;
+        }).join('');
+      } catch (e) {
+        console.error('Failed to load', endpoint, e);
+      }
+    });
+  }
+
+  // Filter helper bound to inputs
+  function bindSearch(inputId, tbodySelector) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener('keyup', function () {
+      const filter = this.value.toLowerCase();
+      const rows = document.querySelectorAll(tbodySelector + ' tr');
+      rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(filter) ? '' : 'none';
+      });
+    });
+  }
+
+  // Wire up inventory + inbound/outbound modals
+  populateModalIfEmpty('modalAllInventory', '/Home/GetAllInventory', '#modalInventoryTableBody');
+  populateModalIfEmpty('modalAllInbound', '/Home/GetAllInboundLogs', '#inboundModalBody');
+  populateModalIfEmpty('modalAllOutbound', '/Home/GetAllOutboundLogs', '#outboundModalBody');
+
+  // Prevent Enter from submitting the outer form when focus is inside modal search inputs
+  ['invSearch','inSearch','outSearch'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+      }
+    });
+  });
+
+  // Live input filtering for modal tables
+  document.getElementById('invSearch')?.addEventListener('input', function(){
+    const filter = this.value.toLowerCase().trim();
+    document.querySelectorAll('#modalInventoryTableBody tr').forEach(row => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = text.includes(filter) ? '' : 'none';
+    });
+  });
+  document.getElementById('inSearch')?.addEventListener('input', function(){
+    const filter = this.value.toLowerCase().trim();
+    document.querySelectorAll('#inboundModalBody tr').forEach(row => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = text.includes(filter) ? '' : 'none';
+    });
+  });
+  document.getElementById('outSearch')?.addEventListener('input', function(){
+    const filter = this.value.toLowerCase().trim();
+    document.querySelectorAll('#outboundModalBody tr').forEach(row => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = text.includes(filter) ? '' : 'none';
+    });
+  });
+</script>
+<div class="modal fade" id="modalAllInbound" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Chi tiết Lịch sử Nhập kho</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2"><input id="inSearch" class="form-control" placeholder="Tìm..." /></div>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped" id="tableAllInbound">
+            <thead><tr><th>ID</th><th>SKU</th><th>Số lượng</th><th>Người thực hiện</th><th>Thời gian</th><th>Tham chiếu</th></tr></thead>
+            <tbody id="inboundModalBody">
+              @if (Model?.AllInbound != null && Model.AllInbound.Any())
+              {
+                  foreach (var it in Model.AllInbound)
+                  {
+                      <tr>
+                          <td>@it.MovementId</td>
+                          <td>@it.SkuId</td>
+                          <td>@it.QuantityDelta</td>
+                          <td>@it.PerformedBy</td>
+                          <td>@it.CreatedAt.ToLocalTime().ToString("g")</td>
+                          <td>@(it.ReferenceId ?? it.ReferenceType ?? "")</td>
+                      </tr>
+                  }
+              }
+              else if (ViewBag.AllInbound != null)
+              {
+                  foreach (var it in (IEnumerable<dynamic>)ViewBag.AllInbound)
+                  {
+                      <tr>
+                          <td>@it.MovementId</td>
+                          <td>@it.SkuId</td>
+                          <td>@it.QuantityDelta</td>
+                          <td>@it.PerformedBy</td>
+                          <td>@((DateTime)it.CreatedAt).ToLocalTime().ToString("g")</td>
+                          <td>@(it.Reference ?? "")</td>
+                      </tr>
+                  }
+              }
+              else
+              {
+                  <tr>
+                      <td colspan="6" class="text-center text-muted">Không có dữ liệu nhập kho</td>
+                  </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalAllOutbound" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Chi tiết Lịch sử Xuất kho</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2"><input id="outSearch" class="form-control" placeholder="Tìm..." /></div>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped" id="tableAllOutbound">
+            <thead><tr><th>ID</th><th>SKU</th><th>Số lượng</th><th>Người thực hiện</th><th>Thời gian</th><th>Tham chiếu</th></tr></thead>
+            <tbody id="outboundModalBody">
+              @if (Model?.AllOutbound != null && Model.AllOutbound.Any())
+              {
+                  foreach (var it in Model.AllOutbound)
+                  {
+                      <tr>
+                          <td>@it.MovementId</td>
+                          <td>@it.SkuId</td>
+                          <td>@it.QuantityDelta</td>
+                          <td>@it.PerformedBy</td>
+                          <td>@it.CreatedAt.ToLocalTime().ToString("g")</td>
+                          <td>@(it.ReferenceId ?? it.ReferenceType ?? "")</td>
+                      </tr>
+                  }
+              }
+              else if (ViewBag.AllOutbound != null)
+              {
+                  foreach (var it in (IEnumerable<dynamic>)ViewBag.AllOutbound)
+                  {
+                      <tr>
+                          <td>@it.MovementId</td>
+                          <td>@it.SkuId</td>
+                          <td>@it.QuantityDelta</td>
+                          <td>@it.PerformedBy</td>
+                          <td>@((DateTime)it.CreatedAt).ToLocalTime().ToString("g")</td>
+                          <td>@(it.Reference ?? "")</td>
+                      </tr>
+                  }
+              }
+              else
+              {
+                  <tr>
+                      <td colspan="6" class="text-center text-muted">Không có dữ liệu xuất kho</td>
+                  </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Optional: client-side filter inside modal
+function wireModalSearch(inputId, tableId){
+  const input = document.getElementById(inputId);
+  const table = document.getElementById(tableId);
+  if(!input || !table) return;
+  input.addEventListener('input', function(){
+    const q = this.value.toLowerCase();
+    table.querySelectorAll('tbody tr').forEach(r=>{
+      const txt = r.innerText.toLowerCase();
+      r.style.display = txt.indexOf(q) !== -1 ? '' : 'none';
+    });
+  });
+}
+document.addEventListener('DOMContentLoaded', function(){
+  wireModalSearch('invSearch','tableAllInventory');
+  wireModalSearch('inSearch','tableAllInbound');
+  wireModalSearch('outSearch','tableAllOutbound');
+});
+</script>
+        <div class="col-md-3">
+            <select name="status" class="form-select">
+                <option value="">-- Trạng thái / Loại --</option>
+                <option value="GOOD" selected="@(Model?.Status == "GOOD" ? "selected" : null)">GOOD</option>
+                <option value="DAMAGED" selected="@(Model?.Status == "DAMAGED" ? "selected" : null)">DAMAGED</option>
+                <option value="RESERVED" selected="@(Model?.Status == "RESERVED" ? "selected" : null)">RESERVED</option>
+            </select>
+        </div>
+            <div class="col-md-5 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Tìm kiếm</button>
+            <a href="@Url.Action("Index","Home")" class="btn btn-outline-secondary">Xóa lọc</a>
+        </div>
+    </form>
+
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>📦 Tồn kho</strong>
+                    <a class="btn btn-sm btn-link" href="#" data-bs-toggle="modal" data-bs-target="#modalAllInventory">Xem tất cả (50)</a>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr><th>SKU</th><th>Sản phẩm</th><th>Kho</th><th>Trạng thái</th><th>Số lượng</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach(var it in Model.Inventory)
+                            {
+                                <tr>
+                                    <td>@it.SkuId</td>
+                                    <td>@it.ProductName</td>
+                                    <td>@it.WarehouseId</td>
+                                    <td>@it.Status</td>
+                                    <td>@it.Quantity</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer">
+                    @if (!Model.ViewAll)
+                    {
+                        var totalPages = (int)Math.Ceiling(Model.InventoryTotal / (double)Model.PageSize);
+                        <nav>
+                            <ul class="pagination mb-0">
+                                <li class="page-item @(Model.Page<=1?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page-1, tab = "inventory", search = Model.Search, status = Model.Status })">«</a></li>
+                                @for (int i=1;i<=totalPages;i++){
+                                    <li class="page-item @(i==Model.Page?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "inventory", search = Model.Search, status = Model.Status })">@i</a></li>
+                                }
+                                <li class="page-item @(Model.Page>=totalPages?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page+1, tab = "inventory", search = Model.Search, status = Model.Status })">»</a></li>
+                            </ul>
+                        </nav>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>📥 Lịch sử Nhập kho</strong>
+                    <a class="btn btn-sm btn-link" href="#" data-bs-toggle="modal" data-bs-target="#modalAllInbound">Xem tất cả (50)</a>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr><th>ID</th><th>SKU</th><th>Số lượng</th><th>Thao tác</th><th>Thời gian</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach(var it in Model.Inbound)
+                            {
+                                <tr>
+                                    <td>@it.MovementId</td>
+                                    <td>@it.SkuId</td>
+                                    <td>@it.QuantityDelta</td>
+                                    <td>@it.MovementType</td>
+                                    <td>@it.CreatedAt.ToLocalTime().ToString("g")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer">
+                    @if (!Model.ViewAll)
+                    {
+                        var totalPages = (int)Math.Ceiling(Model.InboundTotal / (double)Model.PageSize);
+                        <nav>
+                            <ul class="pagination mb-0">
+                                <li class="page-item @(Model.Page<=1?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page-1, tab = "inbound", search = Model.Search })">«</a></li>
+                                @for (int i=1;i<=totalPages;i++){
+                                    <li class="page-item @(i==Model.Page?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "inbound", search = Model.Search })">@i</a></li>
+                                }
+                                <li class="page-item @(Model.Page>=totalPages?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page+1, tab = "inbound", search = Model.Search })">»</a></li>
+                            </ul>
+                        </nav>
+                    }
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>📤 Lịch sử Xuất kho</strong>
+                    <a class="btn btn-sm btn-link" href="#" data-bs-toggle="modal" data-bs-target="#modalAllOutbound">Xem tất cả (50)</a>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr><th>ID</th><th>SKU</th><th>Số lượng</th><th>Thao tác</th><th>Thời gian</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach(var it in Model.Outbound)
+                            {
+                                <tr>
+                                    <td>@it.MovementId</td>
+                                    <td>@it.SkuId</td>
+                                    <td>@it.QuantityDelta</td>
+                                    <td>@it.MovementType</td>
+                                    <td>@it.CreatedAt.ToLocalTime().ToString("g")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer">
+                    @if (!Model.ViewAll)
+                    {
+                        var totalPages = (int)Math.Ceiling(Model.OutboundTotal / (double)Model.PageSize);
+                        <nav>
+                            <ul class="pagination mb-0">
+                                <li class="page-item @(Model.Page<=1?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page-1, tab = "outbound", search = Model.Search })">«</a></li>
+                                @for (int i=1;i<=totalPages;i++){
+                                    <li class="page-item @(i==Model.Page?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "outbound", search = Model.Search })">@i</a></li>
+                                }
+                                <li class="page-item @(Model.Page>=totalPages?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page+1, tab = "outbound", search = Model.Search })">»</a></li>
+                            </ul>
+                        </nav>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

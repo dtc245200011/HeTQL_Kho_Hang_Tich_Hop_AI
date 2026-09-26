@@ -1,0 +1,45 @@
+@{
+    ViewData["Title"] = "Quản lý Hệ thống";
+}
+
+<div class="container mt-4">
+    <h3>Quản lý Hệ thống</h3>
+    <div class="row g-3 mt-3">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Quản lý tài khoản & phân quyền</h6>
+                    <p class="card-text small">Số lượng người dùng: <strong>@ViewBag.TotalUsers</strong></p>
+                    <a class="btn btn-sm btn-primary" href="/Admin/Users">Quản lý</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Cấu hình Kho / Công ty</h6>
+                    <p class="card-text small">Kho: <strong>@ViewBag.TotalWarehouses</strong></p>
+                    <a class="btn btn-sm btn-primary" href="/Admin/Settings">Cấu hình</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Sao lưu & Phục hồi</h6>
+                    <p class="card-text small">DB status: <strong>@(ViewBag.DbOk?"Connected":"Not Connected")</strong></p>
+                    <a class="btn btn-sm btn-secondary" href="/Admin/Backup">Backup</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Nhật ký & Audit</h6>
+                    <p class="card-text small">Xem lịch sử hệ thống</p>
+                    <a class="btn btn-sm btn-primary" href="/Admin/Logs">Xem</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

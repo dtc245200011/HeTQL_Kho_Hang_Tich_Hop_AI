@@ -1,6 +1,28 @@
 # RULESET: Furniture WMS Development Guidelines
 # Reference Document: SRS_Furniture_WMS.md
+DỰ ÁN: Quản lý Kho Nội thất WMS (.NET 9 ASP.NET Core MVC, Clean Architecture, SQL Server, ASP.NET Core Identity).
 
+BẤT KỲ THAO TÁC SỬA CODE NÀO TIẾP THEO BẮT BUỘC PHẢI TUÂN THỦ NGUYÊN TẮC "KHÔNG TÁI PHÁT LỖI CŨ" (NO REGRESSION) VỚI CÁC QUY TẮC CỐ ĐỊNH SAU:
+
+1. PHÂN QUYỀN VÀ TÀI KHOẢN (IDENTITY & ROLES):
+   - KHÔNG ĐƯỢC tự ý tạo mới user "admin" bằng AddAsync mà chưa check trùng. Tất cả logic kiểm tra admin phải dùng `AnyAsync(u => u.UserName == "admin")` để đảm bảo LUÔN CHỈ CÓ 1 ACCOUNT ADMIN duy nhất.
+   - Khi Restore xong hoặc Login thành công: Tự động gắn Role "Admin" nếu bị thiếu, sau đó RefreshSignIn/SignOut sạch sẽ để làm mới Cookie Claims.
+   - Mọi route bị từ chối truy cập phải trả về Login hoặc AccessDenied chuẩn, tuyệt đối KHÔNG đẻ ra lỗi 404 hay 500.
+
+2. CHỨC NĂNG BACKUP & RESTORE:
+   - Tất cả hàm Restore/Backup trong `AdminController.cs` hoặc `BackupController.cs` PHẢI đảm bảo MỌI nhánh điều kiện (if/else/try-catch) đều có lệnh `return` thích hợp (CHỐNG LỖI CS0161).
+   - Khi Serialize dữ liệu ra file JSON Backup, TUYỆT ĐỐI KHÔNG Serialize trực tiếp Entity EF Core. Bắt buộc map ra DTO thuần hoặc dùng `ReferenceHandler.IgnoreCycles` để chống văng lỗi 500 (Circular Reference).
+   - Sau khi Restore thành công và Đăng xuất, KHÔNG giữ lại các banner thông báo thừa trên giao diện Backup sau khi đăng nhập lại.
+
+3. PHÂN HỆ CẤU HÌNH KHO VÀ DOANH NGHIỆP (/Admin/Settings):
+   - Trang Settings phải dùng `SettingsViewModel` chứa cả `SystemConfig` (Thông tin Doanh nghiệp) và `List<Warehouse>` (Danh mục kho).
+   - Hàm POST [Settings] phải có logic tự kiểm tra/tạo bảng `SystemConfigs` an toàn nếu DB chưa có, chống văng lỗi "Invalid object name 'SystemConfigs'".
+   - Quản lý danh mục kho: Form Thêm kho phải có ô chọn Loại kho (MAIN, DAMAGED, QC) và Mã kho.
+   - RÀNG BUỘC NGHIỆP VỤ: Không cho phép XÓA kho nếu kho đó đang có hàng tồn (`Quantity > 0`).
+
+4. AN TOÀN BIÊN DỊCH VÀ CHẠY THỰC THI:
+   - Trước khi trả lời kết quả, hãy kiểm tra đảm bảo dự án build thành công (`dotnet build`) với 0 Error.
+   - Không được xóa bỏ các khối try-catch an toàn đã có ở các hàm trước đó.
 ## 1. Context & Architecture
 - Build a Warehouse Management System for Furniture with AI integration based on SRS_Furniture_WMS.md.
 - Architecture: Layered Architecture (Controller -> Service -> Domain -> Repository/DAL).

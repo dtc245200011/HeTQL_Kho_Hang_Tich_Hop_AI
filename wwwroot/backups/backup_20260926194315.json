@@ -1,0 +1,389 @@
+{
+  "Users": [
+    {
+      "FullName": "",
+      "Id": "550d4c37-73c7-4c22-9785-0e1a3ffbe893",
+      "UserName": "1",
+      "NormalizedUserName": null,
+      "Email": "1@gmail.com",
+      "NormalizedEmail": null,
+      "EmailConfirmed": false,
+      "PasswordHash": null,
+      "SecurityStamp": "e63d16bf-2bf6-434e-a8d0-0ad678e14fa8",
+      "ConcurrencyStamp": "781d2675-967e-4fa2-80a8-9cbc3d88f81e",
+      "PhoneNumber": null,
+      "PhoneNumberConfirmed": false,
+      "TwoFactorEnabled": false,
+      "LockoutEnd": null,
+      "LockoutEnabled": false,
+      "AccessFailedCount": 0
+    },
+    {
+      "FullName": "",
+      "Id": "59e2a2ae-084a-4e5e-9c10-1cea8ae5d419",
+      "UserName": "admin",
+      "NormalizedUserName": null,
+      "Email": "admin@wms.com",
+      "NormalizedEmail": null,
+      "EmailConfirmed": false,
+      "PasswordHash": null,
+      "SecurityStamp": "8246b697-9b90-41f5-be2f-e3253b30a461",
+      "ConcurrencyStamp": "ee8c64a6-ef11-4fc2-a558-bc9ce1683199",
+      "PhoneNumber": null,
+      "PhoneNumberConfirmed": false,
+      "TwoFactorEnabled": false,
+      "LockoutEnd": null,
+      "LockoutEnabled": false,
+      "AccessFailedCount": 0
+    },
+    {
+      "FullName": "System Administrator",
+      "Id": "6aac27f3-19ec-46cf-ab1e-6d99bb7bde2a",
+      "UserName": "admin",
+      "NormalizedUserName": "ADMIN",
+      "Email": "admin@wms.com",
+      "NormalizedEmail": "ADMIN@WMS.COM",
+      "EmailConfirmed": true,
+      "PasswordHash": "AQAAAAIAAYagAAAAECWOkTv\u002B/zB7LLlNx8XcZxZLaEetHxsmhMOjvqNE6muunn4e8T\u002BdHXdHcDX0S1jmNA==",
+      "SecurityStamp": "VEBB7JMLHR36ABGVEGLW2N5AO3PNJGGI",
+      "ConcurrencyStamp": "a96e1d83-7b50-4657-a80c-09608d651c0a",
+      "PhoneNumber": null,
+      "PhoneNumberConfirmed": false,
+      "TwoFactorEnabled": false,
+      "LockoutEnd": null,
+      "LockoutEnabled": true,
+      "AccessFailedCount": 0
+    }
+  ],
+  "Roles": [
+    {
+      "Id": "0d3068a3-e2e2-4d32-b08e-5a6a65006327",
+      "Name": "QC",
+      "NormalizedName": "QC",
+      "ConcurrencyStamp": null
+    },
+    {
+      "Id": "4b9b7d77-3592-411e-8ebd-37c23aca6df7",
+      "Name": "Accountant",
+      "NormalizedName": "ACCOUNTANT",
+      "ConcurrencyStamp": null
+    },
+    {
+      "Id": "5361af82-82ff-4659-a4e1-6c14f502e689",
+      "Name": "Director",
+      "NormalizedName": "DIRECTOR",
+      "ConcurrencyStamp": null
+    },
+    {
+      "Id": "5f2c561a-cbfb-420f-8214-8948def89330",
+      "Name": "Staff",
+      "NormalizedName": "STAFF",
+      "ConcurrencyStamp": null
+    },
+    {
+      "Id": "8a3e9dca-73ef-4531-9747-df884fe203c1",
+      "Name": "WarehouseManager",
+      "NormalizedName": "WAREHOUSEMANAGER",
+      "ConcurrencyStamp": null
+    },
+    {
+      "Id": "d4c5f5c2-38ba-4729-b47c-1e697385bfdd",
+      "Name": "Admin",
+      "NormalizedName": "ADMIN",
+      "ConcurrencyStamp": null
+    },
+    {
+      "Id": "db1b97c6-a047-4e7f-92b8-8b4bfff11447",
+      "Name": "WarehouseKeeper",
+      "NormalizedName": "WAREHOUSEKEEPER",
+      "ConcurrencyStamp": null
+    }
+  ],
+  "UserRoles": [
+    {
+      "UserId": "59e2a2ae-084a-4e5e-9c10-1cea8ae5d419",
+      "RoleId": "d4c5f5c2-38ba-4729-b47c-1e697385bfdd"
+    },
+    {
+      "UserId": "6aac27f3-19ec-46cf-ab1e-6d99bb7bde2a",
+      "RoleId": "d4c5f5c2-38ba-4729-b47c-1e697385bfdd"
+    }
+  ],
+  "Warehouses": [
+    {
+      "WarehouseId": "WH-DAMAGED",
+      "WarehouseName": "Kho H\u00E0ng L\u1ED7i",
+      "WarehouseType": "DAMAGED",
+      "MaxCapacityCbm": 100.0000,
+      "IsActive": true
+    },
+    {
+      "WarehouseId": "WH-GLOBAL",
+      "WarehouseName": "Kho T\u1ED5ng",
+      "WarehouseType": "MAIN",
+      "MaxCapacityCbm": 1000.0000,
+      "IsActive": true
+    }
+  ],
+  "ProductModels": [
+    {
+      "ProductModelId": "PM-CHAIR",
+      "ProductName": "Gh\u1EBF xoay",
+      "Category": "Office",
+      "Unit": "pcs",
+      "MinStock": 10,
+      "IsActive": true
+    },
+    {
+      "ProductModelId": "PM-DESK",
+      "ProductName": "B\u00E0n l\u00E0m vi\u1EC7c",
+      "Category": "Office",
+      "Unit": "pcs",
+      "MinStock": 5,
+      "IsActive": true
+    },
+    {
+      "ProductModelId": "PM-SOFA",
+      "ProductName": "Sofa 3 ch\u1ED7",
+      "Category": "Living",
+      "Unit": "set",
+      "MinStock": 2,
+      "IsActive": true
+    }
+  ],
+  "SkuVariants": [
+    {
+      "SkuId": "SKU-CHAIR-BK",
+      "ProductModelId": "PM-CHAIR",
+      "Color": "Black",
+      "Material": "Leather",
+      "LengthMm": 600,
+      "WidthMm": 600,
+      "HeightMm": 1000,
+      "Cbm": 0.3600,
+      "UnitPrice": 1200000.00,
+      "IsActive": true
+    },
+    {
+      "SkuId": "SKU-DESK-BR",
+      "ProductModelId": "PM-DESK",
+      "Color": "Brown",
+      "Material": "Wood",
+      "LengthMm": 1200,
+      "WidthMm": 600,
+      "HeightMm": 750,
+      "Cbm": 0.5400,
+      "UnitPrice": 2500000.00,
+      "IsActive": true
+    },
+    {
+      "SkuId": "SKU-SOFA-GY",
+      "ProductModelId": "PM-SOFA",
+      "Color": "Gray",
+      "Material": "Fabric",
+      "LengthMm": 2000,
+      "WidthMm": 900,
+      "HeightMm": 800,
+      "Cbm": 1.4400,
+      "UnitPrice": 8000000.00,
+      "IsActive": true
+    }
+  ],
+  "StockLedgers": [
+    {
+      "SkuId": "SKU-CHAIR-BK",
+      "WarehouseId": "WH-DAMAGED",
+      "Status": "DAMAGED",
+      "Quantity": 1
+    },
+    {
+      "SkuId": "SKU-CHAIR-BK",
+      "WarehouseId": "WH-GLOBAL",
+      "Status": "GOOD",
+      "Quantity": 20
+    },
+    {
+      "SkuId": "SKU-DESK-BR",
+      "WarehouseId": "WH-GLOBAL",
+      "Status": "GOOD",
+      "Quantity": 10
+    },
+    {
+      "SkuId": "SKU-SOFA-GY",
+      "WarehouseId": "WH-GLOBAL",
+      "Status": "GOOD",
+      "Quantity": 3
+    }
+  ],
+  "StockMovements": [],
+  "InventoryVouchers": [],
+  "VoucherLines": [],
+  "AuditLogs": [
+    {
+      "LogId": "1469d3e7-beeb-4e8e-988b-1c27b8fea4d5",
+      "EntityType": "DuAnCode.Web.Controllers.AccountController.Login (DuAnCode.Web)",
+      "EntityId": "8fa6d83e-83f7-4afc-b160-74b9a29dd75b",
+      "Action": "POST",
+      "BeforeJson": "{\u0022username\u0022:\u0022admin\u0022,\u0022password\u0022:\u0022Admin@123456\u0022}",
+      "AfterJson": null,
+      "PerformedBy": "anonymous",
+      "PerformedAt": "2026-09-26T19:39:45.2030472",
+      "Reason": null
+    },
+    {
+      "LogId": "1d7bb0f2-aa2f-4c4b-9425-831dff638847",
+      "EntityType": "DuAnCode.Web.Controllers.AccountController.Login (DuAnCode.Web)",
+      "EntityId": "7ab55270-46d9-456e-a745-56de2ba05bd1",
+      "Action": "GET",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "anonymous",
+      "PerformedAt": "2026-09-26T19:43:01.3131338",
+      "Reason": null
+    },
+    {
+      "LogId": "271c2877-6149-42f5-b4d3-084e04dcc777",
+      "EntityType": "DuAnCode.Web.Controllers.AccountController.Login (DuAnCode.Web)",
+      "EntityId": "e8b8c1e2-26b0-4f6b-9090-4c1297a94f17",
+      "Action": "POST",
+      "BeforeJson": "{\u0022username\u0022:\u0022admin\u0022,\u0022password\u0022:\u0022Admin@123456\u0022}",
+      "AfterJson": null,
+      "PerformedBy": "anonymous",
+      "PerformedAt": "2026-09-26T19:43:09.9777196",
+      "Reason": null
+    },
+    {
+      "LogId": "2c884903-b967-4fd1-9767-474d33e025c3",
+      "EntityType": "DuAnCode.Web.Controllers.AdminController.Backup (DuAnCode.Web)",
+      "EntityId": "bc8fe382-f1f4-4e8b-9fea-60ecf3a9aa97",
+      "Action": "GET",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:43:12.9701784",
+      "Reason": null
+    },
+    {
+      "LogId": "423cc9cb-7b93-42e7-b32e-a02092f61881",
+      "EntityType": "DuAnCode.Web.Controllers.AdminController.Index (DuAnCode.Web)",
+      "EntityId": "8d0ef781-ace6-45ba-b9c9-e944a3948347",
+      "Action": "GET",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:43:11.5303375",
+      "Reason": null
+    },
+    {
+      "LogId": "4d28db06-0591-4fa7-acec-189c365a8075",
+      "EntityType": "DuAnCode.Web.Controllers.HomeController.Index (DuAnCode.Web)",
+      "EntityId": "5a131b12-5f2b-473f-ad28-0fd980cb6d65",
+      "Action": "GET",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:39:45.2431055",
+      "Reason": null
+    },
+    {
+      "LogId": "5108b999-cd40-4a33-83c1-e657463e4b97",
+      "EntityType": "DuAnCode.Web.Controllers.AccountController.Login (DuAnCode.Web)",
+      "EntityId": "2221da6b-5969-4c0f-afe1-72365c18c00b",
+      "Action": "GET",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "anonymous",
+      "PerformedAt": "2026-09-26T19:39:33.8239047",
+      "Reason": null
+    },
+    {
+      "LogId": "5f6303a7-e476-45d7-989e-8ce1dda3a282",
+      "EntityType": "DuAnCode.Web.Controllers.AccountController.LogoutPost (DuAnCode.Web)",
+      "EntityId": "a041a5ad-6deb-4dc5-80cb-8a7d586e9d5a",
+      "Action": "POST",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:43:01.2915819",
+      "Reason": null
+    },
+    {
+      "LogId": "6514552a-1e34-45b8-9a23-41b115d1bf58",
+      "EntityType": "DuAnCode.Web.Controllers.AdminController.Backup (DuAnCode.Web)",
+      "EntityId": "be8464e1-0f57-45e4-901c-442402721c43",
+      "Action": "GET",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:42:57.8936229",
+      "Reason": null
+    },
+    {
+      "LogId": "965c67b9-fed7-4c0a-9229-6042dfa809e4",
+      "EntityType": "DuAnCode.Web.Controllers.DashboardController.Index (DuAnCode.Web)",
+      "EntityId": "5b78d76d-8781-4abe-8c33-0bcaf4ecd075",
+      "Action": "GET",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:39:45.2104733",
+      "Reason": null
+    },
+    {
+      "LogId": "990fa92b-308e-4c76-b7fd-74e7961c9fac",
+      "EntityType": "DuAnCode.Web.Controllers.AdminController.Index (DuAnCode.Web)",
+      "EntityId": "889c6601-aad8-4cd5-b5c5-0ea0558eee31",
+      "Action": "GET",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:39:46.7337473",
+      "Reason": null
+    },
+    {
+      "LogId": "b985818b-60f2-43eb-af93-c72f6f9c1450",
+      "EntityType": "DuAnCode.Web.Controllers.AccountController.AccessDenied (DuAnCode.Web)",
+      "EntityId": "1ff5084e-5cb6-4d0d-b548-9e477a1c7033",
+      "Action": "GET",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:39:33.8149976",
+      "Reason": null
+    },
+    {
+      "LogId": "ba11dc60-2f68-4097-a259-bf1fea5322a4",
+      "EntityType": "DuAnCode.Web.Controllers.HomeController.Index (DuAnCode.Web)",
+      "EntityId": "7358030c-9b5f-41b6-aa2d-2ab11de156f0",
+      "Action": "GET",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:43:10.104751",
+      "Reason": null
+    },
+    {
+      "LogId": "c457dd87-ca88-4074-a5e9-0022b1d0f56e",
+      "EntityType": "DuAnCode.Web.Controllers.AdminController.Backup (DuAnCode.Web)",
+      "EntityId": "e32bdc6d-ec3f-48a7-86d1-38cc008dc683",
+      "Action": "GET",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:39:48.7971917",
+      "Reason": null
+    },
+    {
+      "LogId": "f0e5ffa0-4719-47fa-bf28-47eef4736f23",
+      "EntityType": "DuAnCode.Web.Controllers.DashboardController.Index (DuAnCode.Web)",
+      "EntityId": "7ba2ae80-e5eb-4759-8524-f54c08ce365f",
+      "Action": "GET",
+      "BeforeJson": "{}",
+      "AfterJson": null,
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:43:09.9906551",
+      "Reason": null
+    }
+  ],
+  "Settings": {}
+}

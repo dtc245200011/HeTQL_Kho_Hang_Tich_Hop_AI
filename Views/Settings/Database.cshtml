@@ -1,0 +1,91 @@
+@model DuAnCode.Web.Models.ViewModels.DatabaseSettingsViewModel
+@{
+    ViewData["Title"] = "Cấu hình Kết nối CSDL";
+}
+
+<div class="max-w-3xl mx-auto bg-white p-6 rounded shadow">
+    <h2 class="text-lg font-semibold mb-4">Cấu hình Kết nối CSDL</h2>
+
+    @if (TempData["Message"] != null)
+    {
+        <div class="mb-4 text-green-700">@TempData["Message"]</div>
+    }
+
+    <form id="dbForm" method="post" asp-action="Database" class="space-y-4">
+        @Html.AntiForgeryToken()
+        <div>
+            <label class="block text-sm font-medium">Server</label>
+            <input name="ServerName" value="@Model.ServerName" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Tên CSDL</label>
+            <input name="DatabaseName" value="@Model.DatabaseName" class="w-full border rounded px-3 py-2" />
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium">Phương thức xác thực</label>
+            <div class="mt-2 space-x-4">
+                <label class="inline-flex items-center"><input type="radio" name="UseWindowsAuthentication" value="true" @(Model.UseWindowsAuthentication ? "checked" : "") /> <span class="ml-2">Windows Authentication (Integrated Security)</span></label>
+                <label class="inline-flex items-center"><input type="radio" name="UseWindowsAuthentication" value="false" @(!Model.UseWindowsAuthentication ? "checked" : "") /> <span class="ml-2">SQL Server Account (User/Password)</span></label>
+            </div>
+        </div>
+
+        <div id="sqlCreds" class="space-y-2" style="display:@(Model.UseWindowsAuthentication ? "none" : "block")">
+            <div>
+                <label class="block text-sm font-medium">Tên đăng nhập (SQL)</label>
+                <input name="Username" value="@Model.Username" class="w-full border rounded px-3 py-2" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Mật khẩu (SQL)</label>
+                <input name="Password" type="password" value="@Model.Password" class="w-full border rounded px-3 py-2" />
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-4">
+            <label class="inline-flex items-center"><input type="checkbox" name="EnableMARS" @(Model.EnableMARS ? "checked" : "") /> <span class="ml-2">Enable MARS (Multiple Active Result Sets)</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" name="TrustServerCertificate" @(Model.TrustServerCertificate ? "checked" : "") /> <span class="ml-2">Trust Server Certificate</span></label>
+        </div>
+
+        <div class="flex space-x-3">
+            <button type="button" id="testBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Thử kết nối</button>
+            <button type="submit" name="action" value="save" class="bg-green-600 text-white px-4 py-2 rounded">Lưu cấu hình</button>
+        </div>
+    </form>
+
+    <div id="result" class="mt-4"></div>
+</div>
+
+<script>
+    document.querySelectorAll('input[name="UseWindowsAuthentication"]').forEach(r => r.addEventListener('change', function(){
+        var sqlCreds = document.getElementById('sqlCreds');
+        if (this.value === 'false') sqlCreds.style.display = 'block'; else sqlCreds.style.display = 'none';
+    }));
+
+    document.getElementById('testBtn').addEventListener('click', async function(){
+        const form = document.getElementById('dbForm');
+        const data = new FormData(form);
+        const obj = {};
+        data.forEach((v,k) => { obj[k] = v; });
+        obj.EnableMARS = form.querySelector('input[name="EnableMARS"]').checked;
+        obj.TrustServerCertificate = form.querySelector('input[name="TrustServerCertificate"]').checked;
+        obj.UseWindowsAuthentication = form.querySelector('input[name="UseWindowsAuthentication"]:checked').value === 'true';
+
+        document.getElementById('result').innerHTML = 'Đang kiểm tra kết nối...';
+
+        try {
+            const resp = await fetch('@Url.Action("TestConnection","Settings")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(obj)
+            });
+            const json = await resp.json();
+            if (json.ok) {
+                document.getElementById('result').innerHTML = '<div class="text-green-700">' + json.message + '</div>';
+            } else {
+                document.getElementById('result').innerHTML = '<div class="text-red-700">' + json.message + (json.detail ? ('<pre class="text-xs">' + json.detail + '</pre>') : '') + '</div>';
+            }
+        } catch (err) {
+            document.getElementById('result').innerHTML = '<div class="text-red-700">Lỗi khi gọi API kiểm tra: ' + err + '</div>';
+        }
+    });
+</script>

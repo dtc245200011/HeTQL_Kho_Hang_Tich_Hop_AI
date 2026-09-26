@@ -1,0 +1,159 @@
+@{
+    ViewData["Title"] = "Backup";
+}
+<div class="container mt-4">
+    <h3>Backup & Restore</h3>
+    <div class="mb-3">
+        <form method="post" asp-controller="Admin" asp-action="CreateBackup">
+            <button class="btn btn-primary">Start Backup</button>
+        </form>
+    </div>
+    @if(TempData["Message"] != null){ <div class="alert alert-success">@TempData["Message"]</div> }
+    @if(TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <h5>Existing backups</h5>
+    <table class="table table-sm">
+        <thead><tr><th>File</th><th>Size</th><th>Time</th><th></th></tr></thead>
+        <tbody>
+        @foreach(var b in ViewBag.Backups ?? new List<dynamic>()){
+            <tr>
+                <td>@b.Name</td>
+                <td>@( (b.Size ?? 0) / 1024 ) KB</td>
+                <td>@(((DateTime)b.Time).ToString("dd/MM/yyyy HH:mm"))</td>
+                <td>
+                    <a class="btn btn-sm btn-outline-primary" asp-controller="Admin" asp-action="DownloadBackup" asp-route-name="@b.Name">Download</a>
+                    <form method="post" asp-controller="Admin" asp-action="DeleteBackup" style="display:inline">
+                        <input type="hidden" name="name" value="@b.Name" />
+                        <button class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+
+    <h5>Restore from file</h5>
+    <div class="mb-3">
+        <div class="input-group">
+            <input type="text" id="selectedBackupDisplay" class="form-control" placeholder="No file selected" readonly />
+            <input type="hidden" id="selectedBackupFile" name="selectedBackupFile" />
+            <button class="btn btn-outline-secondary" id="btnChooseBackup">Chọn file khôi phục</button>
+        </div>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Hoặc upload file backup từ máy tính</label>
+        <input type="file" name="externalBackupFile" id="externalBackupFile" accept=".json,.enc" class="form-control" />
+    </div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    // wire up backup selection UI
+    const modalSelectEl = document.getElementById('modalSelectBackup');
+    const modalSelect = modalSelectEl ? new bootstrap.Modal(modalSelectEl) : null;
+    document.getElementById('btnChooseBackup')?.addEventListener('click', function(e){ e.preventDefault(); modalSelect?.show(); });
+    document.querySelectorAll('.btn-select-backup').forEach(btn => {
+        btn.addEventListener('click', function(e){
+            e.preventDefault();
+            const name = this.getAttribute('data-name') || '';
+            const display = document.getElementById('selectedBackupDisplay');
+            const hidden = document.getElementById('selectedBackupFile');
+            const fileInput = document.getElementById('fileNameInput');
+            if (display) display.value = name;
+            if (hidden) hidden.value = name;
+            if (fileInput) fileInput.value = name;
+            modalSelect?.hide();
+        });
+    });
+
+    // restore confirm flow
+    const confirmModalEl = document.getElementById('modalConfirmRestore');
+    const confirmModal = confirmModalEl ? new bootstrap.Modal(confirmModalEl) : null;
+    document.getElementById('btnRestore')?.addEventListener('click', function(e){
+        e.preventDefault();
+        // ensure a file is selected
+        const fnEl = document.getElementById('fileNameInput');
+        const fn = fnEl ? fnEl.value : '';
+        if (!fn) { alert('Vui lòng chọn file backup trước khi Restore.'); return; }
+        confirmModal?.show();
+    });
+
+    document.getElementById('btnConfirmRestore')?.addEventListener('click', function(e){
+        e.preventDefault();
+        // submit restore form
+        document.getElementById('restoreForm')?.submit();
+    });
+
+    document.getElementById('btnCreateBackupThenRestore')?.addEventListener('click', async function(e){
+        e.preventDefault();
+        // call AJAX backup endpoint then submit restore
+        try{
+            const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+            const headers = {};
+            if (tokenEl) headers['RequestVerificationToken'] = tokenEl.value;
+            const res = await fetch('@Url.Action("CreateBackupAjax","Admin")', { method: 'POST', headers });
+            const j = await res.json();
+            if (j?.success) {
+                const fileInput = document.getElementById('fileNameInput');
+                const display = document.getElementById('selectedBackupDisplay');
+                if (fileInput) fileInput.value = j.file || '';
+                if (display) display.value = j.file || '';
+                confirmModal?.hide();
+                document.getElementById('restoreForm')?.submit();
+            } else {
+                alert('Backup failed. Aborting restore.');
+            }
+        }catch(err){ console.error(err); alert('Backup request failed'); }
+    });
+
+});
+</script>
+    <form id="restoreForm" method="post" asp-controller="Admin" asp-action="RestoreBackup">
+        <input type="hidden" name="fileName" id="fileNameInput" />
+        <button id="btnRestore" class="btn btn-warning">Restore</button>
+    </form>
+
+    <!-- Modal: Select backup -->
+    <div class="modal fade" id="modalSelectBackup" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header"><h5 class="modal-title">Chọn file backup</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <div class="table-responsive">
+              <table class="table table-sm">
+                <thead><tr><th>File</th><th>Size</th><th>Created</th><th></th></tr></thead>
+                <tbody>
+                  @foreach(var b in ViewBag.Backups ?? new List<dynamic>()){
+                    <tr>
+                      <td>@b.Name</td>
+                      <td>@((long?)b.Size ?? 0 / 1024) KB</td>
+                      <td>@(((DateTime)b.Time).ToString("dd/MM/yyyy HH:mm"))</td>
+                      <td><button class="btn btn-sm btn-primary btn-select-backup" data-name="@b.Name">Chọn</button></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Confirm restore -->
+    <div class="modal fade" id="modalConfirmRestore" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header"><h5 class="modal-title">⚠️ CẢNH BÁO: Restore</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <p>⚠️ CẢNH BÁO: Việc Restore sẽ ghi đè lên toàn bộ dữ liệu hiện tại của hệ thống! Bạn nên tạo một bản Backup mới ngay lúc này để tránh mất các dữ liệu vừa phát sinh.</p>
+          </div>
+          <div class="modal-footer">
+            <button id="btnCreateBackupThenRestore" class="btn btn-primary">Tạo Backup mới &amp; Tiếp tục Restore</button>
+            <button id="btnConfirmRestore" class="btn btn-warning">Tôi đã hiểu, Tiếp tục Restore</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy bỏ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+</div>

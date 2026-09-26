@@ -1,0 +1,617 @@
+{
+  "Users": [
+    {
+      "Id": "879e94be-f19c-4d87-951d-501b752733c1",
+      "UserName": "admin",
+      "Email": "admin@wms.com",
+      "NormalizedUserName": "ADMIN",
+      "EmailConfirmed": true
+    },
+    {
+      "Id": "d485d381-a264-4a01-a91d-ea2cbd3f6c6b",
+      "UserName": "admin1",
+      "Email": "a@aaa.com",
+      "NormalizedUserName": "ADMIN1",
+      "EmailConfirmed": false
+    }
+  ],
+  "Roles": [
+    {
+      "Id": "1bc5b0e8-9f53-4127-9544-793223d5ef74",
+      "Name": "Accountant",
+      "NormalizedName": "ACCOUNTANT"
+    },
+    {
+      "Id": "28784b25-845d-4092-8a38-d9c55f1c0e29",
+      "Name": "WarehouseManager",
+      "NormalizedName": "WAREHOUSEMANAGER"
+    },
+    {
+      "Id": "2b1dddfd-dbc7-4704-8244-36a5d97ecc16",
+      "Name": "WarehouseKeeper",
+      "NormalizedName": "WAREHOUSEKEEPER"
+    },
+    {
+      "Id": "570fe920-0fa5-45f1-abb5-36df23e292d1",
+      "Name": "Staff",
+      "NormalizedName": "STAFF"
+    },
+    {
+      "Id": "c3f2dda9-bfa0-4035-9e34-76a5a680db11",
+      "Name": "Director",
+      "NormalizedName": "DIRECTOR"
+    },
+    {
+      "Id": "c50f36bf-52ef-4693-8ce8-54bcb586a6f6",
+      "Name": "QC",
+      "NormalizedName": "QC"
+    },
+    {
+      "Id": "c7267311-fcc4-4a0c-a69b-9161a99f34f7",
+      "Name": "Admin",
+      "NormalizedName": "ADMIN"
+    }
+  ],
+  "UserRoles": [
+    {
+      "UserId": "d485d381-a264-4a01-a91d-ea2cbd3f6c6b",
+      "RoleId": "570fe920-0fa5-45f1-abb5-36df23e292d1"
+    },
+    {
+      "UserId": "879e94be-f19c-4d87-951d-501b752733c1",
+      "RoleId": "c7267311-fcc4-4a0c-a69b-9161a99f34f7"
+    }
+  ],
+  "Warehouses": [
+    {
+      "WarehouseId": "WH-DAMAGED",
+      "WarehouseName": "Kho H\u00E0ng L\u1ED7i",
+      "WarehouseType": "DAMAGED",
+      "MaxCapacityCbm": 100.0000,
+      "Location": null,
+      "IsActive": true
+    },
+    {
+      "WarehouseId": "WH-GLOBAL",
+      "WarehouseName": "Kho T\u1ED5ng",
+      "WarehouseType": "MAIN",
+      "MaxCapacityCbm": 1000.0000,
+      "Location": null,
+      "IsActive": true
+    }
+  ],
+  "ProductModels": [
+    {
+      "ProductModelId": "PM-CHAIR",
+      "ProductName": "Gh\u1EBF xoay",
+      "Category": "Office",
+      "Unit": "pcs"
+    },
+    {
+      "ProductModelId": "PM-DESK",
+      "ProductName": "B\u00E0n l\u00E0m vi\u1EC7c",
+      "Category": "Office",
+      "Unit": "pcs"
+    },
+    {
+      "ProductModelId": "PM-SOFA",
+      "ProductName": "Sofa 3 ch\u1ED7",
+      "Category": "Living",
+      "Unit": "set"
+    }
+  ],
+  "SkuVariants": [
+    {
+      "SkuId": "SKU-CHAIR-BK",
+      "ProductModelId": "PM-CHAIR",
+      "Color": "Black",
+      "Material": "Leather",
+      "Cbm": 0.3600,
+      "UnitPrice": 1200000.00
+    },
+    {
+      "SkuId": "SKU-DESK-BR",
+      "ProductModelId": "PM-DESK",
+      "Color": "Brown",
+      "Material": "Wood",
+      "Cbm": 0.5400,
+      "UnitPrice": 2500000.00
+    },
+    {
+      "SkuId": "SKU-SOFA-GY",
+      "ProductModelId": "PM-SOFA",
+      "Color": "Gray",
+      "Material": "Fabric",
+      "Cbm": 1.4400,
+      "UnitPrice": 8000000.00
+    }
+  ],
+  "StockLedgers": [
+    {
+      "SkuId": "SKU-CHAIR-BK",
+      "WarehouseId": "WH-DAMAGED",
+      "Status": "DAMAGED",
+      "Quantity": 1
+    },
+    {
+      "SkuId": "SKU-CHAIR-BK",
+      "WarehouseId": "WH-GLOBAL",
+      "Status": "GOOD",
+      "Quantity": 20
+    },
+    {
+      "SkuId": "SKU-DESK-BR",
+      "WarehouseId": "WH-GLOBAL",
+      "Status": "GOOD",
+      "Quantity": 10
+    },
+    {
+      "SkuId": "SKU-SOFA-GY",
+      "WarehouseId": "WH-GLOBAL",
+      "Status": "GOOD",
+      "Quantity": 3
+    }
+  ],
+  "StockMovements": [
+    {
+      "MovementId": 1,
+      "SkuId": "SKU-DESK-BR",
+      "WarehouseId": "WH-GLOBAL",
+      "StockStatus": "GOOD",
+      "QuantityDelta": 10,
+      "MovementType": "INITIAL",
+      "ReferenceType": "SEED",
+      "ReferenceId": "SEED-1",
+      "PerformedBy": "U-ADMIN",
+      "CreatedAt": "2026-09-26T20:51:41.3498956"
+    },
+    {
+      "MovementId": 2,
+      "SkuId": "SKU-CHAIR-BK",
+      "WarehouseId": "WH-GLOBAL",
+      "StockStatus": "GOOD",
+      "QuantityDelta": 20,
+      "MovementType": "INITIAL",
+      "ReferenceType": "SEED",
+      "ReferenceId": "SEED-1",
+      "PerformedBy": "U-ADMIN",
+      "CreatedAt": "2026-09-26T20:51:41.3499094"
+    },
+    {
+      "MovementId": 3,
+      "SkuId": "SKU-SOFA-GY",
+      "WarehouseId": "WH-GLOBAL",
+      "StockStatus": "GOOD",
+      "QuantityDelta": 3,
+      "MovementType": "INITIAL",
+      "ReferenceType": "SEED",
+      "ReferenceId": "SEED-1",
+      "PerformedBy": "U-ADMIN",
+      "CreatedAt": "2026-09-26T20:51:41.3499095"
+    },
+    {
+      "MovementId": 4,
+      "SkuId": "SKU-CHAIR-BK",
+      "WarehouseId": "WH-DAMAGED",
+      "StockStatus": "DAMAGED",
+      "QuantityDelta": 1,
+      "MovementType": "INITIAL",
+      "ReferenceType": "SEED",
+      "ReferenceId": "SEED-1",
+      "PerformedBy": "U-ADMIN",
+      "CreatedAt": "2026-09-26T20:51:41.3499097"
+    }
+  ],
+  "InventoryVouchers": [],
+  "VoucherLines": [],
+  "AuditLogs": [
+    {
+      "Id": "02f4093b-6673-44a3-89f6-c5d0958a9bd6",
+      "Action": "[GET] / - DuAnCode.Web.Controllers.HomeController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:38.0099908"
+    },
+    {
+      "Id": "0445a63a-2742-40a3-9266-df81feb0062c",
+      "Action": "[GET] / - DuAnCode.Web.Controllers.HomeController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:11.7535221"
+    },
+    {
+      "Id": "0b75c091-4a8b-4094-a2e5-a67b4d47be16",
+      "Action": "[GET] / - DuAnCode.Web.Controllers.HomeController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:40.9513684"
+    },
+    {
+      "Id": "0e9d35e9-2027-4937-ab82-46d245e065ed",
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:51:51.3105054"
+    },
+    {
+      "Id": "198c2517-d128-4bc1-8e85-103dea65977e",
+      "Action": "[POST] /Admin/CreateUserAjax - DuAnCode.Web.Controllers.AdminController.CreateUserAjax (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:02:24.5008382"
+    },
+    {
+      "Id": "26fedc73-0f5d-49f5-8ead-bb169cbb6cce",
+      "Action": "[GET] /Dashboard - DuAnCode.Web.Controllers.DashboardController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:09.3240347"
+    },
+    {
+      "Id": "28817565-7a7e-4631-8890-d86b1a9ecc37",
+      "Action": "[GET] /Outbound - DuAnCode.Web.Controllers.OutboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:42.5352556"
+    },
+    {
+      "Id": "2bd1debd-6f6e-4a2a-a98b-63975b556b60",
+      "Action": "[GET] /Admin/Logs - DuAnCode.Web.Controllers.AdminController.Logs (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:01:16.1170373"
+    },
+    {
+      "Id": "2d248122-e420-4c33-ac3e-6bc1020fd7af",
+      "Action": "[POST] /Account/LogoutPost - DuAnCode.Web.Controllers.AccountController.LogoutPost (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:27.0240594"
+    },
+    {
+      "Id": "30464205-4856-40dd-b3f5-319258ae15cb",
+      "Action": "[GET] /Inbound - DuAnCode.Web.Controllers.InboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:45.1535937"
+    },
+    {
+      "Id": "34901a35-5da9-4518-b647-cb9774e3739d",
+      "Action": "[GET] /Inbound - DuAnCode.Web.Controllers.InboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:37.0859502"
+    },
+    {
+      "Id": "34a291b1-4e5a-4f49-924d-b88127f41413",
+      "Action": "[GET] /Inbound - DuAnCode.Web.Controllers.InboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:08.8871171"
+    },
+    {
+      "Id": "3dd26a6e-3db9-43c7-be4b-615f23979d84",
+      "Action": "[GET] /Inbound - DuAnCode.Web.Controllers.InboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:11:37.441797"
+    },
+    {
+      "Id": "45d5f5a5-427a-4894-808c-07628ed514fc",
+      "Action": "[GET] /Dashboard - DuAnCode.Web.Controllers.DashboardController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:37.9869327"
+    },
+    {
+      "Id": "4801e9fd-fda7-4255-843a-c97c64673b84",
+      "Action": "[GET] /Outbound - DuAnCode.Web.Controllers.OutboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:05.881526"
+    },
+    {
+      "Id": "4d274770-deb5-4aea-a2b3-4e297520d6bd",
+      "Action": "[GET] /Admin - DuAnCode.Web.Controllers.AdminController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:02:35.210691"
+    },
+    {
+      "Id": "56177fa0-cda9-4562-9393-962560151872",
+      "Action": "[GET] /Account/Login - DuAnCode.Web.Controllers.AccountController.Login (DuAnCode.Web)",
+      "PerformedBy": "anonymous",
+      "PerformedAt": "2026-09-26T21:03:27.0390926"
+    },
+    {
+      "Id": "57541975-5a97-4136-9959-50c5bceb2598",
+      "Action": "[GET] /Outbound - DuAnCode.Web.Controllers.OutboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:17.8848545"
+    },
+    {
+      "Id": "5d733171-c789-4224-9552-d718c14c24e6",
+      "Action": "[GET] /Replenishment - DuAnCode.Web.Controllers.ReplenishmentController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:21.471086"
+    },
+    {
+      "Id": "5dc69ff4-a07c-422f-8f24-865bb5e540cc",
+      "Action": "[GET] /Admin/Settings - DuAnCode.Web.Controllers.AdminController.Settings (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:13:34.2758577"
+    },
+    {
+      "Id": "5e978cea-6ad5-4965-b870-e14057de5367",
+      "Action": "[GET] /Admin - DuAnCode.Web.Controllers.AdminController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:13:32.8195603"
+    },
+    {
+      "Id": "60369a1e-334d-4680-be75-070740e01da8",
+      "Action": "[GET] /Inbound - DuAnCode.Web.Controllers.InboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:46.5508768"
+    },
+    {
+      "Id": "67c87df0-1940-424b-8b32-5971620cdfcb",
+      "Action": "[GET] /Admin/Backup - DuAnCode.Web.Controllers.AdminController.Backup (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:01:11.8138788"
+    },
+    {
+      "Id": "691ed165-3c80-44c5-84f8-28d228a490eb",
+      "Action": "[GET] /Dashboard - DuAnCode.Web.Controllers.DashboardController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:38.2821322"
+    },
+    {
+      "Id": "6a7d65b6-0513-4d91-9650-1447d8eb81a7",
+      "Action": "[GET] /Admin/Users - DuAnCode.Web.Controllers.AdminController.Users (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:13:20.5950583"
+    },
+    {
+      "Id": "6d1ecc08-4bae-405f-b74f-124c95470128",
+      "Action": "[POST] /Inbound/Create - DuAnCode.Web.Controllers.InboundController.Create (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:35.5916854"
+    },
+    {
+      "Id": "71eaf32b-18b7-444b-abff-0e8dbc0d36ba",
+      "Action": "[GET] /Admin - DuAnCode.Web.Controllers.AdminController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:01:34.3570729"
+    },
+    {
+      "Id": "793e0260-77f6-4d5b-a10f-896b809f9c4d",
+      "Action": "[GET] /Admin/Logs - DuAnCode.Web.Controllers.AdminController.Logs (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:00:53.7829107"
+    },
+    {
+      "Id": "7b3ab010-b535-45e2-aca5-74cbb63640d2",
+      "Action": "[GET] / - DuAnCode.Web.Controllers.HomeController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:47.3390547"
+    },
+    {
+      "Id": "8b7af73e-be71-43b8-9c5c-72254d3ecf22",
+      "Action": "[GET] /Dashboard - DuAnCode.Web.Controllers.DashboardController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:47.3164439"
+    },
+    {
+      "Id": "8c26b2fb-7225-4549-baf6-dc2a9c2f9635",
+      "Action": "[GET] /Admin - DuAnCode.Web.Controllers.AdminController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:13:19.7271653"
+    },
+    {
+      "Id": "94ce7f1a-f5f7-4228-83b6-1821ef620946",
+      "Action": "[GET] /Inbound - DuAnCode.Web.Controllers.InboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:10.881088"
+    },
+    {
+      "Id": "99b7fc21-faf3-4280-9e99-d93216621796",
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:51:47.3134383"
+    },
+    {
+      "Id": "9dc90364-7087-43e2-bf19-8720adeb69f0",
+      "Action": "[GET] /Admin/Users - DuAnCode.Web.Controllers.AdminController.Users (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:02:24.5388119"
+    },
+    {
+      "Id": "a1b18fe8-2429-4d4f-be33-319b04d6d5a9",
+      "Action": "[GET] /Replenishment - DuAnCode.Web.Controllers.ReplenishmentController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:22.3021433"
+    },
+    {
+      "Id": "a28c196f-a237-4129-98b1-85f489422d19",
+      "Action": "[GET] /Outbound - DuAnCode.Web.Controllers.OutboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:46.0303749"
+    },
+    {
+      "Id": "a2dea11c-4445-42ce-8ea7-71b2c4f8c601",
+      "Action": "[GET] /Admin - DuAnCode.Web.Controllers.AdminController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:01:15.1209118"
+    },
+    {
+      "Id": "a45eaae7-b0ae-4704-a3c0-ae7152d7a3b6",
+      "Action": "[GET] /Inbound - DuAnCode.Web.Controllers.InboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:17.8379627"
+    },
+    {
+      "Id": "a569052d-d946-44f5-a17a-72020dbcec32",
+      "Action": "POST",
+      "PerformedBy": "anonymous",
+      "PerformedAt": "2026-09-26T20:51:47.1480977"
+    },
+    {
+      "Id": "a5c73a1c-1d21-4265-b963-f7264e786911",
+      "Action": "[GET] /Report - DuAnCode.Web.Controllers.ReportController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:21.9220147"
+    },
+    {
+      "Id": "a7cab4bd-d1d6-4efd-9ec1-4552f05bffab",
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:51:54.4265157"
+    },
+    {
+      "Id": "a89533a6-6205-4bb6-b25d-3f067a999946",
+      "Action": "[POST] /Admin/CreateUserAjax - DuAnCode.Web.Controllers.AdminController.CreateUserAjax (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:13:27.1538005"
+    },
+    {
+      "Id": "aa566ca5-5001-4cf9-ae42-652064205ae6",
+      "Action": "[GET] /Admin/Settings - DuAnCode.Web.Controllers.AdminController.Settings (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:01:03.399037"
+    },
+    {
+      "Id": "abacb8fb-df8c-4d89-b65c-c63f4f7459da",
+      "Action": "[GET] /Admin/Backup - DuAnCode.Web.Controllers.AdminController.Backup (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:13:36.5552131"
+    },
+    {
+      "Id": "aebd9550-1a5f-47dc-a58f-7f67c418729a",
+      "Action": "[GET] /Inbound - DuAnCode.Web.Controllers.InboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:13:17.4945586"
+    },
+    {
+      "Id": "b05f1180-032a-4a1d-a7db-6d259dc5e2e7",
+      "Action": "[GET] / - DuAnCode.Web.Controllers.HomeController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:09.429599"
+    },
+    {
+      "Id": "b08cd28b-a6f8-434a-a922-63ed7bb804c2",
+      "Action": "[GET] /Admin - DuAnCode.Web.Controllers.AdminController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:23.51297"
+    },
+    {
+      "Id": "b217a84e-4798-4753-b179-7ca46feb5de0",
+      "Action": "[GET] /Admin/Users - DuAnCode.Web.Controllers.AdminController.Users (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:13:29.0058406"
+    },
+    {
+      "Id": "b3422c93-2eac-4b0e-b50f-e25a406fe864",
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:51:47.1935386"
+    },
+    {
+      "Id": "b7297b24-a34e-4c3d-90ee-736dfa0ef44c",
+      "Action": "[GET] /Inbound - DuAnCode.Web.Controllers.InboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:35.6063256"
+    },
+    {
+      "Id": "b7d0a561-7769-4b90-9947-598c3b36a991",
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:51:57.7692945"
+    },
+    {
+      "Id": "b7f4c845-8d66-4030-aecb-71969fd6d974",
+      "Action": "[POST] /Inbound/Create - DuAnCode.Web.Controllers.InboundController.Create (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:08.8615073"
+    },
+    {
+      "Id": "b8e526a8-dcd7-4168-81a2-da2c1ae5c520",
+      "Action": "[POST] /Admin/CreateBackup - DuAnCode.Web.Controllers.AdminController.CreateBackup (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:01:11.8049309"
+    },
+    {
+      "Id": "baa6b8d4-fd1b-44d2-a524-988c6209cf39",
+      "Action": "[GET] /Dashboard - DuAnCode.Web.Controllers.DashboardController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:12:11.6281601"
+    },
+    {
+      "Id": "bb5961fa-fc80-409f-ad86-2c6ed07e9cb0",
+      "Action": "[GET] /Admin - DuAnCode.Web.Controllers.AdminController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:01:01.7558647"
+    },
+    {
+      "Id": "bc479564-ae9e-4b90-9468-af099987b29a",
+      "Action": "[GET] /Admin/Backup - DuAnCode.Web.Controllers.AdminController.Backup (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:01:10.2508909"
+    },
+    {
+      "Id": "be0e119a-77d4-4d79-b5e4-bfdfdb8d058d",
+      "Action": "[GET] /Admin - DuAnCode.Web.Controllers.AdminController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:01:06.039115"
+    },
+    {
+      "Id": "c1a777ca-21c8-4b9a-9fd2-7547a2e0ed37",
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:51:59.0754756"
+    },
+    {
+      "Id": "cb468673-1cb9-4154-ab7f-c50e5c78e4b7",
+      "Action": "[POST] /Outbound/Create - DuAnCode.Web.Controllers.OutboundController.Create (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:05.8644595"
+    },
+    {
+      "Id": "cd2e89c2-50ff-4f20-8404-b7f9b2e7775c",
+      "Action": "[POST] /Account/Login - DuAnCode.Web.Controllers.AccountController.Login (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:38.2757694"
+    },
+    {
+      "Id": "d1af40bb-318f-4b3d-8e94-56450d7683d0",
+      "Action": "[GET] /Inbound - DuAnCode.Web.Controllers.InboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:05:11.2076045"
+    },
+    {
+      "Id": "da1eed2a-82f4-4ded-a54b-a290b42bbf12",
+      "Action": "[GET] /Report - DuAnCode.Web.Controllers.ReportController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:23.0776254"
+    },
+    {
+      "Id": "db38824b-6a7c-45da-81ca-95bfa1693b09",
+      "Action": "[GET] / - DuAnCode.Web.Controllers.HomeController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:38.2993637"
+    },
+    {
+      "Id": "e3bfd6b8-670f-468b-b335-852a97d090ce",
+      "Action": "[GET] /Inbound - DuAnCode.Web.Controllers.InboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:03:19.6290809"
+    },
+    {
+      "Id": "e81677b0-ea2c-46ba-9a49-6c1e1625352e",
+      "Action": "[POST] /Admin/CreateUserAjax - DuAnCode.Web.Controllers.AdminController.CreateUserAjax (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:13:25.754437"
+    },
+    {
+      "Id": "e8653aaf-c794-4537-97be-67f5d645b67d",
+      "Action": "[GET] /Admin/Users - DuAnCode.Web.Controllers.AdminController.Users (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:01:35.4208424"
+    },
+    {
+      "Id": "f630c75a-39d8-480b-b739-97aabad1a1d7",
+      "Action": "[GET] /Admin - DuAnCode.Web.Controllers.AdminController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:13:35.5149541"
+    },
+    {
+      "Id": "fe6e1d55-d69d-4a12-aa3c-f2b4b6438f3b",
+      "Action": "[GET] /Outbound - DuAnCode.Web.Controllers.OutboundController.Index (DuAnCode.Web)",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T21:02:39.3552345"
+    }
+  ]
+}

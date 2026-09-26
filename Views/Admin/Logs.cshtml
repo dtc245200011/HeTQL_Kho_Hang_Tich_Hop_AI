@@ -1,0 +1,54 @@
+@model List<DuAnCode.Web.Models.AuditLog>
+@{
+    ViewData["Title"] = "Nhật ký hệ thống";
+}
+<div class="container mt-4">
+    <h3>Nhật ký hệ thống</h3>
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-auto"><input type="date" name="from" class="form-control" /></div>
+        <div class="col-auto"><input type="date" name="to" class="form-control" /></div>
+        <div class="col-auto"><input name="q" placeholder="User or Action" class="form-control" /></div>
+        <div class="col-auto"><button class="btn btn-primary">Filter</button></div>
+    </form>
+
+    <table class="table table-sm">
+        <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th></tr></thead>
+        <tbody>
+            @foreach(var l in Model ?? new List<DuAnCode.Web.Models.AuditLog>()){
+                <tr>
+                    <td>@l.PerformedAt.ToLocalTime().ToString("g")</td>
+                    <td>@l.PerformedBy</td>
+                    <td>
+                        @{
+                            var method = "GET";
+                            var m = System.Text.RegularExpressions.Regex.Match(l.Action ?? string.Empty, "^\\[(\\w+)\\]");
+                            if (m.Success) method = m.Groups[1].Value.ToUpperInvariant();
+                            var badgeClass = method == "POST" ? "badge bg-success" : method == "PUT" ? "badge bg-warning text-dark" : method == "DELETE" ? "badge bg-danger" : "badge bg-primary";
+                        }
+                        <span class="@badgeClass">@method</span>
+                        <span class="ms-2">@l.Action</span>
+                    </td>
+                    <td>
+                        @{
+                            var detail = l.AfterJson ?? l.BeforeJson ?? l.Reason ?? string.Empty;
+                            if (!string.IsNullOrWhiteSpace(detail))
+                            {
+                                try
+                                {
+                                    // try pretty-print JSON
+                                    var doc = System.Text.Json.JsonDocument.Parse(detail);
+                                    var pretty = System.Text.Json.JsonSerializer.Serialize(doc.RootElement, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                                    <pre style="max-height:200px;overflow:auto">@Html.Raw(System.Net.WebUtility.HtmlEncode(pretty))</pre>
+                                }
+                                catch
+                                {
+                                    <pre style="max-height:200px;overflow:auto">@Html.Raw(System.Net.WebUtility.HtmlEncode(detail))</pre>
+                                }
+                            }
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

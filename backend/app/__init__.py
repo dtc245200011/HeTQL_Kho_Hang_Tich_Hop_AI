@@ -1,1 +1,0 @@
-"""Furniture WMS backend package."""

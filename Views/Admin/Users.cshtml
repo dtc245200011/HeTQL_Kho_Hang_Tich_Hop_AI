@@ -1,0 +1,243 @@
+@model List<DuAnCode.Web.Models.ViewModels.AdminUserViewModel>
+@{
+    ViewData["Title"] = "Quản lý Người dùng";
+}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between mb-3">
+        <h3>Danh sách người dùng</h3>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">Thêm người dùng</button>
+    </div>
+
+    @if(TempData["Message"] != null){ <div class="alert alert-success">@TempData["Message"]</div> }
+    @if(TempData["Error"] != null){ <div class="alert alert-danger">@TempData["Error"]</div> }
+
+    <table class="table table-striped">
+        <thead><tr><th>UserName</th><th>Email</th><th>Roles</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+            @foreach(var u in Model ?? new List<DuAnCode.Web.Models.ViewModels.AdminUserViewModel>()){
+                <tr>
+                    <td>@u.UserName</td>
+                    <td>@u.Email</td>
+                    <td>
+                        <form method="post" asp-controller="Admin" asp-action="ChangeRoleAjax" class="d-inline changeRoleForm">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="userId" value="@u.Id" />
+                            <select name="role" class="form-select form-select-sm d-inline" style="width:160px;display:inline-block">
+                                @{
+                                    var totalUsers = ViewBag.TotalUsers as int? ?? 0;
+                                }
+                                @foreach(var r in ViewBag.AvailableRoles as List<string> ?? new List<string>{"Admin","Thủ kho","Nhân viên"}){
+                                    <option value="@r" selected="@(u.Roles?.Contains(r) == true)" disabled="@(totalUsers == 1)">@r</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-sm btn-outline-primary btn-save-role">Save</button>
+                        </form>
+                    </td>
+                    <td>@(u.Roles)</td>
+                    <td>
+                        <form method="post" asp-controller="Admin" asp-action="ToggleLock" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="userId" value="@u.Id" />
+                            <button class="btn btn-sm btn-warning">Toggle Lock</button>
+                        </form>
+                        <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#resetModal_@u.Id">Reset PW</button>
+                        @{ var totalUsers = ViewBag.TotalUsers as int? ?? 0; }
+                        @if(totalUsers > 1){
+                            <form class="deleteUserForm d-inline" style="display:inline">
+                                @Html.AntiForgeryToken()
+                                <button type="button" class="btn btn-sm btn-danger btn-delete-user" data-userid="@u.Id">Delete</button>
+                            </form>
+                        } else {
+                            <button class="btn btn-sm btn-danger" disabled>Delete</button>
+                        }
+                    </td>
+                </tr>
+
+                <div class="modal fade" id="resetModal_@u.Id" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="post" asp-controller="Admin" asp-action="ResetPassword">
+                                @Html.AntiForgeryToken()
+                                <div class="modal-header"><h5 class="modal-title">Reset mật khẩu - @u.UserName</h5></div>
+                                <div class="modal-body">
+                                    <input type="hidden" name="userId" value="@u.Id" />
+                                    <div class="mb-2"><label>New password</label><input name="newPassword" class="form-control" /></div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    <button class="btn btn-primary">Save</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        </tbody>
+    </table>
+
+    <!-- Add User Modal -->
+    <div class="modal fade" id="addUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="createUserForm" method="post" asp-controller="Admin" asp-action="CreateUserAjax">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-header"><h5 class="modal-title">Thêm người dùng</h5></div>
+                    <div class="modal-body">
+                        <div id="createUserAlert"></div>
+                        <div class="mb-2"><label>Username</label><input name="userName" class="form-control" /></div>
+                        <div class="mb-2"><label>Full name</label><input name="fullName" class="form-control" /></div>
+                        <div class="mb-2"><label>Email</label><input name="email" class="form-control" /></div>
+                        <div class="mb-2"><label>Password</label><input name="password" type="password" class="form-control" /></div>
+                        <div class="mb-2"><label>Role</label>
+                            <select name="role" class="form-select">
+                                @foreach(var r in ViewBag.AvailableRoles as List<string> ?? new List<string>{"Nhân viên","Thủ kho","Admin"}){
+                                    <option value="@r">@r</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Create</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm replace admin modal -->
+<div class="modal fade" id="confirmAdminModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Xác nhận thay đổi Admin</h5></div>
+            <div class="modal-body">
+                <p id="confirmAdminMessage">Hệ thống sẽ thay đổi Admin. Bạn có chắc?</p>
+            </div>
+            <div class="modal-footer">
+                <button id="confirmAdminCancel" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button id="confirmAdminOk" class="btn btn-danger">Đồng ý chuyển quyền</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const createForm = document.getElementById('createUserForm');
+    let pendingCreate = null;
+    const createAlert = document.getElementById('createUserAlert');
+    const confirmModalEl = document.getElementById('confirmAdminModal');
+    const confirmModal = new bootstrap.Modal(confirmModalEl);
+    const confirmMsg = document.getElementById('confirmAdminMessage');
+    const confirmOk = document.getElementById('confirmAdminOk');
+
+    createForm.addEventListener('submit', async function(e){
+        e.preventDefault();
+        createAlert.innerHTML = '';
+        const fd = new FormData(createForm);
+        // send
+        const resp = await fetch(createForm.action, { method: 'POST', body: fd, credentials: 'same-origin' });
+        const data = await resp.json();
+        if(!data) return;
+        if(data.success){
+            if(data.logout && data.redirect){ window.location = data.redirect; return; }
+            location.reload();
+            return;
+        }
+        if(data.requiresConfirmation){
+            // show confirm modal and store pending form data
+            pendingCreate = fd;
+            confirmMsg.textContent = data.message || 'Xác nhận thay thế Admin cũ?';
+            confirmModal.show();
+            return;
+        }
+        // show error
+        createAlert.innerHTML = `<div class="alert alert-danger">${data.message || 'Error'}</div>`;
+    });
+
+    confirmOk.addEventListener('click', async function(){
+        if(!pendingCreate) return;
+        pendingCreate.set('confirm', 'true');
+        const resp = await fetch(createForm.action, { method: 'POST', body: pendingCreate, credentials: 'same-origin' });
+        const data = await resp.json();
+        pendingCreate = null;
+        confirmModal.hide();
+        if(data.success){ if(data.logout && data.redirect){ window.location = data.redirect; return; } location.reload(); }
+        else { alert(data.message || 'Operation failed'); }
+    });
+
+    // role change via AJAX using explicit button clicks to avoid default navigation
+    document.querySelectorAll('.btn-save-role').forEach(btn=>{
+        btn.addEventListener('click', async function(e){
+            e.preventDefault();
+            const form = btn.closest('.changeRoleForm');
+            if(!form) return;
+            try{
+                const tokenEl = form.querySelector('input[name="__RequestVerificationToken"]');
+                const token = tokenEl ? tokenEl.value : '';
+                const userIdEl = form.querySelector('input[name="userId"]');
+                const userId = userIdEl ? userIdEl.value : '';
+                const roleSel = form.querySelector('select[name="role"]');
+                const newRole = roleSel ? roleSel.value : '';
+
+                const params = new URLSearchParams();
+                params.append('__RequestVerificationToken', token);
+                params.append('userId', userId);
+                params.append('role', newRole);
+
+                const resp = await fetch('/Admin/ChangeRoleAjax', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params.toString(),
+                    credentials: 'same-origin'
+                });
+                const data = await resp.json();
+                if(!data) return;
+                if(data.success){
+                    if(data.redirect){ window.location.href = data.redirect; return; }
+                    try{ bootstrap.Modal.getInstance(confirmModalEl)?.hide(); } catch {}
+                    alert(data.message || 'Đã cập nhật quyền thành công!');
+                    location.reload();
+                    return;
+                }
+
+                if(data.requiresConfirmation){
+                    pendingCreate = { form: form, params: params };
+                    confirmMsg.textContent = data.message || 'Xác nhận thay thế Admin cũ?';
+                    confirmModal.show();
+                    const onceHandler = async function(){
+                        try{
+                            params.set('confirm', 'true');
+                            const r = await fetch('/Admin/ChangeRoleAjax', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString(), credentials: 'same-origin' });
+                            const dd = await r.json();
+                            confirmModal.hide();
+                            confirmOk.onclick = null;
+                            if(dd.success){ if(dd.redirect){ window.location.href = dd.redirect; return; } location.reload(); }
+                            else alert(dd.message || 'Error');
+                        } catch(err){ console.error(err); alert('Error'); }
+                    };
+                    confirmOk.onclick = onceHandler;
+                    return;
+                }
+
+                alert(data.message || 'Lỗi khi cập nhật quyền!');
+            } catch(err){ console.error(err); alert('Đã xảy ra lỗi kết nối!'); }
+        });
+    });
+
+    // delete buttons
+    document.querySelectorAll('.btn-delete-user').forEach(btn=>{
+        btn.addEventListener('click', async function(e){
+            e.preventDefault();
+            const userId = this.dataset.userid;
+            const token = this.dataset.token;
+            if(!confirm('Are you sure to delete this user?')) return;
+            const fd = new FormData(); fd.append('userId', userId); fd.append('__RequestVerificationToken', token);
+            const resp = await fetch('/Admin/DeleteUserAjax', { method: 'POST', body: fd, credentials: 'same-origin' });
+            const data = await resp.json();
+            if(data.success){ location.reload(); } else { alert(data.message || 'Error'); }
+        });
+    });
+});
+</script>

@@ -1,0 +1,29 @@
+@{
+    ViewData["Title"] = "Login";
+}
+<div class="min-h-screen flex items-center justify-center bg-gray-50">
+    <div class="w-full max-w-md bg-white p-6 rounded shadow">
+        <h2 class="text-xl font-semibold mb-4">Sign in</h2>
+        <form method="post" asp-controller="Account" asp-action="Login" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Username</label>
+                <input name="username" required class="mt-1 block w-full border rounded px-3 py-2" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Password</label>
+                <input name="password" required type="password" class="mt-1 block w-full border rounded px-3 py-2" />
+            </div>
+            <div>
+                <button type="submit" class="w-full bg-blue-600 text-white px-3 py-2 rounded">Đăng nhập</button>
+            </div>
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="mt-2 text-sm text-red-700 bg-red-50 p-2 rounded">Invalid username or password</div>
+            }
+            @if(ViewData["Info"] != null)
+            {
+                <div class="mt-2 text-sm text-green-700 bg-green-50 p-2 rounded">@ViewData["Info"]</div>
+            }
+        </form>
+    </div>
+</div>

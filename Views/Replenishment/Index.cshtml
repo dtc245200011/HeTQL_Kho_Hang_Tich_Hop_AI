@@ -1,0 +1,42 @@
+@model IEnumerable<dynamic>
+@{
+    ViewData["Title"] = "Gợi ý Nhập hàng (AI)";
+    var suggestions = Model ?? new List<dynamic>();
+}
+
+<div class="bg-white p-4 rounded shadow max-w-4xl mx-auto">
+    <h2 class="text-lg font-semibold mb-4">Gợi ý Nhập hàng (AI)</h2>
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50 text-left text-sm text-gray-600">
+            <tr>
+                <th class="px-4 py-2">Mã SKU</th>
+                <th class="px-4 py-2">Tên sản phẩm</th>
+                <th class="px-4 py-2">Tồn hiện tại</th>
+                <th class="px-4 py-2">Định mức tối thiểu</th>
+                <th class="px-4 py-2">Số lượng đề xuất</th>
+                <th class="px-4 py-2">Ưu tiên</th>
+                <th class="px-4 py-2">Thao tác</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100">
+            @foreach(var s in suggestions)
+            {
+                <tr>
+                    <td class="px-4 py-2 text-sm font-medium">@s.SkuId</td>
+                    <td class="px-4 py-2 text-sm">@s.ProductName</td>
+                    <td class="px-4 py-2 text-sm">@s.CurrentStock</td>
+                    <td class="px-4 py-2 text-sm">@s.MinStock</td>
+                    <td class="px-4 py-2 text-sm">@s.Suggested</td>
+                    <td class="px-4 py-2 text-sm">@s.Priority</td>
+                    <td class="px-4 py-2 text-sm">
+                        <form method="post" asp-controller="Replenishment" asp-action="Approve">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="skuId" value="@s.SkuId" />
+                            <button type="submit" class="bg-green-600 text-white px-3 py-1 rounded">Duyệt Đề Xuất</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

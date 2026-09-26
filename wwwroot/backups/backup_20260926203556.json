@@ -1,0 +1,563 @@
+{
+  "Users": [
+    {
+      "Id": "550d4c37-73c7-4c22-9785-0e1a3ffbe893",
+      "UserName": "1",
+      "Email": "1@gmail.com",
+      "NormalizedUserName": null,
+      "EmailConfirmed": false
+    },
+    {
+      "Id": "59e2a2ae-084a-4e5e-9c10-1cea8ae5d419",
+      "UserName": "admin",
+      "Email": "admin@wms.com",
+      "NormalizedUserName": null,
+      "EmailConfirmed": false
+    },
+    {
+      "Id": "6aac27f3-19ec-46cf-ab1e-6d99bb7bde2a",
+      "UserName": "admin",
+      "Email": "admin@wms.com",
+      "NormalizedUserName": "ADMIN",
+      "EmailConfirmed": true
+    }
+  ],
+  "Roles": [
+    {
+      "Id": "0d3068a3-e2e2-4d32-b08e-5a6a65006327",
+      "Name": "QC",
+      "NormalizedName": "QC"
+    },
+    {
+      "Id": "4b9b7d77-3592-411e-8ebd-37c23aca6df7",
+      "Name": "Accountant",
+      "NormalizedName": "ACCOUNTANT"
+    },
+    {
+      "Id": "5361af82-82ff-4659-a4e1-6c14f502e689",
+      "Name": "Director",
+      "NormalizedName": "DIRECTOR"
+    },
+    {
+      "Id": "5f2c561a-cbfb-420f-8214-8948def89330",
+      "Name": "Staff",
+      "NormalizedName": "STAFF"
+    },
+    {
+      "Id": "8a3e9dca-73ef-4531-9747-df884fe203c1",
+      "Name": "WarehouseManager",
+      "NormalizedName": "WAREHOUSEMANAGER"
+    },
+    {
+      "Id": "d4c5f5c2-38ba-4729-b47c-1e697385bfdd",
+      "Name": "Admin",
+      "NormalizedName": "ADMIN"
+    },
+    {
+      "Id": "db1b97c6-a047-4e7f-92b8-8b4bfff11447",
+      "Name": "WarehouseKeeper",
+      "NormalizedName": "WAREHOUSEKEEPER"
+    }
+  ],
+  "UserRoles": [
+    {
+      "UserId": "59e2a2ae-084a-4e5e-9c10-1cea8ae5d419",
+      "RoleId": "d4c5f5c2-38ba-4729-b47c-1e697385bfdd"
+    },
+    {
+      "UserId": "6aac27f3-19ec-46cf-ab1e-6d99bb7bde2a",
+      "RoleId": "d4c5f5c2-38ba-4729-b47c-1e697385bfdd"
+    }
+  ],
+  "Warehouses": [
+    {
+      "WarehouseId": "WH-DAMAGED",
+      "WarehouseName": "Kho H\u00E0ng L\u1ED7i",
+      "WarehouseType": "DAMAGED",
+      "MaxCapacityCbm": 100.0000,
+      "Location": null,
+      "IsActive": true
+    },
+    {
+      "WarehouseId": "WH-GLOBAL",
+      "WarehouseName": "Kho T\u1ED5ng",
+      "WarehouseType": "MAIN",
+      "MaxCapacityCbm": 1000.0000,
+      "Location": null,
+      "IsActive": true
+    }
+  ],
+  "ProductModels": [
+    {
+      "ProductModelId": "PM-CHAIR",
+      "ProductName": "Gh\u1EBF xoay",
+      "Category": "Office",
+      "Unit": "pcs"
+    },
+    {
+      "ProductModelId": "PM-DESK",
+      "ProductName": "B\u00E0n l\u00E0m vi\u1EC7c",
+      "Category": "Office",
+      "Unit": "pcs"
+    },
+    {
+      "ProductModelId": "PM-SOFA",
+      "ProductName": "Sofa 3 ch\u1ED7",
+      "Category": "Living",
+      "Unit": "set"
+    }
+  ],
+  "SkuVariants": [
+    {
+      "SkuId": "SKU-CHAIR-BK",
+      "ProductModelId": "PM-CHAIR",
+      "Color": "Black",
+      "Material": "Leather",
+      "Cbm": 0.3600,
+      "UnitPrice": 1200000.00
+    },
+    {
+      "SkuId": "SKU-DESK-BR",
+      "ProductModelId": "PM-DESK",
+      "Color": "Brown",
+      "Material": "Wood",
+      "Cbm": 0.5400,
+      "UnitPrice": 2500000.00
+    },
+    {
+      "SkuId": "SKU-SOFA-GY",
+      "ProductModelId": "PM-SOFA",
+      "Color": "Gray",
+      "Material": "Fabric",
+      "Cbm": 1.4400,
+      "UnitPrice": 8000000.00
+    }
+  ],
+  "StockLedgers": [
+    {
+      "SkuId": "SKU-CHAIR-BK",
+      "WarehouseId": "WH-DAMAGED",
+      "Status": "DAMAGED",
+      "Quantity": 1
+    },
+    {
+      "SkuId": "SKU-CHAIR-BK",
+      "WarehouseId": "WH-GLOBAL",
+      "Status": "GOOD",
+      "Quantity": 20
+    },
+    {
+      "SkuId": "SKU-DESK-BR",
+      "WarehouseId": "WH-GLOBAL",
+      "Status": "GOOD",
+      "Quantity": 10
+    },
+    {
+      "SkuId": "SKU-SOFA-GY",
+      "WarehouseId": "WH-GLOBAL",
+      "Status": "GOOD",
+      "Quantity": 3
+    }
+  ],
+  "StockMovements": [],
+  "InventoryVouchers": [],
+  "VoucherLines": [],
+  "AuditLogs": [
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:15:34.6497556"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:48:07.8903834"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:54:46.7920409"
+    },
+    {
+      "Id": null,
+      "Action": "POST",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:16:55.1438574"
+    },
+    {
+      "Id": null,
+      "Action": "POST",
+      "PerformedBy": "anonymous",
+      "PerformedAt": "2026-09-26T19:39:45.2030472"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:07:04.6488031"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "anonymous",
+      "PerformedAt": "2026-09-26T19:43:01.3131338"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:48:10.3710822"
+    },
+    {
+      "Id": null,
+      "Action": "POST",
+      "PerformedBy": "anonymous",
+      "PerformedAt": "2026-09-26T19:43:09.9777196"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:16:07.8857018"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:43:12.9701784"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:12:36.3383553"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:12:01.266585"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:48:16.9913168"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:16:55.1543895"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:43:11.5303375"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:44:21.8719018"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:39:45.2431055"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:44:20.7194844"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "anonymous",
+      "PerformedAt": "2026-09-26T19:39:33.8239047"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:16:04.5315259"
+    },
+    {
+      "Id": null,
+      "Action": "POST",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:43:01.2915819"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:42:57.8936229"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:15:53.9000928"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:48:15.5827833"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "anonymous",
+      "PerformedAt": "2026-09-26T19:44:00.4180263"
+    },
+    {
+      "Id": null,
+      "Action": "POST",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:15:53.883933"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:16:06.4177338"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:16:39.2256471"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:16:02.8653903"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:54:44.5893342"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:11:33.855913"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:48:14.6204759"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:15:37.1052888"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:48:10.5267106"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:07:05.9290543"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:10:50.5408384"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:12:19.4105675"
+    },
+    {
+      "Id": null,
+      "Action": "POST",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:15:37.0852289"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:16:42.8962312"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:39:45.2104733"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:39:46.7337473"
+    },
+    {
+      "Id": "a1b59302-6d0f-4c09-b85c-5cb4e076eeec",
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:35:54.8099625"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:07:07.7211046"
+    },
+    {
+      "Id": null,
+      "Action": "POST",
+      "PerformedBy": "anonymous",
+      "PerformedAt": "2026-09-26T19:44:17.4414433"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:48:15.5392946"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:11:38.3688949"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:44:19.7092609"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:39:33.8149976"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:43:10.104751"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:39:48.7971917"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:58:18.8019096"
+    },
+    {
+      "Id": null,
+      "Action": "POST",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:17:13.2434925"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:12:44.4707973"
+    },
+    {
+      "Id": null,
+      "Action": "POST",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:12:36.317538"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:16:44.221988"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:11:53.7031145"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:44:17.4497471"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:12:17.3275087"
+    },
+    {
+      "Id": null,
+      "Action": "POST",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:12:44.4428567"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:43:09.9906551"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:16:40.0712235"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:07:02.4304834"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T19:44:17.4810134"
+    },
+    {
+      "Id": null,
+      "Action": "POST",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:17:01.5169084"
+    },
+    {
+      "Id": null,
+      "Action": "GET",
+      "PerformedBy": "admin",
+      "PerformedAt": "2026-09-26T20:12:06.1477794"
+    }
+  ]
+}
