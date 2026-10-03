@@ -165,8 +165,8 @@ namespace DuAnCode.Web.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.Property<decimal?>("CbmOverride")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
 
                     b.Property<string>("ComboName")
                         .IsRequired()
@@ -215,6 +215,79 @@ namespace DuAnCode.Web.Migrations
                     b.ToTable("DamagedRecords");
                 });
 
+            modelBuilder.Entity("DuAnCode.Web.Models.InventoryAudit", b =>
+                {
+                    b.Property<string>("AuditId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ApprovedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AuditNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("WarehouseId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("AuditId");
+
+                    b.ToTable("InventoryAudits");
+                });
+
+            modelBuilder.Entity("DuAnCode.Web.Models.InventoryAuditLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ActualQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AuditId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BatchNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("InventoryAuditAuditId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SkuId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SystemQuantity")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InventoryAuditAuditId");
+
+                    b.ToTable("InventoryAuditLines");
+                });
+
             modelBuilder.Entity("DuAnCode.Web.Models.InventoryVoucher", b =>
                 {
                     b.Property<string>("VoucherId")
@@ -225,18 +298,38 @@ namespace DuAnCode.Web.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<string>("ApprovedBy")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Counterparty")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("Date")
                         .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsLocked")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ReferenceDocument")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ToWarehouseId")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
@@ -464,10 +557,13 @@ namespace DuAnCode.Web.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<decimal>("Cbm")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
 
                     b.Property<string>("Color")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CustomAttributesJson")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("HeightMm")
@@ -545,10 +641,17 @@ namespace DuAnCode.Web.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("BatchNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
 
-                    b.HasKey("SkuId", "WarehouseId", "Status");
+                    b.HasKey("SkuId", "WarehouseId", "Status", "BatchNumber");
 
                     b.ToTable("StockLedgers");
                 });
@@ -795,6 +898,16 @@ namespace DuAnCode.Web.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("BatchNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("DocumentQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<decimal>("LineTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -850,8 +963,8 @@ namespace DuAnCode.Web.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("MaxCapacityCbm")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
 
                     b.Property<string>("WarehouseName")
                         .IsRequired()
@@ -984,6 +1097,13 @@ namespace DuAnCode.Web.Migrations
                     b.Navigation("Combo");
                 });
 
+            modelBuilder.Entity("DuAnCode.Web.Models.InventoryAuditLine", b =>
+                {
+                    b.HasOne("DuAnCode.Web.Models.InventoryAudit", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("InventoryAuditAuditId");
+                });
+
             modelBuilder.Entity("DuAnCode.Web.Models.PurchaseOrderLine", b =>
                 {
                     b.HasOne("DuAnCode.Web.Models.PurchaseOrder", "PurchaseOrder")
@@ -1087,6 +1207,11 @@ namespace DuAnCode.Web.Migrations
             modelBuilder.Entity("DuAnCode.Web.Models.ComboProduct", b =>
                 {
                     b.Navigation("Components");
+                });
+
+            modelBuilder.Entity("DuAnCode.Web.Models.InventoryAudit", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("DuAnCode.Web.Models.InventoryVoucher", b =>

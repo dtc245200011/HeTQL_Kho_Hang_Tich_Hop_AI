@@ -4894,11 +4894,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Dai_hoc\\nam 3\\Ung_Dung_AI\\Du An\\DuAnCode\\DuAnCode.Web.csproj",
+      "projectUniqueName": "D:\\Dai_hoc\\nam 3\\Ung_Dung_AI\\Du An\\DuAnCode\\HeTQL_Kho_Hang_Tich_Hop_AI\\DuAnCode.Web.csproj",
       "projectName": "DuAnCode.Web",
-      "projectPath": "D:\\Dai_hoc\\nam 3\\Ung_Dung_AI\\Du An\\DuAnCode\\DuAnCode.Web.csproj",
+      "projectPath": "D:\\Dai_hoc\\nam 3\\Ung_Dung_AI\\Du An\\DuAnCode\\HeTQL_Kho_Hang_Tich_Hop_AI\\DuAnCode.Web.csproj",
       "packagesPath": "C:\\Users\\DUC HIEU\\.nuget\\packages\\",
-      "outputPath": "D:\\Dai_hoc\\nam 3\\Ung_Dung_AI\\Du An\\DuAnCode\\obj\\",
+      "outputPath": "D:\\Dai_hoc\\nam 3\\Ung_Dung_AI\\Du An\\DuAnCode\\HeTQL_Kho_Hang_Tich_Hop_AI\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

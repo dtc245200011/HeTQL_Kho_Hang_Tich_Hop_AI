@@ -31,18 +31,33 @@ namespace DuAnCode.Web.Data
             var admin = await userManager.FindByEmailAsync(adminEmail);
             if (admin == null)
             {
-                admin = new User
-                {
-                    UserName = "admin",
-                    Email = adminEmail,
-                    EmailConfirmed = true,
-                    FullName = "System Administrator"
-                };
-                var createRes = await userManager.CreateAsync(admin, "Admin@123456");
-                if (createRes.Succeeded)
-                {
+                admin = new User { UserName = "admin", Email = adminEmail, EmailConfirmed = true, FullName = "System Administrator" };
+                if ((await userManager.CreateAsync(admin, "Admin@123456")).Succeeded)
                     await userManager.AddToRoleAsync(admin, "Admin");
-                }
+            }
+
+            var accountantEmail = "ketoan@wms.com";
+            if (await userManager.FindByEmailAsync(accountantEmail) == null)
+            {
+                var user = new User { UserName = "ketoan", Email = accountantEmail, EmailConfirmed = true, FullName = "Nhân viên Kế toán" };
+                if ((await userManager.CreateAsync(user, "Ketoan@123")).Succeeded)
+                    await userManager.AddToRoleAsync(user, "Accountant");
+            }
+
+            var managerEmail = "quanly@wms.com";
+            if (await userManager.FindByEmailAsync(managerEmail) == null)
+            {
+                var user = new User { UserName = "quanly", Email = managerEmail, EmailConfirmed = true, FullName = "Quản lý Kho" };
+                if ((await userManager.CreateAsync(user, "Quanly@123")).Succeeded)
+                    await userManager.AddToRoleAsync(user, "WarehouseManager");
+            }
+
+            var directorEmail = "giamdoc@wms.com";
+            if (await userManager.FindByEmailAsync(directorEmail) == null)
+            {
+                var user = new User { UserName = "giamdoc", Email = directorEmail, EmailConfirmed = true, FullName = "Giám đốc" };
+                if ((await userManager.CreateAsync(user, "Giamdoc@123")).Succeeded)
+                    await userManager.AddToRoleAsync(user, "Director");
             }
 
             if (!await db.Warehouses.AnyAsync())

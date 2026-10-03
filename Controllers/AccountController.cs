@@ -108,5 +108,57 @@ namespace DuAnCode.Web.Controllers
             try { HttpContext.Session.Clear(); } catch { }
             return RedirectToAction("Login", "Account");
         }
+        [HttpGet]
+        public async Task<IActionResult> Profile()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return RedirectToAction("Login");
+            return View(user);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Profile(string FullName, string PhoneNumber)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return RedirectToAction("Login");
+            
+            user.FullName = FullName;
+            user.PhoneNumber = PhoneNumber;
+            var result = await _userManager.UpdateAsync(user);
+            if (result.Succeeded)
+            {
+                TempData["Success"] = "Cập nhật hồ sơ thành công!";
+            }
+            else
+            {
+                TempData["Error"] = "Cập nhật thất bại.";
+            }
+            return RedirectToAction("Profile");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ChangePassword(string OldPassword, string NewPassword, string ConfirmPassword)
+        {
+            if (NewPassword != ConfirmPassword)
+            {
+                TempData["Error"] = "Mật khẩu mới không khớp.";
+                return RedirectToAction("Profile");
+            }
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return RedirectToAction("Login");
+            
+            var result = await _userManager.ChangePasswordAsync(user, OldPassword, NewPassword);
+            if (result.Succeeded)
+            {
+                TempData["Success"] = "Đổi mật khẩu thành công!";
+            }
+            else
+            {
+                TempData["Error"] = string.Join(", ", result.Errors.Select(e => e.Description));
+            }
+            return RedirectToAction("Profile");
+        }
     }
 }

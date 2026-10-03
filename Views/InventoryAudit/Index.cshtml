@@ -1,0 +1,64 @@
+@model IEnumerable<DuAnCode.Web.Models.InventoryAudit>
+@{
+    ViewData["Title"] = "Quản lý Phiếu Nhập kho";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Quản lý Phiếu Kiểm Kê</h3>
+        <a asp-action="Create" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Tạo Phiếu Kiểm kê</a>
+    </div>
+
+    
+    
+
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-striped table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Mã Phiếu</th>
+                        <th>Ngày</th>
+                        <th>Trạng thái</th>
+                        <th>Người tạo</th>
+                        <!-- th>Tổng tiền</th -->
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var v in Model)
+                    {
+                        <tr>
+                            <td>@v.AuditNumber</td>
+                            <td>@v.Date.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>
+                                @if (v.Status == "APPROVED")
+                                {
+                                    <span class="badge bg-success">Đã duyệt</span>
+                                }
+                                else if (v.Status == "PENDING")
+                                {
+                                    <span class="badge bg-warning">Chờ duyệt</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Nháp</span>
+                                }
+                            </td>
+                            <td>@v.CreatedBy</td>
+                            <td>
+                                <a asp-action="Create" asp-route-id="@v.AuditId" class="btn btn-sm btn-info">Chi tiết / Sửa</a>
+                                @if (v.Status == "DRAFT" || v.Status == "PENDING")
+                                {
+                                    <form asp-action="Approve" asp-route-id="@v.AuditId" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc muốn duyệt phiếu này? Sau khi duyệt sẽ cập nhật Tồn kho và sinh phiếu điều chỉnh nếu có lệch.');">
+                                        <button type="submit" class="btn btn-sm btn-success">Duyệt Phiếu</button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

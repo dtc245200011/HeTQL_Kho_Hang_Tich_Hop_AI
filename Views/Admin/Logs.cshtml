@@ -1,4 +1,47 @@
 @model List<DuAnCode.Web.Models.AuditLog>
+@functions {
+    public string TranslateAction(string action)
+    {
+        if (string.IsNullOrEmpty(action)) return "Thao tác không xác định";
+        
+        bool isPost = action.Contains("[POST]");
+        bool isGet = action.Contains("[GET]");
+
+        if (action.Contains("AccountController.Login") && isPost) return "Đăng nhập vào hệ thống";
+        if (action.Contains("AccountController.Login") && isGet) return "Truy cập trang Đăng nhập";
+        if (action.Contains("AccountController.Logout")) return "Đăng xuất khỏi hệ thống";
+
+        if (action.Contains("AdminController.Index")) return "Truy cập Quản lý hệ thống";
+        if (action.Contains("AdminController.Users")) return "Truy cập Quản lý người dùng";
+        if (action.Contains("AdminController.Settings")) return "Truy cập Cấu hình hệ thống";
+        
+        if (action.Contains("InboundController.Index")) return "Truy cập Quản lý nhập kho";
+        if (action.Contains("InboundController.Create") && isPost) return "Tạo Phiếu Nhập kho mới";
+        if (action.Contains("InboundController.Create") && isGet) return "Truy cập trang Tạo Phiếu Nhập";
+        if (action.Contains("InboundController.Approve")) return "Duyệt Phiếu Nhập kho";
+
+        if (action.Contains("OutboundController.Index")) return "Truy cập Quản lý xuất kho";
+        if (action.Contains("OutboundController.Create") && isPost) return "Tạo Phiếu Xuất kho mới";
+        if (action.Contains("OutboundController.Create") && isGet) return "Truy cập trang Tạo Phiếu Xuất";
+
+        if (action.Contains("StockTransferController.Index")) return "Truy cập Quản lý chuyển kho";
+        if (action.Contains("StockTransferController.Create") && isPost) return "Tạo Phiếu Chuyển kho mới";
+        if (action.Contains("StockTransferController.Create") && isGet) return "Truy cập trang Tạo Phiếu Chuyển kho";
+
+        if (action.Contains("InventoryAuditController.Index")) return "Truy cập Quản lý kiểm kê";
+        if (action.Contains("InventoryAuditController.Create") && isPost) return "Tạo Phiếu Kiểm kê mới";
+        if (action.Contains("InventoryAuditController.Create") && isGet) return "Truy cập trang Tạo Phiếu Kiểm kê";
+
+        if (action.Contains("ReplenishmentController.Index")) return "Truy cập Gợi ý AI (Nhập hàng)";
+        
+        if (action.Contains("ReportController.Index")) return "Truy cập Báo cáo thống kê";
+        
+        if (action.Contains("DashboardController.Index")) return "Truy cập Tổng quan (Dashboard)";
+
+        return action; // fallback
+    }
+}
+
 @{
     ViewData["Title"] = "Nhật ký hệ thống";
 }
@@ -7,12 +50,12 @@
     <form method="get" class="row g-2 mb-3">
         <div class="col-auto"><input type="date" name="from" class="form-control" /></div>
         <div class="col-auto"><input type="date" name="to" class="form-control" /></div>
-        <div class="col-auto"><input name="q" placeholder="User or Action" class="form-control" /></div>
-        <div class="col-auto"><button class="btn btn-primary">Filter</button></div>
+        <div class="col-auto"><input name="q" placeholder="Tài khoản hoặc thao tác..." class="form-control" /></div>
+        <div class="col-auto"><button class="btn btn-primary">Lọc dữ liệu</button></div>
     </form>
 
     <table class="table table-sm">
-        <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th></tr></thead>
+        <thead><tr><th>Thời gian</th><th>Tài khoản</th><th>Thao tác</th><th>Chi tiết</th></tr></thead>
         <tbody>
             @foreach(var l in Model ?? new List<DuAnCode.Web.Models.AuditLog>()){
                 <tr>
@@ -26,7 +69,8 @@
                             var badgeClass = method == "POST" ? "badge bg-success" : method == "PUT" ? "badge bg-warning text-dark" : method == "DELETE" ? "badge bg-danger" : "badge bg-primary";
                         }
                         <span class="@badgeClass">@method</span>
-                        <span class="ms-2">@l.Action</span>
+                        <span class="ms-2">@TranslateAction(l.Action ?? string.Empty)</span>
+                        <div class="text-muted small" style="font-size:0.75rem">@l.Action</div>
                     </td>
                     <td>
                         @{

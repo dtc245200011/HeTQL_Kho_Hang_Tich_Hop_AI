@@ -36,41 +36,134 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="/css/site.css" />
 
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bs-body-font-family: 'Inter', sans-serif;
+            --primary-bg: #f4f6f9;
+            --sidebar-bg: #0f172a;
+            --sidebar-hover: #1e293b;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --card-radius: 12px;
+        }
+
+        body {
+            font-family: var(--bs-body-font-family);
+            background-color: var(--primary-bg);
+            color: #334155;
+            -webkit-font-smoothing: antialiased;
+        }
+
         /* Sidebar layout */
-        .app-root { display: flex; height: 100vh; }
+        .app-root { display: flex; height: 100vh; overflow: hidden; }
         .sidebar {
-            width: 250px;
-            background: #0d6efd; /* bootstrap primary */
-            color: #fff;
+            width: 260px;
+            background: var(--sidebar-bg);
+            color: #94a3b8;
             display: flex;
             flex-direction: column;
-            transition: width 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             min-width: 70px;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+            z-index: 1040;
         }
-        .sidebar .sidebar-header { padding: 1rem; display:flex; align-items:center; gap:.5rem; }
-        .sidebar .brand { font-weight:700; font-size:1rem; }
-        .sidebar .profile { padding: 0.75rem 1rem; border-top:1px solid rgba(255,255,255,0.06); border-bottom:1px solid rgba(255,255,255,0.06); }
-        .sidebar .profile .avatar { width:42px; height:42px; border-radius:50%; background:#fff3; display:inline-flex; align-items:center; justify-content:center; }
-        .sidebar .nav-links { padding: .5rem 0; flex:1; overflow:auto; }
-        .sidebar .nav-link { color: #e9f2ff; padding: .6rem 1rem; display:flex; align-items:center; gap:.6rem; text-decoration:none; }
-        .sidebar .nav-link:hover { background: rgba(255,255,255,0.06); color: #fff; }
-        .sidebar .logout { margin: 1rem; }
+        .sidebar .sidebar-header { padding: 1.25rem 1rem; display:flex; align-items:center; gap:1rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .sidebar .sidebar-header .btn-light { background: transparent; border: none; color: #fff; padding: 0.25rem 0.5rem; }
+        .sidebar .sidebar-header .btn-light:hover { background: rgba(255,255,255,0.1); }
+        .sidebar .brand { font-weight: 700; font-size: 1.1rem; letter-spacing: 0.5px; text-transform: uppercase; color: #f8fafc !important; }
+        .sidebar .profile { padding: 1.25rem 1rem; border-bottom:1px solid rgba(255,255,255,0.05); }
+        .sidebar .profile .avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: #fff; display:inline-flex; align-items:center; justify-content:center; font-size: 1.2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        .sidebar .profile .meta { margin-left: 0.75rem; }
+        .sidebar .profile .meta a { color: #f8fafc !important; font-weight: 600; font-size: 0.95rem; }
+        .sidebar .profile .meta .small { font-size: 0.8rem; color: #94a3b8 !important; }
+        .sidebar .nav-links { padding: 1rem 0; flex:1; overflow-y: auto; overflow-x: hidden; }
+        .sidebar .nav-link { color: #cbd5e1; padding: 0.75rem 1.25rem; display:flex; align-items:center; gap:1rem; text-decoration:none; font-weight: 500; transition: all 0.2s ease; border-left: 3px solid transparent; margin-bottom: 0.25rem; }
+        .sidebar .nav-link i { font-size: 1.1rem; width: 24px; text-align: center; opacity: 0.8; }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active { background: var(--sidebar-hover); color: #fff; border-left-color: #3b82f6; }
+        .sidebar .nav-link:hover i, .sidebar .nav-link.active i { opacity: 1; color: #3b82f6; }
+        .sidebar .logout { margin: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: transparent; color: #cbd5e1; transition: all 0.2s; }
+        .sidebar .logout:hover { background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
 
-        .main-content { flex:1; overflow:auto; display:flex; flex-direction:column; }
-        .main-header { padding: .75rem 1rem; border-bottom:1px solid #e9ecef; background:#f8f9fa; }
-        .main-body { padding:1rem; }
+        .main-content { flex:1; overflow-y: auto; overflow-x: hidden; display:flex; flex-direction:column; background-color: var(--primary-bg); }
+        .main-header { padding: 1rem 2rem; border-bottom: 1px solid #e2e8f0; background: #fff; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .main-body { padding: 2rem; max-width: 1600px; margin: 0 auto; width: 100%; }
 
         .sidebar-collapsed { width: 70px !important; }
         .sidebar-collapsed .brand, .sidebar-collapsed .profile .meta, .sidebar-collapsed .nav-link span.text { display:none; }
-        .sidebar-collapsed .nav-link { justify-content:center; }
+        .sidebar-collapsed .nav-link { justify-content:center; padding: 0.85rem 0; border-left-width: 2px; }
+        .sidebar-collapsed .sidebar-header { justify-content: center; padding: 1.25rem 0; }
+        .sidebar-collapsed .sidebar-header .btn-light { margin: 0; }
+        .sidebar-collapsed .profile { justify-content: center; padding: 1rem 0; }
+        .sidebar-collapsed .profile .avatar { margin: 0; width: 40px; height: 40px; }
+
+        /* Global UI Improvements */
+        .card { border: none; border-radius: var(--card-radius); box-shadow: var(--card-shadow); transition: transform 0.2s, box-shadow 0.2s; background: #fff; margin-bottom: 1.5rem; }
+        .card-header { background: #fff; border-bottom: 1px solid #f1f5f9; padding: 1.25rem 1.5rem; border-radius: var(--card-radius) var(--card-radius) 0 0 !important; font-weight: 600; color: #1e293b; }
+        .card-body { padding: 1.5rem; }
+        
+        .btn { font-weight: 500; padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
+        .btn-primary { background-color: #3b82f6; border-color: #3b82f6; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); }
+        .btn-primary:hover { background-color: #2563eb; border-color: #2563eb; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.4); transform: translateY(-1px); }
+        .btn-success { background-color: #10b981; border-color: #10b981; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3); }
+        .btn-success:hover { background-color: #059669; border-color: #059669; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(16, 185, 129, 0.4); }
+        
+        .table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        .table thead th { background-color: #f8fafc; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; padding: 1rem 1.5rem; border-bottom: 1px solid #e2e8f0; border-top: none; }
+        .table tbody td { padding: 1rem 1.5rem; vertical-align: middle; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        .table tbody tr { transition: all 0.15s ease; }
+        .table tbody tr:hover { background-color: #f8fafc; transform: scale(1.002); box-shadow: 0 2px 4px rgba(0,0,0,0.02); z-index: 1; position: relative; }
+        
+        .form-control, .form-select { border-radius: 6px; border: 1px solid #cbd5e1; padding: 0.5rem 0.75rem; transition: border-color 0.15s, box-shadow 0.15s; }
+        .form-control:focus, .form-select:focus { border-color: #3b82f6; box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25); }
+        
+        .badge { padding: 0.35em 0.65em; font-weight: 500; letter-spacing: 0.3px; border-radius: 4px; }
+        .bg-success { background-color: #10b981 !important; }
+        .bg-warning { background-color: #f59e0b !important; }
+        .bg-danger { background-color: #ef4444 !important; }
+        .bg-info { background-color: #3b82f6 !important; }
+
+        /* Animation for page load */
+        .main-body { animation: fadeIn 0.4s ease-out; }
+        @@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Chat Widget Enhancements */
+        #aiChatWidget #openChatBtn { background: linear-gradient(135deg, #3b82f6, #6366f1); border: none; box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.5); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        #aiChatWidget #openChatBtn:hover { transform: scale(1.1) rotate(5deg); }
+        #chatBox { border-radius: 16px; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+        #chatBox .card-header { background: linear-gradient(135deg, #1e293b, #334155); border-bottom: none; }
+        #chatMessages .bg-primary { background: linear-gradient(135deg, #3b82f6, #4f46e5) !important; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); }
 
         @@media (max-width: 768px) {
             .sidebar { position: fixed; left: -260px; top:0; bottom:0; z-index:1045; }
             .sidebar.show { left:0; }
             .main-content { margin-left:0; }
+            .main-body { padding: 1rem; }
         }
+    
+        /* Validation Styling */
+        .input-validation-error {
+            border-color: #ef4444 !important;
+            padding-right: calc(1.5em + 0.75rem);
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23ef4444'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23ef4444' stroke='none'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right calc(0.375em + 0.1875rem) center;
+            background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        }
+        .input-validation-error:focus {
+            box-shadow: 0 0 0 0.25rem rgba(239, 68, 68, 0.25) !important;
+        }
+        .field-validation-error {
+            color: #ef4444;
+            font-size: 0.875em;
+            margin-top: 0.25rem;
+            display: block;
+        }
+
     </style>
+
 
     <script>
         // Sidebar toggle script will run after DOM loaded
@@ -117,7 +210,7 @@
             <div class="profile d-flex align-items-center">
                 <div class="avatar me-2"><i class="fa fa-user"></i></div>
                 <div class="meta">
-                    <div class="fw-bold">@userDisplay</div>
+                    <div class="fw-bold"><a href="/Account/Profile" class="text-white text-decoration-none" title="Xem hồ sơ">@userDisplay</a></div>
                     <div class="small text-white-50">@string.Join(", ", roles)</div>
                 </div>
             </div>
@@ -128,6 +221,8 @@
                 {
                     <a asp-controller="Inbound" asp-action="Index" class="nav-link"><i class="fa-solid fa-box-arrow-in-down"></i> <span class="text">Nhập kho</span></a>
                     <a asp-controller="Outbound" asp-action="Index" class="nav-link"><i class="fa-solid fa-box-arrow-up"></i> <span class="text">Xuất kho</span></a>
+                    <a asp-controller="StockTransfer" asp-action="Index" class="nav-link"><i class="fa-solid fa-exchange-alt"></i> <span class="text">Chuyển kho</span></a>
+                    <a asp-controller="InventoryAudit" asp-action="Index" class="nav-link"><i class="fa-solid fa-clipboard-check"></i> <span class="text">Kiểm kê</span></a>
                 }
                 @if (isAdmin || isWarehouse)
                 {
@@ -150,12 +245,12 @@
             <div class="logout mt-auto">
                 @if (!isAuthenticated)
                 {
-                    <a asp-controller="Account" asp-action="Login" class="btn btn-outline-light w-100">Đăng nhập</a>
+                    <a asp-controller="Account" asp-action="Login" class="btn btn-outline-light w-100" title="Đăng nhập"><i class="fa-solid fa-sign-in-alt"></i><span class="text ms-2 d-none d-md-inline">Đăng nhập</span></a>
                 }
                 else
                 {
                     <form asp-controller="Account" asp-action="LogoutPost" method="post">@Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-danger w-100">Đăng xuất</button>
+                        <button type="submit" class="btn btn-danger w-100" title="Đăng xuất"><i class="fa-solid fa-sign-out-alt"></i><span class="text ms-2 d-none d-md-inline">Đăng xuất</span></button>
                     </form>
                 }
             </div>
@@ -164,10 +259,19 @@
         <div class="main-content">
             <header class="main-header d-flex justify-content-between align-items-center">
                 <div class="ms-3">@ViewData["Title"]</div>
-                <div class="me-3 small text-muted">@userDisplay</div>
+                
             </header>
 
             <div class="main-body">
+                
+                @if (TempData["Message"] != null)
+                {
+                    <div class="alert alert-success m-3">@TempData["Message"]</div>
+                }
+                @if (TempData["Error"] != null)
+                {
+                    <div class="alert alert-danger m-3">@TempData["Error"]</div>
+                }
                 @RenderBody()
             </div>
 
@@ -176,6 +280,165 @@
             </footer>
         </div>
     </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+
+    @if (isAdmin || isWarehouse || isQc)
+    {
+        <!-- AI Chat Widget -->
+        <div id="aiChatWidget" class="position-fixed" style="bottom: 20px; right: 20px; z-index: 1050;">
+            <div id="chatBox" class="card shadow d-none" style="width: 350px; height: 450px;">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="fa-solid fa-robot"></i> Trợ lý AI Ollama</h6>
+                    <button type="button" class="btn-close btn-close-white btn-sm" id="closeChat"></button>
+                </div>
+                <div class="card-body overflow-auto" id="chatMessages" style="flex: 1; background: #f8f9fa;">
+                    <div class="text-muted text-center small mb-3">AI (qwen2.5-coder:7b) đã sẵn sàng</div>
+                </div>
+                <div class="card-footer">
+                    <form id="chatForm">
+                        <div class="input-group">
+                            <input type="text" id="chatInput" class="form-control form-control-sm" placeholder="Hỏi AI về kho hàng..." required autocomplete="off">
+                            <button class="btn btn-primary btn-sm" type="submit" id="sendChatBtn"><i class="fa-solid fa-paper-plane"></i></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <button id="openChatBtn" class="btn btn-primary btn-lg rounded-circle shadow" style="width: 60px; height: 60px; float: right;">
+                <i class="fa-solid fa-message fs-4"></i>
+            </button>
+        </div>
+        
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // Wait for jQuery
+                let intv = setInterval(function() {
+                    if (window.jQuery) {
+                        clearInterval(intv);
+                        initChat();
+                    }
+                }, 100);
+
+                                function initChat() {
+                    let currentUser = '@(User.Identity?.Name ?? "guest")';
+                    let chatKey = 'chatHistory_' + currentUser;
+
+                    function saveChat(role, content) {
+                        let history = JSON.parse(localStorage.getItem(chatKey)) || [];
+                        history.push({ role: role, content: content });
+                        localStorage.setItem(chatKey, JSON.stringify(history));
+                    }
+
+                    function loadChat() {
+                        let history = JSON.parse(localStorage.getItem(chatKey)) || [];
+                        history.forEach(item => {
+                            if (item.role === 'user') {
+                                $('#chatMessages').append('<div class="d-flex justify-content-end mb-2"><div class="bg-primary text-white p-2 rounded" style="max-width: 80%;">' + escapeHtml(item.content) + '</div></div>');
+                            } else {
+                                let replyHtml = escapeHtml(item.content).replace(/\n/g, '<br>');
+                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-white border p-2 rounded shadow-sm" style="max-width: 85%; font-size: 0.95em;">' + replyHtml + '</div></div>');
+                            }
+                        });
+                        scrollToBottom();
+                    }
+                    
+                    loadChat();
+
+                    $('#openChatBtn').click(function() {
+                        $('#chatBox').removeClass('d-none').addClass('d-flex flex-column');
+                        $(this).addClass('d-none');
+                        $('#chatInput').focus();
+                    });
+                    $('#closeChat').click(function() {
+                        $('#chatBox').addClass('d-none').removeClass('d-flex flex-column');
+                        $('#openChatBtn').removeClass('d-none');
+                    });
+
+                    $('#chatForm').submit(function(e) {
+                        e.preventDefault();
+                        let prompt = $('#chatInput').val().trim();
+                        if (!prompt) return;
+
+                                                $('#chatMessages').append('<div class="d-flex justify-content-end mb-2"><div class="bg-primary text-white p-2 rounded" style="max-width: 80%;">' + escapeHtml(prompt) + '</div></div>');
+                        saveChat('user', prompt);
+                        $('#chatInput').val('');
+                        scrollToBottom();
+
+                        let loadingId = 'loading-' + Date.now();
+                        $('#chatMessages').append('<div id="' + loadingId + '" class="d-flex justify-content-start mb-2"><div class="bg-light border p-2 rounded text-muted">AI đang nghĩ <i class="fa-solid fa-circle-notch fa-spin"></i></div></div>');
+                        scrollToBottom();
+                        $('#sendChatBtn').prop('disabled', true);
+
+                        $.ajax({
+                            url: '/api/AiChat/chat',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ prompt: prompt }),
+                                                                                    success: function(res) {
+                                $('#' + loadingId).remove();
+                                let replyText = res.reply;
+                                
+                                // Check for NAVIGATE command
+                                let navMatch = replyText.match(/\[NAVIGATE:\s*([^\]]+)\]/);
+                                let actionMatch = replyText.match(/\[ACTION:\s*([^\]]+)\]/);
+                                
+                                let navUrl = null;
+                                if (navMatch) {
+                                    navUrl = navMatch[1].trim();
+                                    replyText = replyText.replace(navMatch[0], '').trim();
+                                }
+                                
+                                let actionCmd = null;
+                                if (actionMatch) {
+                                    actionCmd = actionMatch[1].trim();
+                                    replyText = replyText.replace(actionMatch[0], '').trim();
+                                }
+                                
+                                                                let replyHtml = escapeHtml(replyText).replace(/\n/g, '<br>');
+                                saveChat('ai', replyText);
+                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-white border p-2 rounded shadow-sm" style="max-width: 85%; font-size: 0.95em;">' + replyHtml + '</div></div>');
+                                scrollToBottom();
+                                $('#sendChatBtn').prop('disabled', false);
+                                $('#chatInput').focus();
+                                
+                                if (navUrl) {
+                                    setTimeout(function() {
+                                        window.location.href = navUrl;
+                                    }, 1500);
+                                } else if (actionCmd === 'TRIGGER_REPLENISHMENT') {
+                                    $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-warning border p-2 rounded small text-dark"><i class="fa fa-spinner fa-spin"></i> Hệ thống đang chạy thuật toán phân tích tồn kho...</div></div>');
+                                    scrollToBottom();
+                                    $.post('/api/AiChat/trigger-replenishment', function() {
+                                        setTimeout(function() {
+                                            $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-success text-white border p-2 rounded small"><i class="fa fa-check"></i> Đã hoàn tất phân tích! Đang chuyển hướng...</div></div>');
+                                            scrollToBottom();
+                                            setTimeout(function() { window.location.href = '/Replenishment'; }, 1500);
+                                        }, 1000);
+                                    });
+                                }
+                            },
+                            error: function(xhr) {
+                                $('#' + loadingId).remove();
+                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-danger text-white p-2 rounded small">Lỗi kết nối AI: ' + xhr.responseText + '</div></div>');
+                                scrollToBottom();
+                                $('#sendChatBtn').prop('disabled', false);
+                                $('#chatInput').focus();
+                            }
+                        });
+                    });
+
+                    function escapeHtml(text) {
+                        return $('<div>').text(text).html();
+                    }
+                    function scrollToBottom() {
+                        let d = $('#chatMessages');
+                        d.scrollTop(d.prop("scrollHeight"));
+                    }
+                }
+            });
+        </script>
+    }
 
 </body>
 </html>

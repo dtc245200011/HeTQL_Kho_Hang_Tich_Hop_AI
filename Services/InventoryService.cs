@@ -16,16 +16,24 @@ namespace DuAnCode.Web.Services
         public async Task<bool> AdjustStockAsync(string skuId, string warehouseId, string status, int delta, string performedBy, string referenceType, string referenceId)
         {
             var ledger = await _repo.GetLedgerAsync(skuId, warehouseId, status);
+            bool isNew = false;
             if (ledger == null)
             {
                 ledger = new StockLedger { SkuId = skuId, WarehouseId = warehouseId, Status = status, Quantity = 0 };
-                await _repo.GetLedgerAsync(skuId, warehouseId, status); // ensure tracked
+                isNew = true;
             }
 
             ledger.Quantity += delta;
             if (ledger.Quantity < 0) return false;
 
-            await _repo.UpdateLedgerAsync(ledger);
+            if (isNew)
+            {
+                await _repo.AddLedgerAsync(ledger);
+            }
+            else
+            {
+                await _repo.UpdateLedgerAsync(ledger);
+            }
 
             var mv = new StockMovement
             {

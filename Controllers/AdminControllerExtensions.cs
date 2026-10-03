@@ -34,6 +34,14 @@ namespace DuAnCode.Web.Controllers
                     adminUser = await userManager.FindByNameAsync("admin") ?? await userManager.FindByEmailAsync("admin@example.com");
                 }
             }
+            
+            if (adminUser != null && string.IsNullOrEmpty(adminUser.PasswordHash))
+            {
+                var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<User>();
+                adminUser.PasswordHash = hasher.HashPassword(adminUser, "ChangeMe123!");
+                adminUser.SecurityStamp = Guid.NewGuid().ToString();
+                await userManager.UpdateAsync(adminUser);
+            }
 
             var exists = await _db.Set<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>().AnyAsync(ur => ur.UserId == adminUser!.Id && ur.RoleId == adminRole!.Id);
             if (!exists)

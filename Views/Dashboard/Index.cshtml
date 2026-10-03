@@ -3,27 +3,37 @@
     ViewData["Title"] = "Tổng quan Tồn kho";
 }
 
-<div class="space-y-4">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white p-4 rounded shadow">
-            <div class="text-sm text-gray-500">Tổng mã SKU</div>
-            <div class="text-2xl font-semibold">@Model.TotalSkus</div>
+<div class="d-flex flex-column gap-4">
+    <div class="row g-4">
+        <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card h-100 border-0">
+            <div class="card-body">
+            <div class="text-muted small fw-semibold text-uppercase mb-2">Tổng mã SKU</div>
+            <div class="fs-2 fw-bold text-primary">@Model.TotalSkus</div>
         </div>
-        <div class="bg-white p-4 rounded shadow">
-            <div class="text-sm text-gray-500">Tổng sản phẩm khả dụng</div>
-            <div class="text-2xl font-semibold">@Model.TotalInventory</div>
+        <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card h-100 border-0">
+            <div class="card-body">
+            <div class="text-muted small fw-semibold text-uppercase mb-2">Tổng sản phẩm khả dụng</div>
+            <div class="fs-2 fw-bold text-primary">@Model.TotalInventory</div>
         </div>
-        <div class="bg-white p-4 rounded shadow">
-            <div class="text-sm text-gray-500">Tồn hàng lỗi / hỏng</div>
-            <div class="text-2xl font-semibold">@Model.Damaged</div>
+        <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card h-100 border-0">
+            <div class="card-body">
+            <div class="text-muted small fw-semibold text-uppercase mb-2">Tồn hàng lỗi / hỏng</div>
+            <div class="fs-2 fw-bold text-primary">@Model.Damaged</div>
         </div>
-        <div class="bg-white p-4 rounded shadow">
-            <div class="text-sm text-gray-500">Cảnh báo sắp hết hàng</div>
-            <div class="text-2xl font-semibold">@Model.LowStockCount</div>
+        <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card h-100 border-0">
+            <div class="card-body">
+            <div class="text-muted small fw-semibold text-uppercase mb-2">Cảnh báo sắp hết hàng</div>
+            <div class="fs-2 fw-bold text-primary">@Model.LowStockCount</div>
         </div>
     </div>
 
-    <div class="bg-white p-4 rounded shadow">
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card h-100 border-0">
+            <div class="card-body">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold">Tổng quan Tồn kho</h2>
             <div>
@@ -31,14 +41,14 @@
             </div>
         </div>
 
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50 text-left text-sm text-gray-600">
+        <table class="table table-striped">
+            <thead class="table-light">
                 <tr>
-                    <th class="px-4 py-2">Mã SKU</th>
-                    <th class="px-4 py-2">Sản phẩm</th>
-                    <th class="px-4 py-2">Kho lưu trữ</th>
-                    <th class="px-4 py-2">Trạng thái</th>
-                    <th class="px-4 py-2">Số lượng tồn</th>
+                    <th >Mã SKU</th>
+                    <th >Sản phẩm</th>
+                    <th >Kho lưu trữ</th>
+                    <th >Trạng thái</th>
+                    <th >Số lượng tồn</th>
                 </tr>
             </thead>
             <tbody id="stockBody" class="bg-white divide-y divide-gray-100">
@@ -46,11 +56,11 @@
                 {
                     var statusText = s.Status == "GOOD" ? "Hàng tốt / Khả dụng" : s.Status == "DAMAGED" ? "Hàng lỗi / Hỏng" : s.Status;
                     <tr>
-                        <td class="px-4 py-2 text-sm font-medium">@s.SkuId</td>
-                        <td class="px-4 py-2 text-sm">@s.ProductName</td>
-                        <td class="px-4 py-2 text-sm">@s.WarehouseId</td>
-                        <td class="px-4 py-2 text-sm">@statusText</td>
-                        <td class="px-4 py-2 text-sm">@s.Quantity</td>
+                        <td class="fw-bold">@s.SkuId</td>
+                        <td >@s.ProductName</td>
+                        <td >@s.WarehouseId</td>
+                        <td >@statusText</td>
+                        <td >@s.Quantity</td>
                     </tr>
                 }
             </tbody>

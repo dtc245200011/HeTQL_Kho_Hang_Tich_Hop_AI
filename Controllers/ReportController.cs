@@ -15,6 +15,9 @@ namespace DuAnCode.Web.Controllers
         [Authorize]
         public async Task<IActionResult> Index(DateTime? from, DateTime? to, string? warehouse)
         {
+            ViewBag.From = from?.ToString("yyyy-MM-dd");
+            ViewBag.To = to?.ToString("yyyy-MM-dd");
+            ViewBag.SelectedWarehouse = warehouse;
             // Prepare simple report rows and warehouses to pass to the view
             var warehouses = await _db.Warehouses.AsNoTracking().ToListAsync();
             var skus = await _db.SkuVariants.AsNoTracking().ToListAsync();
@@ -33,15 +36,22 @@ namespace DuAnCode.Web.Controllers
             {
                 var totalInPeriod = stockMovements.Where(m => m.SkuId == sku.SkuId && m.QuantityDelta > 0 && m.CreatedAt >= fromDt && m.CreatedAt <= toDt && movementWarehouseFilter(m)).Sum(m => m.QuantityDelta);
                 var totalOutPeriod = stockMovements.Where(m => m.SkuId == sku.SkuId && m.QuantityDelta < 0 && m.CreatedAt >= fromDt && m.CreatedAt <= toDt && movementWarehouseFilter(m)).Sum(m => -m.QuantityDelta);
-                var ending = ledgers.Where(l => l.SkuId == sku.SkuId && ledgerWarehouseFilter(l)).Sum(l => l.Quantity);
-                var beginning = ending - totalInPeriod + totalOutPeriod;
+                
+                var currentEnding = ledgers.Where(l => l.SkuId == sku.SkuId && ledgerWarehouseFilter(l)).Sum(l => l.Quantity);
+                
+                var totalInAfter = stockMovements.Where(m => m.SkuId == sku.SkuId && m.QuantityDelta > 0 && m.CreatedAt > toDt && movementWarehouseFilter(m)).Sum(m => m.QuantityDelta);
+                var totalOutAfter = stockMovements.Where(m => m.SkuId == sku.SkuId && m.QuantityDelta < 0 && m.CreatedAt > toDt && movementWarehouseFilter(m)).Sum(m => -m.QuantityDelta);
+
+                var endingAtPeriod = currentEnding - totalInAfter + totalOutAfter;
+                var beginningAtPeriod = endingAtPeriod - totalInPeriod + totalOutPeriod;
+
                 return new ReportRow
                 {
                     SkuId = sku.SkuId,
-                    Beginning = beginning,
+                    Beginning = beginningAtPeriod,
                     TotalIn = totalInPeriod,
                     TotalOut = totalOutPeriod,
-                    Ending = ending
+                    Ending = endingAtPeriod
                 };
             }).ToList();
 

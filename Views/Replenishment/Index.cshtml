@@ -1,42 +1,70 @@
 @model IEnumerable<dynamic>
 @{
-    ViewData["Title"] = "Gợi ý Nhập hàng (AI)";
-    var suggestions = Model ?? new List<dynamic>();
+    ViewData["Title"] = "AI Gợi ý nhập hàng & Cảnh báo";
 }
 
-<div class="bg-white p-4 rounded shadow max-w-4xl mx-auto">
-    <h2 class="text-lg font-semibold mb-4">Gợi ý Nhập hàng (AI)</h2>
-    <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50 text-left text-sm text-gray-600">
-            <tr>
-                <th class="px-4 py-2">Mã SKU</th>
-                <th class="px-4 py-2">Tên sản phẩm</th>
-                <th class="px-4 py-2">Tồn hiện tại</th>
-                <th class="px-4 py-2">Định mức tối thiểu</th>
-                <th class="px-4 py-2">Số lượng đề xuất</th>
-                <th class="px-4 py-2">Ưu tiên</th>
-                <th class="px-4 py-2">Thao tác</th>
-            </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-100">
-            @foreach(var s in suggestions)
-            {
-                <tr>
-                    <td class="px-4 py-2 text-sm font-medium">@s.SkuId</td>
-                    <td class="px-4 py-2 text-sm">@s.ProductName</td>
-                    <td class="px-4 py-2 text-sm">@s.CurrentStock</td>
-                    <td class="px-4 py-2 text-sm">@s.MinStock</td>
-                    <td class="px-4 py-2 text-sm">@s.Suggested</td>
-                    <td class="px-4 py-2 text-sm">@s.Priority</td>
-                    <td class="px-4 py-2 text-sm">
-                        <form method="post" asp-controller="Replenishment" asp-action="Approve">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="skuId" value="@s.SkuId" />
-                            <button type="submit" class="bg-green-600 text-white px-3 py-1 rounded">Duyệt Đề Xuất</button>
-                        </form>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Hệ thống AI Đề Xuất (Gợi ý nhập hàng & Cảnh báo)</h3>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Ngày phát hiện</th>
+                            <th>Loại cảnh báo</th>
+                            <th>Hàng hóa</th>
+                            <th>Tồn kho / Định mức tối thiểu</th>
+                            <th>Đề xuất (Số lượng)</th>
+                            <th>Lý do (AI Phân tích)</th>
+                            <th style="width: 200px">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Any())
+                        {
+                            <tr><td colspan="7" class="text-center py-4">Hiện tại không có đề xuất nào từ AI. Hệ thống đang an toàn!</td></tr>
+                        }
+                        @foreach(var item in Model)
+                        {
+                            <tr>
+                                <td>@item.Date.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>
+                                    @if(item.Type == "REPLENISHMENT")
+                                    {
+                                        <span class="badge bg-primary">Gợi ý nhập hàng</span>
+                                    }
+                                    else if (item.Type == "ANOMALY")
+                                    {
+                                        <span class="badge bg-danger">Biến động bất thường</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning text-dark">@item.Type</span>
+                                    }
+                                </td>
+                                <td class="fw-bold">@item.ProductName</td>
+                                <td>@item.CurrentStock / @item.MinStock</td>
+                                <td class="text-success fw-bold">@item.SuggestedQty</td>
+                                <td>@item.Reason</td>
+                                <td>
+                                    <form method="post" class="d-inline" asp-action="Approve" asp-route-id="@item.Id">
+                                        @Html.AntiForgeryToken()
+                                        <button class="btn btn-sm btn-success" type="submit" title="Sinh phiếu nhập nháp"><i class="fa-solid fa-check"></i> Duyệt</button>
+                                    </form>
+                                    <form method="post" class="d-inline" asp-action="Reject" asp-route-id="@item.Id">
+                                        @Html.AntiForgeryToken()
+                                        <button class="btn btn-sm btn-danger" type="submit"><i class="fa-solid fa-xmark"></i> Bỏ qua</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>

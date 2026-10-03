@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "Iicn42KeJSM=",
+  "dgSpecHash": "FhlKh8crHxc=",
   "success": true,
-  "projectFilePath": "D:\\Dai_hoc\\nam 3\\Ung_Dung_AI\\Du An\\DuAnCode\\DuAnCode.Web.csproj",
+  "projectFilePath": "D:\\Dai_hoc\\nam 3\\Ung_Dung_AI\\Du An\\DuAnCode\\HeTQL_Kho_Hang_Tich_Hop_AI\\DuAnCode.Web.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\DUC HIEU\\.nuget\\packages\\azure.core\\1.38.0\\azure.core.1.38.0.nupkg.sha512",
     "C:\\Users\\DUC HIEU\\.nuget\\packages\\azure.identity\\1.11.4\\azure.identity.1.11.4.nupkg.sha512",

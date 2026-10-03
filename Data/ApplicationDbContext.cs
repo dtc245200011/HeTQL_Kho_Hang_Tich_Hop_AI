@@ -31,6 +31,8 @@ namespace DuAnCode.Web.Data
         public DbSet<InventoryVoucher> InventoryVouchers { get; set; } = null!;
         public DbSet<VoucherLine> VoucherLines { get; set; } = null!;
         public DbSet<SystemConfig> SystemConfigs { get; set; } = null!;
+        public DbSet<InventoryAudit> InventoryAudits { get; set; } = null!;
+        public DbSet<InventoryAuditLine> InventoryAuditLines { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -41,7 +43,7 @@ namespace DuAnCode.Web.Data
                 b.HasKey(w => w.WarehouseId);
                 b.Property(w => w.WarehouseId).HasMaxLength(50);
                 b.Property(w => w.WarehouseName).HasMaxLength(100).IsRequired();
-                b.Property(w => w.MaxCapacityCbm).HasPrecision(18, 4);
+                b.Property(w => w.MaxCapacityCbm).HasPrecision(18, 6);
             });
 
             modelBuilder.Entity<Supplier>(b =>
@@ -64,7 +66,7 @@ namespace DuAnCode.Web.Data
                 b.HasKey(s => s.SkuId);
                 b.Property(s => s.SkuId).HasMaxLength(100);
                 b.HasOne<ProductModel>().WithMany().HasForeignKey(s => s.ProductModelId).OnDelete(DeleteBehavior.Restrict);
-                b.Property(s => s.Cbm).HasPrecision(18, 4);
+                b.Property(s => s.Cbm).HasPrecision(18, 6);
                 b.Property(s => s.UnitPrice).HasPrecision(18, 2);
             });
 
@@ -73,7 +75,7 @@ namespace DuAnCode.Web.Data
                 b.HasKey(c => c.ComboId);
                 b.Property(c => c.ComboId).HasMaxLength(50);
                 b.Property(c => c.ComboName).HasMaxLength(200).IsRequired();
-                b.Property(c => c.CbmOverride).HasPrecision(18, 4);
+                b.Property(c => c.CbmOverride).HasPrecision(18, 6);
             });
 
             modelBuilder.Entity<PurchaseOrder>(b =>
@@ -104,8 +106,9 @@ namespace DuAnCode.Web.Data
 
             modelBuilder.Entity<StockLedger>(b =>
             {
-                b.HasKey(x => new { x.SkuId, x.WarehouseId, x.Status });
+                b.HasKey(x => new { x.SkuId, x.WarehouseId, x.Status, x.BatchNumber });
                 b.Property(x => x.Status).HasMaxLength(20);
+                b.Property(x => x.BatchNumber).HasMaxLength(100);
                 b.Property(x => x.Quantity).IsRequired();
             });
 

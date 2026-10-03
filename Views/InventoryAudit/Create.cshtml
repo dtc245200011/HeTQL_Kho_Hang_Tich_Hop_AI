@@ -1,0 +1,133 @@
+@model DuAnCode.Web.Models.InventoryAudit
+@{
+    ViewData["Title"] = "Tạo phiếu kiểm kê";
+    var warehouses = ViewBag.Warehouses as List<DuAnCode.Web.Models.Warehouse> ?? new List<DuAnCode.Web.Models.Warehouse>();
+}
+
+<div class="container-fluid py-4">
+    <div class="card shadow">
+        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">PHIẾU KIỂM KÊ KHO</h5>
+            <span>Mã phiếu: @(string.IsNullOrWhiteSpace(Model.AuditNumber) ? "Tự động tạo" : Model.AuditNumber)</span>
+        </div>
+        <div class="card-body">
+            <form method="post" asp-action="Create" id="auditForm">
+
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="AuditId" value="@Model.AuditId" />
+                <input type="hidden" name="AuditNumber" value="@Model.AuditNumber" />
+
+                <div class="row g-4 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold text-muted small text-uppercase">Kho cần kiểm kê</label>
+                        <select name="WarehouseId" class="form-select">
+                            @foreach(var w in warehouses) { <option value="@w.WarehouseId" selected="@(w.WarehouseId == Model.WarehouseId)">@w.WarehouseName</option> }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold text-muted small text-uppercase">Ngày kiểm kê</label>
+                        <input name="Date" type="date" class="form-control form-control-sm" value="@Model.Date.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold text-muted small text-uppercase">Lý do / Ghi chú</label>
+                        <input name="Reason" class="form-control form-control-sm" value="@Model.Reason" />
+                    </div>
+                </div>
+
+                
+<style>
+    #linesTable { font-size: 0.85rem; }
+    #linesTable th, #linesTable td { padding: 0.4rem 0.3rem !important; vertical-align: middle; white-space: nowrap; }
+    #linesTable input.form-control-sm { padding: 0.25rem 0.4rem; font-size: 0.85rem; border-radius: 4px; border: 1px solid #e2e8f0; width: 100%; min-width: 70px; }
+    #linesTable input.form-control-sm:focus { border-color: #3b82f6; box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15); }
+    #linesTable .product-name { min-width: 150px !important; }
+    #linesTable .sku-select { min-width: 110px !important; }
+</style>
+<div class="table-responsive border rounded shadow-sm mb-3">
+                    <table class="table table-hover table-sm align-middle " id="linesTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:50px">STT</th>
+                                <th >Mã hàng</th>
+                                <th>Mã lô (Batch)</th>
+                                <th style="width:120px">Số lượng Hệ Thống</th>
+                                <th style="width:120px">Số lượng Thực Tế</th>
+                                <th>Ghi chú</th>
+                                <th style="width:80px">Xóa</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if(Model.Lines != null && Model.Lines.Any()){
+                                for (int i = 0; i < Model.Lines.Count; i++)
+                                {
+                                    var ln = Model.Lines[i];
+                                    <tr>
+                                        <td class="text-center idx">@(i+1)</td>
+                                        <td><input name="Form.Lines[@i].SkuId" class="form-control form-control-sm sku" value="@ln.SkuId" required /></td>
+                                        <td><input name="Form.Lines[@i].BatchNumber" class="form-control form-control-sm" value="@ln.BatchNumber" /></td>
+                                        <td>
+                                            <!-- SL Hệ thống sẽ được Server tính tự động khi Duyệt, ở đây có thể để readonly -->
+                                            <input name="Form.Lines[@i].SystemQuantity" type="number" class="form-control form-control-sm bg-light" value="@ln.SystemQuantity" readonly />
+                                        </td>
+                                        <td><input name="Form.Lines[@i].ActualQuantity" type="number" min="0" value="@ln.ActualQuantity" class="form-control form-control-sm text-primary fw-bold" required /></td>
+                                        <td><input name="Form.Lines[@i].Notes" class="form-control form-control-sm" value="@ln.Notes" /></td>
+                                        <td class="text-center"><button type="button" class="btn btn-sm btn-danger remove-line">-</button></td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                    <button type="button" class="btn btn-sm btn-success" id="addLine">+ Thêm dòng</button>
+                </div>
+
+                <div class="mt-4 text-end">
+                    <button type="button" class="btn btn-outline-secondary fw-semibold no-print" onclick="window.history.back()">Quay lại</button>
+                    <button type="submit" class="btn btn-primary fw-semibold shadow-sm no-print">Lưu Phiếu Kiểm Kê</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            function updateIndexes() {
+                $('#linesTable tbody tr').each(function (index) {
+                    $(this).find('.idx').text(index + 1);
+                    $(this).find('input').each(function () {
+                        var name = $(this).attr('name');
+                        if (name) {
+                            var newName = name.replace(/\[\d+\]/, '[' + index + ']');
+                            $(this).attr('name', newName);
+                        }
+                    });
+                });
+            }
+
+            $('#addLine').click(function () {
+                var idx = $('#linesTable tbody tr').length;
+                var html = `<tr>
+                                <td class="text-center idx">${idx + 1}</td>
+                                <td><input name="Form.Lines[${idx}].SkuId" class="form-control form-control-sm sku" required /></td>
+                                <td><input name="Form.Lines[${idx}].BatchNumber" class="form-control form-control-sm" /></td>
+                                <td><input name="Form.Lines[${idx}].SystemQuantity" type="number" class="form-control form-control-sm bg-light" value="0" readonly /></td>
+                                <td><input name="Form.Lines[${idx}].ActualQuantity" type="number" min="0" value="0" class="form-control form-control-sm text-primary fw-bold" required /></td>
+                                <td><input name="Form.Lines[${idx}].Notes" class="form-control form-control-sm" /></td>
+                                <td class="text-center"><button type="button" class="btn btn-sm btn-danger remove-line">-</button></td>
+                            </tr>`;
+                $('#linesTable tbody').append(html);
+            });
+
+            $(document).on('click', '.remove-line', function () {
+                $(this).closest('tr').remove();
+                updateIndexes();
+            });
+
+            // Trigger click on load if table is empty
+            if ($('#linesTable tbody tr').length === 0) {
+                $('#addLine').click();
+            }
+        });
+    </script>
+}

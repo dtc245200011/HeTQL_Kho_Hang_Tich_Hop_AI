@@ -8,6 +8,7 @@ namespace DuAnCode.Web.Services
     {
         Task EnsureApprovalStepsForPurchaseAsync(PurchaseOrder po);
         Task EnsureApprovalStepsForSalesAsync(SalesOrder so);
+        Task EnsureApprovalStepsForVoucherAsync(InventoryVoucher voucher);
     }
 
     public class ApprovalWorkflowService : IApprovalWorkflowService
@@ -37,6 +38,26 @@ namespace DuAnCode.Web.Services
             if (so.TotalAmount > 100000000M)
             {
                 steps.Add(new ApprovalStep { EntityType = "SO", EntityId = so.SoId, Level = 3, ApproverRole = "Director", Status = "PENDING" });
+            }
+
+            _db.ApprovalSteps.AddRange(steps);
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task EnsureApprovalStepsForVoucherAsync(InventoryVoucher voucher)
+        {
+            var steps = new List<ApprovalStep>();
+            
+            // Cấp 1: Kế toán
+            steps.Add(new ApprovalStep { EntityType = "VOUCHER", EntityId = voucher.VoucherId, Level = 1, ApproverRole = "Accountant", Status = "PENDING" });
+            
+            // Cấp 2: Quản lý kho
+            steps.Add(new ApprovalStep { EntityType = "VOUCHER", EntityId = voucher.VoucherId, Level = 2, ApproverRole = "WarehouseManager", Status = "PENDING" });
+
+            // Cấp 3: Giám đốc (chỉ áp dụng nếu Phiếu Xuất và > 100 triệu VNĐ)
+            if (voucher.Type == "OUTBOUND" && voucher.TotalAmount > 100000000M)
+            {
+                steps.Add(new ApprovalStep { EntityType = "VOUCHER", EntityId = voucher.VoucherId, Level = 3, ApproverRole = "Director", Status = "PENDING" });
             }
 
             _db.ApprovalSteps.AddRange(steps);

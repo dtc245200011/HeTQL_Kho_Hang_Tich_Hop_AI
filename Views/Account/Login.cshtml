@@ -1,29 +1,56 @@
 @{
-    ViewData["Title"] = "Login";
+    ViewData["Title"] = "Đăng nhập";
+    Layout = null; // Don't use the main layout for the login page
 }
-<div class="min-h-screen flex items-center justify-center bg-gray-50">
-    <div class="w-full max-w-md bg-white p-6 rounded shadow">
-        <h2 class="text-xl font-semibold mb-4">Sign in</h2>
-        <form method="post" asp-controller="Account" asp-action="Login" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Username</label>
-                <input name="username" required class="mt-1 block w-full border rounded px-3 py-2" />
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đăng nhập - Quản lý Kho</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        body { background-color: #f4f7f6; font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="d-flex align-items-center justify-content-center" style="min-height: 100vh;">
+    <div class="card shadow-lg border-0 rounded-4" style="width: 100%; max-width: 400px;">
+        <div class="card-body p-5">
+            <div class="text-center mb-4">
+                <i class="fa-solid fa-boxes-stacked fa-3x text-primary mb-3"></i>
+                <h3 class="fw-bold">Đăng Nhập</h3>
+                <p class="text-muted">Hệ thống Quản lý Kho Tích hợp AI</p>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Password</label>
-                <input name="password" required type="password" class="mt-1 block w-full border rounded px-3 py-2" />
-            </div>
-            <div>
-                <button type="submit" class="w-full bg-blue-600 text-white px-3 py-2 rounded">Đăng nhập</button>
-            </div>
-            @if (!ViewData.ModelState.IsValid)
-            {
-                <div class="mt-2 text-sm text-red-700 bg-red-50 p-2 rounded">Invalid username or password</div>
-            }
-            @if(ViewData["Info"] != null)
-            {
-                <div class="mt-2 text-sm text-green-700 bg-green-50 p-2 rounded">@ViewData["Info"]</div>
-            }
-        </form>
+            
+            <form method="post" asp-controller="Account" asp-action="Login">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Email / Tên đăng nhập</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fa-solid fa-user"></i></span>
+                        <input name="username" required class="form-control" placeholder="nhanvien@wms.com" />
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">Mật khẩu</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fa-solid fa-lock"></i></span>
+                        <input name="password" required type="password" class="form-control" placeholder="••••••••" />
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold fs-5 rounded-3 mb-3">Đăng Nhập</button>
+                
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="alert alert-danger py-2 text-center" style="font-size: 0.9rem;">Sai email hoặc mật khẩu!</div>
+                }
+                @if(ViewData["Info"] != null)
+                {
+                    <div class="alert alert-success py-2 text-center" style="font-size: 0.9rem;">@ViewData["Info"]</div>
+                }
+            </form>
+        </div>
     </div>
-</div>
+</body>
+</html>

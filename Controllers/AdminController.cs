@@ -207,7 +207,7 @@ namespace DuAnCode.Web.Controllers
         public async Task<IActionResult> Users()
         {
             // Use DTO projection to avoid potential EF circular serialization and to ensure up-to-date user manager data
-            var users = await _db.Users.AsNoTracking().Select(u => new User { Id = u.Id, UserName = u.UserName, Email = u.Email }).ToListAsync();
+            var users = await _db.Users.AsNoTracking().Select(u => new User { Id = u.Id, UserName = u.UserName, Email = u.Email, LockoutEnd = u.LockoutEnd }).ToListAsync();
             var model = new List<AdminUserViewModel>();
             foreach (var u in users)
             {
@@ -217,7 +217,8 @@ namespace DuAnCode.Web.Controllers
                     Id = u.Id,
                     UserName = u.UserName ?? string.Empty,
                     Email = u.Email ?? string.Empty,
-                    Roles = string.Join(", ", roles)
+                    Roles = string.Join(", ", roles),
+                    IsLockedOut = u.LockoutEnd != null && u.LockoutEnd > DateTimeOffset.UtcNow
                 });
             }
             // also supply available roles
@@ -638,70 +639,32 @@ namespace DuAnCode.Web.Controllers
                 var fileName = $"backup_{DateTime.UtcNow:yyyyMMddHHmmss}.json";
                 var path = Path.Combine(dir, fileName);
 
-                // export full snapshot of DB tables using DTOs to avoid EF navigation issues
                 var export = new Dictionary<string, object?>();
+                export["Users"] = await _db.Users.AsNoTracking().ToListAsync();
+                export["Roles"] = await _db.Roles.AsNoTracking().ToListAsync();
+                export["UserRoles"] = await _db.Set<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>().AsNoTracking().ToListAsync();
+                export["Warehouses"] = await _db.Warehouses.AsNoTracking().ToListAsync();
+                export["ProductModels"] = await _db.ProductModels.AsNoTracking().ToListAsync();
+                export["SkuVariants"] = await _db.SkuVariants.AsNoTracking().ToListAsync();
+                export["StockLedgers"] = await _db.StockLedgers.AsNoTracking().ToListAsync();
+                export["StockMovements"] = await _db.StockMovements.AsNoTracking().ToListAsync();
+                export["InventoryVouchers"] = await _db.InventoryVouchers.AsNoTracking().ToListAsync();
+                export["VoucherLines"] = await _db.VoucherLines.AsNoTracking().ToListAsync();
+                export["AuditLogs"] = await _db.AuditLogs.AsNoTracking().ToListAsync();
+                export["ComboProducts"] = await _db.ComboProducts.AsNoTracking().ToListAsync();
+                export["BomComponents"] = await _db.BomComponents.AsNoTracking().ToListAsync();
+                export["StockTransfers"] = await _db.StockTransfers.AsNoTracking().ToListAsync();
+                export["StockTransferLines"] = await _db.StockTransferLines.AsNoTracking().ToListAsync();
+                export["StockAdjustments"] = await _db.StockAdjustments.AsNoTracking().ToListAsync();
+                export["DamagedRecords"] = await _db.DamagedRecords.AsNoTracking().ToListAsync();
+                export["ApprovalSteps"] = await _db.ApprovalSteps.AsNoTracking().ToListAsync();
+                export["AiSuggestions"] = await _db.AiSuggestions.AsNoTracking().ToListAsync();
+                export["PurchaseOrders"] = await _db.PurchaseOrders.AsNoTracking().ToListAsync();
+                export["PurchaseOrderLines"] = await _db.PurchaseOrderLines.AsNoTracking().ToListAsync();
+                export["SalesOrders"] = await _db.SalesOrders.AsNoTracking().ToListAsync();
+                export["SalesOrderLines"] = await _db.SalesOrderLines.AsNoTracking().ToListAsync();
 
-                var users = await _db.Users.AsNoTracking()
-                    .Select(u => new { u.Id, u.UserName, u.Email, u.NormalizedUserName, u.EmailConfirmed })
-                    .ToListAsync();
-                export["Users"] = users;
-
-                var roles = await _db.Roles.AsNoTracking()
-                    .Select(r => new { r.Id, r.Name, r.NormalizedName })
-                    .ToListAsync();
-                export["Roles"] = roles;
-
-                var userRoles = await _db.Set<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>().AsNoTracking()
-                    .Select(ur => new { ur.UserId, ur.RoleId })
-                    .ToListAsync();
-                export["UserRoles"] = userRoles;
-
-                var warehouses = await _db.Warehouses.AsNoTracking()
-                    .Select(w => new { w.WarehouseId, w.WarehouseName, w.WarehouseType, w.MaxCapacityCbm, w.Location, w.IsActive })
-                    .ToListAsync();
-                export["Warehouses"] = warehouses;
-
-                var productModels = await _db.ProductModels.AsNoTracking()
-                    .Select(p => new { p.ProductModelId, p.ProductName, p.Category, p.Unit })
-                    .ToListAsync();
-                export["ProductModels"] = productModels;
-
-                var skuVariants = await _db.SkuVariants.AsNoTracking()
-                    .Select(s => new { s.SkuId, s.ProductModelId, s.Color, s.Material, s.Cbm, s.UnitPrice })
-                    .ToListAsync();
-                export["SkuVariants"] = skuVariants;
-
-                var stockLedgers = await _db.StockLedgers.AsNoTracking()
-                    .Select(s => new { s.SkuId, s.WarehouseId, s.Status, s.Quantity })
-                    .ToListAsync();
-                export["StockLedgers"] = stockLedgers;
-
-                var stockMovements = await _db.StockMovements.AsNoTracking()
-                    .Select(m => new { m.MovementId, m.SkuId, m.WarehouseId, m.StockStatus, m.QuantityDelta, m.MovementType, m.ReferenceType, m.ReferenceId, m.PerformedBy, m.CreatedAt })
-                    .ToListAsync();
-                export["StockMovements"] = stockMovements;
-
-                var inventoryVouchers = await _db.InventoryVouchers.AsNoTracking()
-                    .Select(v => new { v.VoucherId, v.VoucherNumber, v.Type, v.Counterparty, v.TotalAmount })
-                    .ToListAsync();
-                export["InventoryVouchers"] = inventoryVouchers;
-
-                var voucherLines = await _db.VoucherLines.AsNoTracking()
-                    .Select(l => new { l.Id, l.VoucherId, l.SkuId, l.Quantity, l.UnitPrice })
-                    .ToListAsync();
-                export["VoucherLines"] = voucherLines;
-
-                var auditLogs = await _db.AuditLogs.AsNoTracking()
-                    .Select(a => new { a.Id, a.Action, a.PerformedBy, a.PerformedAt })
-                    .ToListAsync();
-                export["AuditLogs"] = auditLogs;
-
-                var jsonOptions = new System.Text.Json.JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles
-                };
-
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions { WriteIndented = true, ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles };
                 var json = System.Text.Json.JsonSerializer.Serialize(export, jsonOptions);
                 await System.IO.File.WriteAllTextAsync(path, json);
 
@@ -727,9 +690,29 @@ namespace DuAnCode.Web.Controllers
                 var path = Path.Combine(dir, fileName);
 
                 var export = new Dictionary<string, object?>();
-                export["Users"] = await _db.Users.AsNoTracking().Select(u => new { u.Id, u.UserName, u.Email }).ToListAsync();
-                export["Warehouses"] = await _db.Warehouses.AsNoTracking().Select(w => new { w.WarehouseId, w.WarehouseName, w.WarehouseType, w.MaxCapacityCbm }).ToListAsync();
-                export["SkuVariants"] = await _db.SkuVariants.AsNoTracking().Select(s => new { s.SkuId, s.ProductModelId, s.Cbm }).ToListAsync();
+                export["Users"] = await _db.Users.AsNoTracking().ToListAsync();
+                export["Roles"] = await _db.Roles.AsNoTracking().ToListAsync();
+                export["UserRoles"] = await _db.Set<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>().AsNoTracking().ToListAsync();
+                export["Warehouses"] = await _db.Warehouses.AsNoTracking().ToListAsync();
+                export["ProductModels"] = await _db.ProductModels.AsNoTracking().ToListAsync();
+                export["SkuVariants"] = await _db.SkuVariants.AsNoTracking().ToListAsync();
+                export["StockLedgers"] = await _db.StockLedgers.AsNoTracking().ToListAsync();
+                export["StockMovements"] = await _db.StockMovements.AsNoTracking().ToListAsync();
+                export["InventoryVouchers"] = await _db.InventoryVouchers.AsNoTracking().ToListAsync();
+                export["VoucherLines"] = await _db.VoucherLines.AsNoTracking().ToListAsync();
+                export["AuditLogs"] = await _db.AuditLogs.AsNoTracking().ToListAsync();
+                export["ComboProducts"] = await _db.ComboProducts.AsNoTracking().ToListAsync();
+                export["BomComponents"] = await _db.BomComponents.AsNoTracking().ToListAsync();
+                export["StockTransfers"] = await _db.StockTransfers.AsNoTracking().ToListAsync();
+                export["StockTransferLines"] = await _db.StockTransferLines.AsNoTracking().ToListAsync();
+                export["StockAdjustments"] = await _db.StockAdjustments.AsNoTracking().ToListAsync();
+                export["DamagedRecords"] = await _db.DamagedRecords.AsNoTracking().ToListAsync();
+                export["ApprovalSteps"] = await _db.ApprovalSteps.AsNoTracking().ToListAsync();
+                export["AiSuggestions"] = await _db.AiSuggestions.AsNoTracking().ToListAsync();
+                export["PurchaseOrders"] = await _db.PurchaseOrders.AsNoTracking().ToListAsync();
+                export["PurchaseOrderLines"] = await _db.PurchaseOrderLines.AsNoTracking().ToListAsync();
+                export["SalesOrders"] = await _db.SalesOrders.AsNoTracking().ToListAsync();
+                export["SalesOrderLines"] = await _db.SalesOrderLines.AsNoTracking().ToListAsync();
 
                 var jsonOptions = new System.Text.Json.JsonSerializerOptions { WriteIndented = true, ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles };
                 var json = System.Text.Json.JsonSerializer.Serialize(export, jsonOptions);
@@ -985,7 +968,34 @@ namespace DuAnCode.Web.Controllers
                         try
                         {
                             var users = System.Text.Json.JsonSerializer.Deserialize<List<User>>(usersEl.GetRawText());
-                            if (users != null && users.Any()) { await _db.Users.AddRangeAsync(users); await _db.SaveChangesAsync(); }
+                            if (users != null && users.Any()) 
+                            { 
+                                var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<User>();
+                                foreach(var u in users)
+                                {
+                                    if (string.IsNullOrEmpty(u.PasswordHash))
+                                    {
+                                        u.PasswordHash = hasher.HashPassword(u, "ChangeMe123!");
+                                    }
+                                    if (string.IsNullOrEmpty(u.SecurityStamp))
+                                    {
+                                        u.SecurityStamp = Guid.NewGuid().ToString();
+                                    }
+                                }
+                                await _db.Users.AddRangeAsync(users); 
+                                await _db.SaveChangesAsync(); 
+                            }
+                        }
+                        catch { }
+                    }
+
+                    // UserRoles
+                    if (doc.RootElement.TryGetProperty("UserRoles", out var urEl))
+                    {
+                        try
+                        {
+                            var urs = System.Text.Json.JsonSerializer.Deserialize<List<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>>(urEl.GetRawText());
+                            if (urs != null && urs.Any()) { await _db.Set<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>().AddRangeAsync(urs); await _db.SaveChangesAsync(); }
                         }
                         catch { }
                     }

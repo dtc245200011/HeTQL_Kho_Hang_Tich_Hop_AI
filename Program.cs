@@ -43,6 +43,8 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/Account/AccessDenied";
 });
 
+builder.Services.AddHostedService<DuAnCode.Web.Services.OllamaStartupService>();
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())

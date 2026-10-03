@@ -12,5 +12,8 @@ namespace DuAnCode.Web.Models
         public decimal Cbm { get; set; }
         public decimal UnitPrice { get; set; }
         public bool IsActive { get; set; } = true;
+        
+        // Khả năng tùy biến: Lưu trữ các thuộc tính động (dynamic attributes) dưới dạng JSON
+        public string? CustomAttributesJson { get; set; }
     }
 }

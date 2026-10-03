@@ -7,42 +7,64 @@
     var rows = Model?.ReportRows ?? Enumerable.Empty<ReportRow>();
 }
 
-<div class="bg-white p-4 rounded shadow max-w-5xl mx-auto">
-    <h2 class="text-lg font-semibold mb-4">Báo cáo Nhập - Xuất - Tồn</h2>
-    <form method="get" class="space-x-2 mb-4">
-        <label class="text-sm">Từ ngày</label>
-        <input type="date" name="from" class="border rounded px-2 py-1" />
-        <label class="text-sm">Đến ngày</label>
-        <input type="date" name="to" class="border rounded px-2 py-1" />
-        <label class="text-sm">Kho</label>
-        <select name="warehouse" class="border rounded px-2 py-1">
-            <option value="">Tất cả</option>
-            @foreach(var w in warehouses){ <option value="@((w as dynamic).WarehouseId)">@((w as dynamic).WarehouseName)</option> }
-        </select>
-        <button type="submit" class="bg-indigo-600 text-white px-3 py-1 rounded">Lọc</button>
-    </form>
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Báo cáo Nhập - Xuất - Tồn</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3 mb-4 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Từ ngày</label>
+                    <input type="date" name="from" class="form-control" value="@ViewBag.From" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Đến ngày</label>
+                    <input type="date" name="to" class="form-control" value="@ViewBag.To" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Kho hàng</label>
+                    <select name="warehouse" class="form-select">
+                        <option value="">Tất cả các kho</option>
+                        @foreach(var w in warehouses){ 
+                            <option value="@((w as dynamic).WarehouseId)" selected="@(((w as dynamic).WarehouseId == ViewBag.SelectedWarehouse) ? "selected" : null)">@((w as dynamic).WarehouseName)</option> 
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fa-solid fa-filter"></i> Lọc dữ liệu</button>
+                </div>
+            </form>
 
-    <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50 text-left text-sm text-gray-600">
-            <tr>
-                <th class="px-4 py-2">Mã SKU</th>
-                <th class="px-4 py-2">Tồn đầu kỳ</th>
-                <th class="px-4 py-2">Tổng Nhập trong kỳ</th>
-                <th class="px-4 py-2">Tổng Xuất trong kỳ</th>
-                <th class="px-4 py-2">Tồn cuối kỳ</th>
-            </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-100">
-            @foreach(var row in rows)
-            {
-                <tr>
-                    <td class="px-4 py-2">@row.SkuId</td>
-                    <td class="px-4 py-2">@row.Beginning</td>
-                    <td class="px-4 py-2">@row.TotalIn</td>
-                    <td class="px-4 py-2">@row.TotalOut</td>
-                    <td class="px-4 py-2">@row.Ending</td>
-                </tr>
-            }
-        </tbody>
-    </table>
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Mã SKU</th>
+                            <th class="text-end">Tồn đầu kỳ</th>
+                            <th class="text-end">Tổng Nhập trong kỳ</th>
+                            <th class="text-end">Tổng Xuất trong kỳ</th>
+                            <th class="text-end text-primary">Tồn cuối kỳ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if(!rows.Any())
+                        {
+                            <tr><td colspan="5" class="text-center">Không có dữ liệu báo cáo</td></tr>
+                        }
+                        @foreach(var row in rows)
+                        {
+                            <tr>
+                                <td class="fw-bold">@row.SkuId</td>
+                                <td class="text-end">@row.Beginning</td>
+                                <td class="text-end text-success">@row.TotalIn</td>
+                                <td class="text-end text-danger">@row.TotalOut</td>
+                                <td class="text-end text-primary fw-bold">@row.Ending</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>

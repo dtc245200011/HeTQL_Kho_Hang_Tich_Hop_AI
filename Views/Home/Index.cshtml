@@ -2,13 +2,10 @@
 @{
     ViewData["Title"] = "Tổng quan";
 }
+@if (Model == null) { return; }
 
 <div class="container-fluid">
-    <form method="get" class="row g-2 mb-3" onsubmit="return false;">
-        <input type="hidden" name="tab" value="@Model.Tab" />
-        <div class="col-md-4">
-            <input type="text" name="search" value="@Model.Search" class="form-control" placeholder="Tìm tên hoặc SKU..." />
-        </div>
+
 
 <!-- Modals for full lists -->
 <div class="modal fade" id="modalAllInventory" tabindex="-1">
@@ -290,19 +287,7 @@ document.addEventListener('DOMContentLoaded', function(){
   wireModalSearch('outSearch','tableAllOutbound');
 });
 </script>
-        <div class="col-md-3">
-            <select name="status" class="form-select">
-                <option value="">-- Trạng thái / Loại --</option>
-                <option value="GOOD" selected="@(Model?.Status == "GOOD" ? "selected" : null)">GOOD</option>
-                <option value="DAMAGED" selected="@(Model?.Status == "DAMAGED" ? "selected" : null)">DAMAGED</option>
-                <option value="RESERVED" selected="@(Model?.Status == "RESERVED" ? "selected" : null)">RESERVED</option>
-            </select>
-        </div>
-            <div class="col-md-5 d-flex gap-2">
-            <button type="submit" class="btn btn-primary">Tìm kiếm</button>
-            <a href="@Url.Action("Index","Home")" class="btn btn-outline-secondary">Xóa lọc</a>
-        </div>
-    </form>
+
 
     <div class="row">
         <div class="col-lg-6 mb-4">
@@ -317,7 +302,7 @@ document.addEventListener('DOMContentLoaded', function(){
                             <tr><th>SKU</th><th>Sản phẩm</th><th>Kho</th><th>Trạng thái</th><th>Số lượng</th></tr>
                         </thead>
                         <tbody>
-                            @foreach(var it in Model.Inventory)
+                            @foreach(var it in Model?.Inventory ?? new List<DuAnCode.Web.Models.ViewModels.StockLedgerVm>())
                             {
                                 <tr>
                                     <td>@it.SkuId</td>
@@ -331,9 +316,9 @@ document.addEventListener('DOMContentLoaded', function(){
                     </table>
                 </div>
                 <div class="card-footer">
-                    @if (!Model.ViewAll)
+                    @if (!(Model?.ViewAll ?? false))
                     {
-                        var totalPages = (int)Math.Ceiling(Model.InventoryTotal / (double)Model.PageSize);
+                        var totalPages = (int)Math.Ceiling((Model?.InventoryTotal ?? 0) / (double)(Model?.PageSize ?? 1));
                         <nav>
                             <ul class="pagination mb-0">
                                 <li class="page-item @(Model.Page<=1?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page-1, tab = "inventory", search = Model.Search, status = Model.Status })">«</a></li>

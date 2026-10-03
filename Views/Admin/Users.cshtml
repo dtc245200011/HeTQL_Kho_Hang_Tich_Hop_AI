@@ -12,7 +12,7 @@
     @if(TempData["Error"] != null){ <div class="alert alert-danger">@TempData["Error"]</div> }
 
     <table class="table table-striped">
-        <thead><tr><th>UserName</th><th>Email</th><th>Roles</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Tên đăng nhập</th><th>Email</th><th>Phân quyền</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
         <tbody>
             @foreach(var u in Model ?? new List<DuAnCode.Web.Models.ViewModels.AdminUserViewModel>()){
                 <tr>
@@ -30,25 +30,34 @@
                                     <option value="@r" selected="@(u.Roles?.Contains(r) == true)" disabled="@(totalUsers == 1)">@r</option>
                                 }
                             </select>
-                            <button type="button" class="btn btn-sm btn-outline-primary btn-save-role">Save</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary btn-save-role">Lưu</button>
                         </form>
                     </td>
-                    <td>@(u.Roles)</td>
+                    <td>
+                        @if (u.IsLockedOut)
+                        {
+                            <span class="badge bg-danger">Bị khóa</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success">Hoạt động</span>
+                        }
+                    </td>
                     <td>
                         <form method="post" asp-controller="Admin" asp-action="ToggleLock" class="d-inline">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="userId" value="@u.Id" />
-                            <button class="btn btn-sm btn-warning">Toggle Lock</button>
+                            <button class="btn btn-sm btn-warning">@(@u.IsLockedOut ? "Mở khóa" : "Khóa")</button>
                         </form>
-                        <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#resetModal_@u.Id">Reset PW</button>
+                        <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#resetModal_@u.Id">Đổi MK</button>
                         @{ var totalUsers = ViewBag.TotalUsers as int? ?? 0; }
                         @if(totalUsers > 1){
                             <form class="deleteUserForm d-inline" style="display:inline">
                                 @Html.AntiForgeryToken()
-                                <button type="button" class="btn btn-sm btn-danger btn-delete-user" data-userid="@u.Id">Delete</button>
+                                <button type="button" class="btn btn-sm btn-danger btn-delete-user" data-userid="@u.Id">Xóa</button>
                             </form>
                         } else {
-                            <button class="btn btn-sm btn-danger" disabled>Delete</button>
+                            <button class="btn btn-sm btn-danger" disabled>Xóa</button>
                         }
                     </td>
                 </tr>
