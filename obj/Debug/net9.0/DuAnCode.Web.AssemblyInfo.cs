@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DuAnCode.Web")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fc33cc2957c9756478675bb2bc59030fa6312253")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+eb10305360eca49d2b51ff5e758a2ea80021cbad")]
 [assembly: System.Reflection.AssemblyProductAttribute("DuAnCode.Web")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DuAnCode.Web")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

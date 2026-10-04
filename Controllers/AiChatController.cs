@@ -30,10 +30,14 @@ namespace DuAnCode.Web.Controllers
 
             try
             {
+                var config = await _db.SystemConfigs.FirstOrDefaultAsync();
+                var ollamaUrl = string.IsNullOrWhiteSpace(config?.OllamaUrl) ? "http://localhost:11434" : config.OllamaUrl;
+                var modelName = string.IsNullOrWhiteSpace(config?.OllamaModel) ? "qwen2.5-coder:7b" : config.OllamaModel;
+
                 var client = _clientFactory.CreateClient();
                 var payload = new
                 {
-                    model = "qwen2.5-coder:7b",
+                    model = modelName,
                     messages = new[] {
                         new { role = "system", content = "Bạn là trợ lý AI quản lý kho hàng của hệ thống DuAnCode WMS. Đặc biệt lưu ý các LỆNH sau:\n- Nếu người dùng yêu cầu 'mở', 'đi đến', 'truy cập' chức năng (vd: phiếu nhập, xuất kho, kiểm kê, báo cáo), thêm lệnh ở cuối: [NAVIGATE: <url>] (URL: /Inbound, /Outbound, /StockTransfer, /InventoryAudit, /Replenishment, /Report, /Admin/Users).\n- Nếu người dùng yêu cầu 'tạo báo cáo', 'xuất báo cáo', 'xuất dữ liệu', thêm lệnh: [NAVIGATE: /Admin/ExportData]\n- Nếu người dùng yêu cầu 'chạy phân tích AI', 'tạo gợi ý nhập hàng', 'phân tích kho', thêm lệnh: [ACTION: TRIGGER_REPLENISHMENT]\nHãy trả lời thân thiện và kèm theo mã lệnh tương ứng." },
                         new { role = "user", content = request.Prompt }
@@ -41,8 +45,9 @@ namespace DuAnCode.Web.Controllers
                     stream = false
                 };
 
+                var requestUrl = $"{ollamaUrl.TrimEnd('/')}/api/chat";
                 var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-                var response = await client.PostAsync("http://localhost:11434/api/chat", content);
+                var response = await client.PostAsync(requestUrl, content);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -51,7 +56,8 @@ namespace DuAnCode.Web.Controllers
                     var reply = doc.RootElement.GetProperty("message").GetProperty("content").GetString();
                     return Ok(new { reply });
                 }
-                return StatusCode((int)response.StatusCode, "Lỗi khi gọi AI cục bộ.");
+                var errorBody = await response.Content.ReadAsStringAsync();
+                return StatusCode((int)response.StatusCode, $"Lỗi từ Ollama: {errorBody}");
             }
             catch (Exception ex)
             {

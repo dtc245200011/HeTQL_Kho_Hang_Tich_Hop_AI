@@ -487,7 +487,7 @@ namespace DuAnCode.Web.Controllers
         {
             if (vm == null || vm.Config == null) return RedirectToAction("Settings");
 
-            // Ensure the SystemConfigs table exists (safe-create for SQL Server)
+            // Ensure the SystemConfigs table exists and has necessary columns (safe-create/alter for SQL Server)
             try
             {
                 await _db.Database.ExecuteSqlRawAsync(@"
@@ -500,9 +500,64 @@ namespace DuAnCode.Web.Controllers
                             Address NVARCHAR(500) NULL,
                             Phone NVARCHAR(50) NULL,
                             Email NVARCHAR(100) NULL,
-                            AutoBackup BIT NOT NULL DEFAULT 0
+                            AutoBackup BIT NOT NULL DEFAULT 0,
+                            MaintenanceMode BIT NOT NULL DEFAULT 0,
+                            StopInbound BIT NOT NULL DEFAULT 0,
+                            StopOutbound BIT NOT NULL DEFAULT 0,
+                            StopApi BIT NOT NULL DEFAULT 0,
+                            LowStockAlertThreshold INT NOT NULL DEFAULT 10,
+                            CapacityAlertPercent INT NOT NULL DEFAULT 90,
+                            EnableEmailAlerts BIT NOT NULL DEFAULT 1,
+                            InboundPrefix NVARCHAR(50) NOT NULL DEFAULT 'PN-',
+                            OutboundPrefix NVARCHAR(50) NOT NULL DEFAULT 'PX-',
+                            BarcodeFormat NVARCHAR(50) NOT NULL DEFAULT 'QR',
+                            LabelWidth INT NOT NULL DEFAULT 50,
+                            LabelHeight INT NOT NULL DEFAULT 50,
+                            PrintPriceOnLabel BIT NOT NULL DEFAULT 1,
+                            PrintExpiryOnLabel BIT NOT NULL DEFAULT 1,
+                            OllamaUrl NVARCHAR(255) NOT NULL DEFAULT 'http://localhost:11434',
+                            OllamaModel NVARCHAR(100) NOT NULL DEFAULT 'llama3',
+                            AiScanIntervalMinutes INT NOT NULL DEFAULT 30,
+                            DefaultLanguage NVARCHAR(50) NOT NULL DEFAULT 'vi-VN',
+                            CurrencyFormat NVARCHAR(50) NOT NULL DEFAULT 'VND'
                         );
-                    END");
+                    END
+                    ELSE
+                    BEGIN
+                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE Name = N'MaintenanceMode' AND Object_ID = Object_ID(N'SystemConfigs'))
+                        BEGIN
+                            ALTER TABLE SystemConfigs ADD 
+                                MaintenanceMode BIT NOT NULL DEFAULT 0,
+                                StopInbound BIT NOT NULL DEFAULT 0,
+                                StopOutbound BIT NOT NULL DEFAULT 0,
+                                StopApi BIT NOT NULL DEFAULT 0,
+                                LowStockAlertThreshold INT NOT NULL DEFAULT 10,
+                                CapacityAlertPercent INT NOT NULL DEFAULT 90,
+                                EnableEmailAlerts BIT NOT NULL DEFAULT 1;
+                        END
+                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE Name = N'InboundPrefix' AND Object_ID = Object_ID(N'SystemConfigs'))
+                        BEGIN
+                            ALTER TABLE SystemConfigs ADD 
+                                InboundPrefix NVARCHAR(50) NOT NULL DEFAULT 'PN-',
+                                OutboundPrefix NVARCHAR(50) NOT NULL DEFAULT 'PX-',
+                                BarcodeFormat NVARCHAR(50) NOT NULL DEFAULT 'QR',
+                                LabelWidth INT NOT NULL DEFAULT 50,
+                                LabelHeight INT NOT NULL DEFAULT 50,
+                                PrintPriceOnLabel BIT NOT NULL DEFAULT 1,
+                                PrintExpiryOnLabel BIT NOT NULL DEFAULT 1,
+                                OllamaUrl NVARCHAR(255) NOT NULL DEFAULT 'http://localhost:11434',
+                                OllamaModel NVARCHAR(100) NOT NULL DEFAULT 'llama3',
+                                AiScanIntervalMinutes INT NOT NULL DEFAULT 30,
+                                DefaultLanguage NVARCHAR(50) NOT NULL DEFAULT 'vi-VN',
+                                CurrencyFormat NVARCHAR(50) NOT NULL DEFAULT 'VND';
+                        END
+                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE Name = N'AiScanIntervalMinutes' AND Object_ID = Object_ID(N'SystemConfigs'))
+                        BEGIN
+                            ALTER TABLE SystemConfigs ADD 
+                                AiScanIntervalMinutes INT NOT NULL DEFAULT 30;
+                        END
+                    END
+                ");
             }
             catch
             {
@@ -518,6 +573,7 @@ namespace DuAnCode.Web.Controllers
                 var existing = await _db.SystemConfigs.FirstOrDefaultAsync();
                 if (existing == null)
                 {
+                    if (model.AiScanIntervalMinutes <= 0) model.AiScanIntervalMinutes = 30;
                     _db.SystemConfigs.Add(model);
                 }
                 else
@@ -527,6 +583,29 @@ namespace DuAnCode.Web.Controllers
                     existing.Phone = model.Phone;
                     existing.AutoBackup = model.AutoBackup;
                     existing.Email = model.Email;
+                    
+                    // Stop & Alerts fields
+                    existing.MaintenanceMode = model.MaintenanceMode;
+                    existing.StopInbound = model.StopInbound;
+                    existing.StopOutbound = model.StopOutbound;
+                    existing.StopApi = model.StopApi;
+                    existing.LowStockAlertThreshold = model.LowStockAlertThreshold;
+                    existing.CapacityAlertPercent = model.CapacityAlertPercent;
+                    existing.EnableEmailAlerts = model.EnableEmailAlerts;
+
+                    // New Fields
+                    existing.InboundPrefix = model.InboundPrefix ?? "PN-";
+                    existing.OutboundPrefix = model.OutboundPrefix ?? "PX-";
+                    existing.BarcodeFormat = model.BarcodeFormat ?? "QR";
+                    existing.LabelWidth = model.LabelWidth > 0 ? model.LabelWidth : 50;
+                    existing.LabelHeight = model.LabelHeight > 0 ? model.LabelHeight : 50;
+                    existing.PrintPriceOnLabel = model.PrintPriceOnLabel;
+                    existing.PrintExpiryOnLabel = model.PrintExpiryOnLabel;
+                    existing.OllamaUrl = string.IsNullOrWhiteSpace(model.OllamaUrl) ? "http://localhost:11434" : model.OllamaUrl;
+                    existing.OllamaModel = string.IsNullOrWhiteSpace(model.OllamaModel) ? "qwen2.5-coder:7b" : model.OllamaModel;
+                    existing.AiScanIntervalMinutes = model.AiScanIntervalMinutes > 0 ? model.AiScanIntervalMinutes : 30;
+                    existing.DefaultLanguage = model.DefaultLanguage ?? "vi-VN";
+                    existing.CurrencyFormat = model.CurrencyFormat ?? "VND";
                 }
 
                 await _db.SaveChangesAsync();

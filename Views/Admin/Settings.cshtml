@@ -2,87 +2,364 @@
 @{
     ViewData["Title"] = "Cấu hình hệ thống";
 }
-<div class="container mt-4">
-    <h3>Cấu hình kho</h3>
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold m-0"><i class="fa-solid fa-gears me-2 text-primary"></i>Cấu hình hệ thống</h3>
+    </div>
+
     @if(TempData["Error"] != null)
     {
-        <div class="alert alert-danger">@TempData["Error"]</div>
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
     }
-    @if(TempData["Message"] != null)
+    @if(TempData["Message"] != null || TempData["Success"] != null)
     {
-        <div class="alert alert-success">@TempData["Message"]</div>
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fa-solid fa-circle-check me-2"></i>@(TempData["Message"] ?? TempData["Success"])
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
     }
-    @if(TempData["Success"] != null)
-    {
-        <div class="alert alert-success">@TempData["Success"]</div>
-    }
-    <form method="post" asp-controller="Admin" asp-action="SettingsPost">
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label">Thông tin Doanh nghiệp</label>
-                    <input name="Config.CompanyName" value="@Model?.Config?.CompanyName" class="form-control" placeholder="Tên Công ty / Thương hiệu" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Địa chỉ</label>
-                    <input name="Config.Address" value="@Model?.Config?.Address" class="form-control" placeholder="Địa chỉ công ty" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Số điện thoại</label>
-                    <input name="Config.Phone" value="@Model?.Config?.Phone" class="form-control" placeholder="Số điện thoại liên hệ" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Email quản lý</label>
-                    <input name="Config.Email" value="@Model?.Config?.Email" class="form-control" placeholder="email@company.com" />
-                </div>
-                <div class="form-check form-switch mb-3">
-                    <input type="hidden" name="Config.AutoBackup" value="false" />
-                    <input class="form-check-input" type="checkbox" role="switch" name="Config.AutoBackup" id="AutoBackup" value="true" @(Model?.Config?.AutoBackup == true ? "checked" : "") />
-                    <label class="form-check-label" for="AutoBackup">Tự động sao lưu dữ liệu</label>
-                </div>
-                <button type="submit" class="btn btn-primary">Lưu cấu hình</button>
-            </div>
-            <div class="col-md-6">
-                <h5>Danh sách kho</h5>
-                <table class="table table-sm">
-                    <thead><tr><th>Mã kho</th><th>Tên kho</th><th>Loại kho</th><th>Sức chứa tối đa (CBM)</th><th></th></tr></thead>
-                    <tbody>
-                        @if (Model?.Warehouses != null && Model.Warehouses.Any())
-                        {
-                            foreach(var w in Model.Warehouses)
-                            {
-                            <tr>
-                                <td>@w.WarehouseId</td>
-                                <td>@w.WarehouseName</td>
-                                <td>@w.WarehouseType</td>
-                                <td>@w.MaxCapacityCbm</td>
-                                <td>
-                                    <form method="post" asp-controller="Admin" asp-action="DeleteWarehouse" style="display:inline">
-                                        <input type="hidden" name="id" value="@w.WarehouseId" />
-                                        <button class="btn btn-sm btn-danger">Xóa</button>
-                                    </form>
-                                </td>
-                            </tr>
-                            }
-                        }
-                    </tbody>
-                </table>
-                <h6>Thêm kho hàng mới</h6>
-                <form method="post" asp-controller="Admin" asp-action="AddWarehouse">
-                    <div class="mb-2"><input name="code" placeholder="Mã kho (ví dụ: WH-01)" class="form-control" /></div>
-                    <div class="mb-2"><input name="name" placeholder="Tên kho" class="form-control" /></div>
-                    <div class="mb-2">
-                        <select name="type" class="form-select">
-                            <option value="MAIN">Kho chính (MAIN)</option>
-                            <option value="DAMAGED">Kho hàng lỗi (DAMAGED)</option>
-                            <option value="QC">Kho kiểm định (QC)</option>
-                        </select>
+
+    <div class="row">
+        <!-- FORM CHÍNH CHO CÁC CẤU HÌNH HỆ THỐNG -->
+        <div class="col-12">
+            <form method="post" asp-controller="Admin" asp-action="SettingsPost">
+                
+                <!-- 1. Thông tin Doanh nghiệp -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseCompany">
+                        <strong class="text-primary"><i class="fa-solid fa-building me-2"></i>Thông tin Doanh nghiệp</strong>
+                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
                     </div>
-                    <div class="mb-2"><input name="location" placeholder="Vị trí kho" class="form-control" /></div>
-                    <div class="mb-2"><input name="capacity" placeholder="Sức chứa CBM (numeric)" type="number" step="0.01" class="form-control" /></div>
-                    <button class="btn btn-sm btn-success">Thêm kho</button>
-                </form>
+                    <div class="collapse" id="collapseCompany">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Tên Công ty / Thương hiệu</label>
+                                    <input name="Config.CompanyName" value="@Model?.Config?.CompanyName" class="form-control" placeholder="Tên Công ty" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Email quản lý</label>
+                                    <input name="Config.Email" value="@Model?.Config?.Email" class="form-control" placeholder="email@company.com" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Số điện thoại</label>
+                                    <input name="Config.Phone" value="@Model?.Config?.Phone" class="form-control" placeholder="Số điện thoại liên hệ" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Địa chỉ</label>
+                                    <input name="Config.Address" value="@Model?.Config?.Address" class="form-control" placeholder="Địa chỉ công ty" />
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="hidden" name="Config.AutoBackup" value="false" />
+                                        <input class="form-check-input" type="checkbox" role="switch" name="Config.AutoBackup" id="AutoBackup" value="true" @(Model?.Config?.AutoBackup == true ? "checked" : "") />
+                                        <label class="form-check-label" for="AutoBackup">Tự động sao lưu dữ liệu hệ thống (Hàng ngày)</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Thiết lập Dừng (Stop Configurations) -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseStopConfig">
+                        <strong class="text-danger"><i class="fa-solid fa-power-off me-2"></i>Thiết lập Dừng & Bảo trì</strong>
+                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
+                    </div>
+                    <div class="collapse" id="collapseStopConfig">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch mb-3">
+                                        <input type="hidden" name="Config.MaintenanceMode" value="false" />
+                                        <input class="form-check-input" type="checkbox" role="switch" name="Config.MaintenanceMode" id="MaintenanceMode" value="true" @(Model?.Config?.MaintenanceMode == true ? "checked" : "")>
+                                        <label class="form-check-label fw-bold text-danger" for="MaintenanceMode">Bật chế độ bảo trì hệ thống</label>
+                                        <div class="form-text">Khóa truy cập với toàn bộ nhân viên, chỉ Admin được phép sử dụng.</div>
+                                    </div>
+                                    <div class="form-check form-switch mb-3">
+                                        <input type="hidden" name="Config.StopInbound" value="false" />
+                                        <input class="form-check-input" type="checkbox" role="switch" name="Config.StopInbound" id="StopInbound" value="true" @(Model?.Config?.StopInbound == true ? "checked" : "")>
+                                        <label class="form-check-label fw-semibold" for="StopInbound">Dừng tiếp nhận Phiếu Nhập Kho mới</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch mb-3">
+                                        <input type="hidden" name="Config.StopOutbound" value="false" />
+                                        <input class="form-check-input" type="checkbox" role="switch" name="Config.StopOutbound" id="StopOutbound" value="true" @(Model?.Config?.StopOutbound == true ? "checked" : "")>
+                                        <label class="form-check-label fw-semibold" for="StopOutbound">Dừng tạo Phiếu Xuất Kho mới</label>
+                                    </div>
+                                    <div class="form-check form-switch mb-3">
+                                        <input type="hidden" name="Config.StopApi" value="false" />
+                                        <input class="form-check-input" type="checkbox" role="switch" name="Config.StopApi" id="StopApi" value="true" @(Model?.Config?.StopApi == true ? "checked" : "")>
+                                        <label class="form-check-label fw-semibold" for="StopApi">Khóa cổng API kết nối từ bên thứ ba</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Thiết lập Cảnh báo (Alerts) -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseAlerts">
+                        <strong class="text-warning"><i class="fa-solid fa-bell me-2"></i>Thiết lập Cảnh báo</strong>
+                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
+                    </div>
+                    <div class="collapse" id="collapseAlerts">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Ngưỡng tồn kho tối thiểu (Low stock alert)</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" name="Config.LowStockAlertThreshold" value="@(Model?.Config?.LowStockAlertThreshold ?? 10)" placeholder="Số lượng">
+                                        <span class="input-group-text">Đơn vị</span>
+                                    </div>
+                                    <div class="form-text">Cảnh báo nếu sản phẩm có số lượng tồn dưới mức này.</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Ngưỡng sức chứa kho (Capacity alert)</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" name="Config.CapacityAlertPercent" value="@(Model?.Config?.CapacityAlertPercent ?? 90)" placeholder="Phần trăm">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <div class="form-text">Cảnh báo khi sức chứa của kho đạt mức tỷ lệ này.</div>
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="hidden" name="Config.EnableEmailAlerts" value="false" />
+                                        <input class="form-check-input" type="checkbox" role="switch" name="Config.EnableEmailAlerts" id="EnableEmailAlerts" value="true" @((Model?.Config?.EnableEmailAlerts ?? true) ? "checked" : "")>
+                                        <label class="form-check-label fw-semibold" for="EnableEmailAlerts">Gửi email cho Quản trị viên khi có cảnh báo</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                
+                <!-- 4. Cấu hình Tiền tố Mã Chứng Từ (Prefix) -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapsePrefix">
+                        <strong class="text-info"><i class="fa-solid fa-file-invoice-dollar me-2"></i>Cấu hình Tiền tố Mã Chứng Từ</strong>
+                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
+                    </div>
+                    <div class="collapse" id="collapsePrefix">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Tiền tố Phiếu Nhập Kho</label>
+                                    <input type="text" class="form-control" name="Config.InboundPrefix" value="@(Model?.Config?.InboundPrefix ?? "PN-")" placeholder="VD: PN-">
+                                    <div class="form-text">Mã phiếu tự sinh sẽ có dạng: <strong>@(Model?.Config?.InboundPrefix ?? "PN-")20231015...</strong></div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Tiền tố Phiếu Xuất Kho</label>
+                                    <input type="text" class="form-control" name="Config.OutboundPrefix" value="@(Model?.Config?.OutboundPrefix ?? "PX-")" placeholder="VD: PX-">
+                                    <div class="form-text">Mã phiếu tự sinh sẽ có dạng: <strong>@(Model?.Config?.OutboundPrefix ?? "PX-")20231015...</strong></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Cấu hình In tem nhãn (Barcode/QR) -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseBarcode">
+                        <strong class="text-secondary"><i class="fa-solid fa-barcode me-2"></i>Cấu hình In tem nhãn</strong>
+                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
+                    </div>
+                    <div class="collapse" id="collapseBarcode">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">Định dạng mã vạch</label>
+                                    <select name="Config.BarcodeFormat" class="form-select">
+                                        <option value="QR" selected="@(Model?.Config?.BarcodeFormat == "QR")">Mã QR Code</option>
+                                        <option value="BARCODE" selected="@(Model?.Config?.BarcodeFormat == "BARCODE")">Mã vạch đứng (Barcode)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">Chiều rộng tem (mm)</label>
+                                    <input type="number" class="form-control" name="Config.LabelWidth" value="@(Model?.Config?.LabelWidth > 0 ? Model.Config.LabelWidth : 50)">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">Chiều cao tem (mm)</label>
+                                    <input type="number" class="form-control" name="Config.LabelHeight" value="@(Model?.Config?.LabelHeight > 0 ? Model.Config.LabelHeight : 50)">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="hidden" name="Config.PrintPriceOnLabel" value="false" />
+                                        <input class="form-check-input" type="checkbox" role="switch" name="Config.PrintPriceOnLabel" id="PrintPriceOnLabel" value="true" @((Model?.Config?.PrintPriceOnLabel ?? true) ? "checked" : "")>
+                                        <label class="form-check-label fw-semibold" for="PrintPriceOnLabel">Hiển thị Đơn giá trên tem</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="hidden" name="Config.PrintExpiryOnLabel" value="false" />
+                                        <input class="form-check-input" type="checkbox" role="switch" name="Config.PrintExpiryOnLabel" id="PrintExpiryOnLabel" value="true" @((Model?.Config?.PrintExpiryOnLabel ?? true) ? "checked" : "")>
+                                        <label class="form-check-label fw-semibold" for="PrintExpiryOnLabel">Hiển thị Hạn sử dụng trên tem</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. Cấu hình kết nối Ollama (AI) -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseOllama">
+                        <strong class="text-primary"><i class="fa-solid fa-robot me-2"></i>Cấu hình kết nối Ollama (AI)</strong>
+                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
+                    </div>
+                    <div class="collapse" id="collapseOllama">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-5 mb-3">
+                                    <label class="form-label fw-semibold">Địa chỉ Máy chủ Ollama (URL)</label>
+                                    <input type="text" class="form-control" name="Config.OllamaUrl" value="@(string.IsNullOrWhiteSpace(Model?.Config?.OllamaUrl) ? "http://localhost:11434" : Model.Config.OllamaUrl)" placeholder="http://localhost:11434">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold">Mô hình Ngôn ngữ (Model)</label>
+                                    <input type="text" class="form-control" name="Config.OllamaModel" value="@(string.IsNullOrWhiteSpace(Model?.Config?.OllamaModel) ? "qwen2.5-coder:7b" : Model.Config.OllamaModel)" placeholder="VD: qwen2.5-coder:7b">
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label fw-semibold">Tần suất quét (phút)</label>
+                                    <input type="number" class="form-control" name="Config.AiScanIntervalMinutes" value="@(Model?.Config?.AiScanIntervalMinutes > 0 ? Model.Config.AiScanIntervalMinutes : 30)">
+                                    <div class="form-text">Mặc định: 30 phút.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 7. Cấu hình Đa ngôn ngữ (I18N) -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseLanguage">
+                        <strong class="text-success"><i class="fa-solid fa-language me-2"></i>Cấu hình Đa ngôn ngữ & Khu vực</strong>
+                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
+                    </div>
+                    <div class="collapse" id="collapseLanguage">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Ngôn ngữ mặc định</label>
+                                    <select name="Config.DefaultLanguage" class="form-select">
+                                        <option value="vi-VN" selected="@(Model?.Config?.DefaultLanguage == "vi-VN")">Tiếng Việt (vi-VN)</option>
+                                        <option value="en-US" selected="@(Model?.Config?.DefaultLanguage == "en-US")">English (en-US)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Định dạng Tiền tệ</label>
+                                    <select name="Config.CurrencyFormat" class="form-select">
+                                        <option value="VND" selected="@(Model?.Config?.CurrencyFormat == "VND")">Việt Nam Đồng (VND)</option>
+                                        <option value="USD" selected="@(Model?.Config?.CurrencyFormat == "USD")">Đô la Mỹ (USD)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Sticky Save Button for System Configs -->
+                <div class="position-sticky bottom-0 bg-white p-3 shadow-lg border-top rounded text-end mb-4 z-3">
+                    <button type="submit" class="btn btn-primary px-5 fw-bold"><i class="fa-solid fa-floppy-disk me-2"></i>Lưu toàn bộ Cấu hình Hệ thống</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 4. Quản lý Kho hàng -->
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseWarehouse">
+                    <strong class="text-success"><i class="fa-solid fa-warehouse me-2"></i>Quản lý Kho hàng</strong>
+                    <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
+                </div>
+                <div class="collapse" id="collapseWarehouse">
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Form thêm kho -->
+                            <div class="col-12 mb-4">
+                                <h6 class="fw-bold text-primary mb-3 text-uppercase">Thêm kho hàng mới</h6>
+                                <form method="post" asp-controller="Admin" asp-action="AddWarehouse">
+                                    <div class="row g-3">
+                                        <div class="col-md-3">
+                                            <label class="form-label text-muted small fw-semibold text-uppercase">Mã kho (ID)</label>
+                                            <input name="code" placeholder="VD: WH-01" class="form-control form-control-sm" required />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label text-muted small fw-semibold text-uppercase">Tên kho</label>
+                                            <input name="name" placeholder="VD: Kho chính Hà Nội" class="form-control form-control-sm" required />
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label text-muted small fw-semibold text-uppercase">Phân loại</label>
+                                            <select name="type" class="form-select form-select-sm">
+                                                <option value="MAIN">Kho chính</option>
+                                                <option value="DAMAGED">Kho lỗi</option>
+                                                <option value="QC">Kho kiểm định</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label text-muted small fw-semibold text-uppercase">Sức chứa (CBM)</label>
+                                            <input name="capacity" type="number" step="0.01" class="form-control form-control-sm" value="100" />
+                                        </div>
+                                        <div class="col-md-9 mt-3">
+                                            <label class="form-label text-muted small fw-semibold text-uppercase">Vị trí (Location)</label>
+                                            <input name="location" placeholder="Tọa độ hoặc địa chỉ" class="form-control form-control-sm" />
+                                        </div>
+                                        <div class="col-md-3 mt-3 d-flex align-items-end">
+                                            <button class="btn btn-primary shadow-sm fw-semibold w-100">Thêm kho</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                            
+                            <hr class="text-muted" />
+
+                            <!-- Table danh sách -->
+                            <div class="col-12 mt-3">
+                                <h6 class="fw-bold text-primary mb-3 text-uppercase">Danh sách kho hiện tại</h6>
+                                <div class="table-responsive border rounded shadow-sm">
+                                    <table class="table table-hover table-sm align-middle mb-0" id="warehouseTable">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="padding: 0.4rem 0.3rem !important;">Mã kho</th>
+                                                <th style="padding: 0.4rem 0.3rem !important;">Tên kho</th>
+                                                <th style="padding: 0.4rem 0.3rem !important;">Loại</th>
+                                                <th style="padding: 0.4rem 0.3rem !important;">Sức chứa</th>
+                                                <th class="text-center" style="width:80px; padding: 0.4rem 0.3rem !important;">&nbsp;</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @if (Model?.Warehouses != null && Model.Warehouses.Any())
+                                            {
+                                                foreach(var w in Model.Warehouses)
+                                                {
+                                                <tr>
+                                                    <td style="padding: 0.4rem 0.3rem !important;"><span class="fw-semibold">@w.WarehouseId</span></td>
+                                                    <td style="padding: 0.4rem 0.3rem !important;">@w.WarehouseName</td>
+                                                    <td style="padding: 0.4rem 0.3rem !important;"><span class="badge bg-secondary">@w.WarehouseType</span></td>
+                                                    <td style="padding: 0.4rem 0.3rem !important;">@w.MaxCapacityCbm CBM</td>
+                                                    <td class="text-center" style="padding: 0.4rem 0.3rem !important;">
+                                                        <form method="post" asp-controller="Admin" asp-action="DeleteWarehouse" style="display:inline">
+                                                            <input type="hidden" name="id" value="@w.WarehouseId" />
+                                                            <button class="btn btn-sm btn-danger remove-line" onclick="return confirm('Bạn có chắc muốn xóa kho này?');">-</button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                                }
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </form>
+
+    </div>
 </div>

@@ -347,3 +347,5 @@ D:\Dai_hoc\nam 3\Ung_Dung_AI\Du An\DuAnCode\HeTQL_Kho_Hang_Tich_Hop_AI\obj\Debug
 D:\Dai_hoc\nam 3\Ung_Dung_AI\Du An\DuAnCode\HeTQL_Kho_Hang_Tich_Hop_AI\obj\Debug\net9.0\DuAnCode.Web.genruntimeconfig.cache
 D:\Dai_hoc\nam 3\Ung_Dung_AI\Du An\DuAnCode\HeTQL_Kho_Hang_Tich_Hop_AI\obj\Debug\net9.0\ref\DuAnCode.Web.dll
 D:\Dai_hoc\nam 3\Ung_Dung_AI\Du An\DuAnCode\HeTQL_Kho_Hang_Tich_Hop_AI\obj\Debug\net9.0\compressed\ve79zc6i21-{0}-5ukv4utglg-5ukv4utglg.gz
+D:\Dai_hoc\nam 3\Ung_Dung_AI\Du An\DuAnCode\HeTQL_Kho_Hang_Tich_Hop_AI\bin\Debug\net9.0\scratch\obj\FixDb.csproj.nuget.dgspec.json
+D:\Dai_hoc\nam 3\Ung_Dung_AI\Du An\DuAnCode\HeTQL_Kho_Hang_Tich_Hop_AI\bin\Debug\net9.0\scratch\obj\project.assets.json

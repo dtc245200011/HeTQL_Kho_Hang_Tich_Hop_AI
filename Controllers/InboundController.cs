@@ -60,6 +60,21 @@ namespace DuAnCode.Web.Controllers
         [HttpGet]
         public async Task<IActionResult> Create(string? id = null)
         {
+            var config = await _db.SystemConfigs.FirstOrDefaultAsync();
+            if (config != null)
+            {
+                if (config.MaintenanceMode)
+                {
+                    TempData["Error"] = "Hệ thống đang bảo trì, không thể truy cập chức năng này.";
+                    return RedirectToAction("Index", "Home");
+                }
+                if (config.StopInbound)
+                {
+                    TempData["Error"] = "Chức năng tạo Phiếu Nhập Kho đã bị tạm dừng bởi Quản trị viên.";
+                    return RedirectToAction("Index");
+                }
+            }
+
             var vm = new Models.ViewModels.VoucherPageViewModel();
             vm.Skus = await GetSkuOptionsAsync();
             vm.Warehouses = await _db.Warehouses.AsNoTracking().ToListAsync();
@@ -175,6 +190,13 @@ namespace DuAnCode.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([FromForm] Models.ViewModels.VoucherFormViewModel form)
         {
+            var config = await _db.SystemConfigs.FirstOrDefaultAsync();
+            if (config != null && (config.MaintenanceMode || config.StopInbound))
+            {
+                TempData["Error"] = "Chức năng tạo Phiếu Nhập Kho đã bị tạm dừng bởi Quản trị viên.";
+                return RedirectToAction("Index");
+            }
+
             ModelState.Remove("VoucherId");
             ModelState.Remove("VoucherNumber");
 
@@ -238,9 +260,10 @@ namespace DuAnCode.Web.Controllers
                 else
                 {
                     // CREATE DRAFT FLOW
+                    var prefix = config?.InboundPrefix ?? "PN-";
                     var voucher = new InventoryVoucher
                     {
-                        VoucherNumber = (string.IsNullOrWhiteSpace(form.VoucherNumber) || string.Equals(form.VoucherNumber, "AUTO", StringComparison.OrdinalIgnoreCase)) ? ("PN-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss")) : form.VoucherNumber,
+                        VoucherNumber = (string.IsNullOrWhiteSpace(form.VoucherNumber) || string.Equals(form.VoucherNumber, "AUTO", StringComparison.OrdinalIgnoreCase)) ? (prefix + DateTime.UtcNow.ToString("yyyyMMddHHmmss")) : form.VoucherNumber,
                         Date = form.Date,
                         Type = "INBOUND",
                         Status = "DRAFT",

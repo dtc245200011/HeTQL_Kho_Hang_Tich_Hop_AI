@@ -9,7 +9,6 @@ namespace DuAnCode.Web.Background
     {
         private readonly IServiceProvider _sp;
         private readonly ILogger<AiMonitoringService> _logger;
-        private readonly TimeSpan _interval = TimeSpan.FromMinutes(30);
 
         public AiMonitoringService(IServiceProvider sp, ILogger<AiMonitoringService> logger)
         {
@@ -25,6 +24,10 @@ namespace DuAnCode.Web.Background
                     using var scope = _sp.CreateScope();
                     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                     var ollama = scope.ServiceProvider.GetRequiredService<IOllamaClient>();
+
+                    var config = await db.SystemConfigs.FirstOrDefaultAsync();
+                    int lowStockThreshold = config?.LowStockAlertThreshold ?? 10;
+                    int capacityAlertPercent = config?.CapacityAlertPercent ?? 90;
 
                     // Fetch data and detect anomalies
                     var since60 = DateTime.UtcNow.AddDays(-60);
@@ -46,6 +49,44 @@ namespace DuAnCode.Web.Background
                             {
                                 var payload = new { sku = sku, avg60 = avg60, avg7 = avg7, diff = diff };
                                 db.AiSuggestions.Add(new AiSuggestion { SuggestionType = "ANOMALY", PayloadJson = System.Text.Json.JsonSerializer.Serialize(payload) });
+                            }
+                        }
+                    }
+
+                    // Low Stock Alert (Based on SystemConfig)
+                    var allLedgers = await db.StockLedgers.Where(l => l.Status == "GOOD").ToListAsync();
+                    var stockBySku = allLedgers.GroupBy(l => l.SkuId).ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+                    
+                    var allSkus = await db.SkuVariants.Select(s => s.SkuId).ToListAsync();
+                    foreach (var skuCode in allSkus)
+                    {
+                        var totalStock = stockBySku.ContainsKey(skuCode) ? stockBySku[skuCode] : 0;
+                        if (totalStock < lowStockThreshold)
+                        {
+                            var payload = new { sku = skuCode, currentStock = totalStock, threshold = lowStockThreshold };
+                            // Check if an unreviewed suggestion already exists to prevent spamming
+                            var exists = await db.AiSuggestions.AnyAsync(a => a.SkuId == skuCode && a.SuggestionType == "LOW_STOCK" && a.Status == "PENDING_REVIEW");
+                            if (!exists)
+                            {
+                                db.AiSuggestions.Add(new AiSuggestion { SuggestionType = "LOW_STOCK", SkuId = skuCode, PayloadJson = System.Text.Json.JsonSerializer.Serialize(payload) });
+                            }
+                        }
+                    }
+
+                    // Warehouse Capacity Alert (Based on SystemConfig)
+                    var warehouses = await db.Warehouses.ToListAsync();
+                    foreach(var wh in warehouses)
+                    {
+                        var whStock = allLedgers.Where(l => l.WarehouseId == wh.WarehouseId).Sum(l => l.Quantity);
+                        // Convert quantity to CBM if needed, here we assume 1 qty = roughly 0.1 CBM for simplicity, or just use qty.
+                        decimal currentCbm = (decimal)whStock * 0.1m; 
+                        if (wh.MaxCapacityCbm > 0)
+                        {
+                            var pct = (currentCbm / wh.MaxCapacityCbm) * 100;
+                            if (pct >= capacityAlertPercent)
+                            {
+                                var payload = new { warehouse = wh.WarehouseId, percent = pct, threshold = capacityAlertPercent };
+                                db.AiSuggestions.Add(new AiSuggestion { SuggestionType = "CAPACITY_WARNING", PayloadJson = System.Text.Json.JsonSerializer.Serialize(payload) });
                             }
                         }
                     }
@@ -74,7 +115,7 @@ namespace DuAnCode.Web.Background
                     {
                         var avg60 = movements60.Where(m => m.SkuId == sku).Select(m => Math.Abs(m.QuantityDelta)).DefaultIfEmpty(0).Average();
                         double seasonal = 1.0; // simple placeholder, could be improved
-                        var suggested = (int)Math.Ceiling(avg60 * seasonal - await db.StockLedgers.Where(l => l.SkuId == sku && l.Status == "GOOD").SumAsync(l => l.Quantity));
+                        var suggested = (int)Math.Ceiling(avg60 * seasonal - allLedgers.Where(l => l.SkuId == sku).Sum(l => l.Quantity));
                         if (suggested > 0)
                         {
                             var payload = new { sku = sku, suggested = suggested };
@@ -83,13 +124,15 @@ namespace DuAnCode.Web.Background
                     }
 
                     await db.SaveChangesAsync();
+                    var currentIntervalMinutes = config?.AiScanIntervalMinutes > 0 ? config.AiScanIntervalMinutes : 30;
+
+                    await Task.Delay(TimeSpan.FromMinutes(currentIntervalMinutes), stoppingToken);
                 }
                 catch(Exception ex)
                 {
                     _logger.LogError(ex, "Error in AiMonitoringService");
+                    await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken); // delay 1 min on error before retry
                 }
-
-                await Task.Delay(_interval, stoppingToken);
             }
         }
     }
