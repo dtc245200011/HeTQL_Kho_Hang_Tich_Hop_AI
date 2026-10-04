@@ -290,129 +290,152 @@ document.addEventListener('DOMContentLoaded', function(){
 
 
     <div class="row">
-        <div class="col-lg-6 mb-4">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <strong>📦 Tồn kho</strong>
-                    <a class="btn btn-sm btn-link" href="#" data-bs-toggle="modal" data-bs-target="#modalAllInventory">Xem tất cả (50)</a>
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseInventory">
+                    <strong class="text-primary"><i class="fa-solid fa-boxes-stacked me-2"></i>📦 Tồn kho</strong>
+                    <div>
+                        <a class="btn btn-sm btn-outline-primary rounded-pill me-2" href="#" data-bs-toggle="modal" data-bs-target="#modalAllInventory" onclick="event.stopPropagation()">Xem tất cả</a>
+                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
+                    </div>
                 </div>
-                <div class="card-body p-0">
-                    <table class="table mb-0">
-                        <thead>
-                            <tr><th>SKU</th><th>Sản phẩm</th><th>Kho</th><th>Trạng thái</th><th>Số lượng</th></tr>
-                        </thead>
-                        <tbody>
-                            @foreach(var it in Model?.Inventory ?? new List<DuAnCode.Web.Models.ViewModels.StockLedgerVm>())
-                            {
-                                <tr>
-                                    <td>@it.SkuId</td>
-                                    <td>@it.ProductName</td>
-                                    <td>@it.WarehouseId</td>
-                                    <td>@it.Status</td>
-                                    <td>@it.Quantity</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-                <div class="card-footer">
-                    @if (!(Model?.ViewAll ?? false))
-                    {
-                        var totalPages = (int)Math.Ceiling((Model?.InventoryTotal ?? 0) / (double)(Model?.PageSize ?? 1));
-                        <nav>
-                            <ul class="pagination mb-0">
-                                <li class="page-item @(Model.Page<=1?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page-1, tab = "inventory", search = Model.Search, status = Model.Status })">«</a></li>
-                                @for (int i=1;i<=totalPages;i++){
-                                    <li class="page-item @(i==Model.Page?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "inventory", search = Model.Search, status = Model.Status })">@i</a></li>
-                                }
-                                <li class="page-item @(Model.Page>=totalPages?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page+1, tab = "inventory", search = Model.Search, status = Model.Status })">»</a></li>
-                            </ul>
-                        </nav>
-                    }
+                <div class="collapse" id="collapseInventory">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr><th>SKU</th><th>Sản phẩm</th><th>Kho</th><th>Trạng thái</th><th>Số lượng</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach(var it in Model?.Inventory ?? new List<DuAnCode.Web.Models.ViewModels.StockLedgerVm>())
+                                    {
+                                        <tr>
+                                            <td><span class="fw-semibold">@it.SkuId</span></td>
+                                            <td>@it.ProductName</td>
+                                            <td><span class="badge bg-secondary">@it.WarehouseId</span></td>
+                                            <td><span class="badge @(it.Status == "Available" ? "bg-success" : (it.Status == "Damaged" ? "bg-danger" : "bg-warning"))">@it.Status</span></td>
+                                            <td><span class="badge bg-info text-dark rounded-pill px-3">@it.Quantity</span></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white border-top-0 pt-3">
+                        @if (!(Model?.ViewAll ?? false))
+                        {
+                            var totalPages = (int)Math.Ceiling((Model?.InventoryTotal ?? 0) / (double)(Model?.PageSize ?? 1));
+                            <nav>
+                                <ul class="pagination pagination-sm justify-content-end mb-0">
+                                    <li class="page-item @(Model?.Page<=1?"disabled":"")"><a class="page-link rounded-start-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)-1, tab = "inventory", search = Model?.Search, status = Model?.Status })">Trước</a></li>
+                                    @for (int i=1;i<=totalPages;i++){
+                                        <li class="page-item @(i==(Model?.Page ?? 1)?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "inventory", search = Model?.Search, status = Model?.Status })">@i</a></li>
+                                    }
+                                    <li class="page-item @((Model?.Page ?? 1)>=totalPages?"disabled":"")"><a class="page-link rounded-end-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)+1, tab = "inventory", search = Model?.Search, status = Model?.Status })">Sau</a></li>
+                                </ul>
+                            </nav>
+                        }
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-lg-6 mb-4">
-            <div class="card mb-3">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <strong>📥 Lịch sử Nhập kho</strong>
-                    <a class="btn btn-sm btn-link" href="#" data-bs-toggle="modal" data-bs-target="#modalAllInbound">Xem tất cả (50)</a>
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseInbound">
+                    <strong class="text-success"><i class="fa-solid fa-arrow-down-to-bracket me-2"></i>📥 Lịch sử Nhập kho</strong>
+                    <div>
+                        <a class="btn btn-sm btn-outline-success rounded-pill me-2" href="#" data-bs-toggle="modal" data-bs-target="#modalAllInbound" onclick="event.stopPropagation()">Xem tất cả</a>
+                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
+                    </div>
                 </div>
-                <div class="card-body p-0">
-                    <table class="table mb-0">
-                        <thead>
-                            <tr><th>ID</th><th>SKU</th><th>Số lượng</th><th>Thao tác</th><th>Thời gian</th></tr>
-                        </thead>
-                        <tbody>
-                            @foreach(var it in Model.Inbound)
-                            {
-                                <tr>
-                                    <td>@it.MovementId</td>
-                                    <td>@it.SkuId</td>
-                                    <td>@it.QuantityDelta</td>
-                                    <td>@it.MovementType</td>
-                                    <td>@it.CreatedAt.ToLocalTime().ToString("g")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-                <div class="card-footer">
-                    @if (!Model.ViewAll)
-                    {
-                        var totalPages = (int)Math.Ceiling(Model.InboundTotal / (double)Model.PageSize);
-                        <nav>
-                            <ul class="pagination mb-0">
-                                <li class="page-item @(Model.Page<=1?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page-1, tab = "inbound", search = Model.Search })">«</a></li>
-                                @for (int i=1;i<=totalPages;i++){
-                                    <li class="page-item @(i==Model.Page?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "inbound", search = Model.Search })">@i</a></li>
-                                }
-                                <li class="page-item @(Model.Page>=totalPages?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page+1, tab = "inbound", search = Model.Search })">»</a></li>
-                            </ul>
-                        </nav>
-                    }
+                <div class="collapse" id="collapseInbound">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr><th>ID Lịch sử</th><th>SKU</th><th class="text-center">Số lượng</th><th>Thao tác</th><th>Thời gian</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach(var it in Model.Inbound)
+                                    {
+                                        <tr>
+                                            <td><span class="text-muted">#@it.MovementId</span></td>
+                                            <td><span class="fw-semibold">@it.SkuId</span></td>
+                                            <td class="text-center"><span class="badge bg-success rounded-pill px-3">+@it.QuantityDelta</span></td>
+                                            <td>@it.MovementType</td>
+                                            <td><small class="text-muted"><i class="fa-regular fa-clock me-1"></i>@it.CreatedAt.ToLocalTime().ToString("g")</small></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white border-top-0 pt-3">
+                        @if (!Model.ViewAll)
+                        {
+                            var totalPages = (int)Math.Ceiling((Model?.InboundTotal ?? 0) / (double)(Model?.PageSize ?? 1));
+                            <nav>
+                                <ul class="pagination pagination-sm justify-content-end mb-0">
+                                    <li class="page-item @(Model?.Page<=1?"disabled":"")"><a class="page-link rounded-start-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)-1, tab = "inbound", search = Model?.Search })">Trước</a></li>
+                                    @for (int i=1;i<=totalPages;i++){
+                                        <li class="page-item @(i==(Model?.Page ?? 1)?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "inbound", search = Model?.Search })">@i</a></li>
+                                    }
+                                    <li class="page-item @((Model?.Page ?? 1)>=totalPages?"disabled":"")"><a class="page-link rounded-end-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)+1, tab = "inbound", search = Model?.Search })">Sau</a></li>
+                                </ul>
+                            </nav>
+                        }
+                    </div>
                 </div>
             </div>
+        </div>
 
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <strong>📤 Lịch sử Xuất kho</strong>
-                    <a class="btn btn-sm btn-link" href="#" data-bs-toggle="modal" data-bs-target="#modalAllOutbound">Xem tất cả (50)</a>
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseOutbound">
+                    <strong class="text-warning"><i class="fa-solid fa-arrow-up-right-from-square me-2"></i>📤 Lịch sử Xuất kho</strong>
+                    <div>
+                        <a class="btn btn-sm btn-outline-warning rounded-pill me-2" href="#" data-bs-toggle="modal" data-bs-target="#modalAllOutbound" onclick="event.stopPropagation()">Xem tất cả</a>
+                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
+                    </div>
                 </div>
-                <div class="card-body p-0">
-                    <table class="table mb-0">
-                        <thead>
-                            <tr><th>ID</th><th>SKU</th><th>Số lượng</th><th>Thao tác</th><th>Thời gian</th></tr>
-                        </thead>
-                        <tbody>
-                            @foreach(var it in Model.Outbound)
-                            {
-                                <tr>
-                                    <td>@it.MovementId</td>
-                                    <td>@it.SkuId</td>
-                                    <td>@it.QuantityDelta</td>
-                                    <td>@it.MovementType</td>
-                                    <td>@it.CreatedAt.ToLocalTime().ToString("g")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-                <div class="card-footer">
-                    @if (!Model.ViewAll)
-                    {
-                        var totalPages = (int)Math.Ceiling(Model.OutboundTotal / (double)Model.PageSize);
-                        <nav>
-                            <ul class="pagination mb-0">
-                                <li class="page-item @(Model.Page<=1?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page-1, tab = "outbound", search = Model.Search })">«</a></li>
-                                @for (int i=1;i<=totalPages;i++){
-                                    <li class="page-item @(i==Model.Page?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "outbound", search = Model.Search })">@i</a></li>
-                                }
-                                <li class="page-item @(Model.Page>=totalPages?"disabled":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = Model.Page+1, tab = "outbound", search = Model.Search })">»</a></li>
-                            </ul>
-                        </nav>
-                    }
+                <div class="collapse" id="collapseOutbound">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr><th>ID Lịch sử</th><th>SKU</th><th class="text-center">Số lượng</th><th>Thao tác</th><th>Thời gian</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach(var it in Model.Outbound)
+                                    {
+                                        <tr>
+                                            <td><span class="text-muted">#@it.MovementId</span></td>
+                                            <td><span class="fw-semibold">@it.SkuId</span></td>
+                                            <td class="text-center"><span class="badge bg-warning text-dark rounded-pill px-3">@it.QuantityDelta</span></td>
+                                            <td>@it.MovementType</td>
+                                            <td><small class="text-muted"><i class="fa-regular fa-clock me-1"></i>@it.CreatedAt.ToLocalTime().ToString("g")</small></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white border-top-0 pt-3">
+                        @if (!Model.ViewAll)
+                        {
+                            var totalPages = (int)Math.Ceiling((Model?.OutboundTotal ?? 0) / (double)(Model?.PageSize ?? 1));
+                            <nav>
+                                <ul class="pagination pagination-sm justify-content-end mb-0">
+                                    <li class="page-item @(Model?.Page<=1?"disabled":"")"><a class="page-link rounded-start-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)-1, tab = "outbound", search = Model?.Search })">Trước</a></li>
+                                    @for (int i=1;i<=totalPages;i++){
+                                        <li class="page-item @(i==(Model?.Page ?? 1)?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "outbound", search = Model?.Search })">@i</a></li>
+                                    }
+                                    <li class="page-item @((Model?.Page ?? 1)>=totalPages?"disabled":"")"><a class="page-link rounded-end-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)+1, tab = "outbound", search = Model?.Search })">Sau</a></li>
+                                </ul>
+                            </nav>
+                        }
+                    </div>
                 </div>
             </div>
         </div>
