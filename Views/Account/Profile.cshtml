@@ -1,4 +1,4 @@
-@model DuAnCode.Web.Models.User
+﻿@model DuAnCode.Web.Models.User
 @{
     ViewData["Title"] = "Hồ sơ cá nhân";
 }
@@ -33,7 +33,15 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Email</label>
-                            <input class="form-control bg-light" value="@Model.Email" readonly />
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <input name="Email" type="email" class="form-control bg-light" value="@Model.Email" readonly title="Không thể đổi Email tài khoản Admin" />
+                                <div class="form-text text-danger">Tài khoản Admin bị khóa đổi Email để bảo vệ hệ thống.</div>
+                            }
+                            else
+                            {
+                                <input name="Email" type="email" class="form-control" value="@Model.Email" required />
+                            }
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Họ và tên</label>
@@ -78,5 +86,39 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+
+@if (TempData["OTP_Pending"] != null)
+{
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var otpModal = new bootstrap.Modal(document.getElementById('otpModal'));
+            otpModal.show();
+        });
+    </script>
+}
+
+<!-- OTP Modal -->
+<div class="modal fade" id="otpModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <form asp-action="VerifyEmailOTP" method="post">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Xác thực đổi Email</h5>
+                </div>
+                <div class="modal-body text-center">
+                    <p>Một mã xác thực gồm 6 chữ số đã được gửi đến Email <b>hiện tại</b> của bạn để xác nhận yêu cầu đổi Email sang <b class="text-primary">@TempData["NewEmail"]</b>.</p>
+                    <div class="mb-3 w-50 mx-auto">
+                        <input name="otpCode" class="form-control text-center fw-bold fs-4" placeholder="------" required maxlength="6" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a asp-action="Profile" class="btn btn-secondary">Hủy bỏ</a>
+                    <button type="submit" class="btn btn-primary">Xác nhận</button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>

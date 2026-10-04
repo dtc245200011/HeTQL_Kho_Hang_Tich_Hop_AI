@@ -204,6 +204,22 @@ namespace DuAnCode.Web.Controllers
             return View();
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult UpdateSmtpConfig(string SmtpEmail, string SmtpPassword)
+        {
+            try
+            {
+                DuAnCode.Web.Services.EnvHelper.SetSmtpConfig(SmtpEmail, SmtpPassword);
+                TempData["Message"] = "Cấu hình Email (SMTP) đã được cập nhật thành công vào file .env!";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = "Lỗi khi lưu cấu hình SMTP: " + ex.Message;
+            }
+            return RedirectToAction(nameof(Settings));
+        }
+
         public async Task<IActionResult> Users()
         {
             // Use DTO projection to avoid potential EF circular serialization and to ensure up-to-date user manager data
@@ -217,6 +233,8 @@ namespace DuAnCode.Web.Controllers
                     Id = u.Id,
                     UserName = u.UserName ?? string.Empty,
                     Email = u.Email ?? string.Empty,
+                    FullName = u.FullName ?? string.Empty,
+                    PhoneNumber = u.PhoneNumber ?? string.Empty,
                     Roles = string.Join(", ", roles),
                     IsLockedOut = u.LockoutEnd != null && u.LockoutEnd > DateTimeOffset.UtcNow
                 });
@@ -350,6 +368,12 @@ namespace DuAnCode.Web.Controllers
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null) return Json(new { success = false, message = "User not found" });
 
+            var currentUserId = _userManager.GetUserId(User);
+            if (user.Id == currentUserId)
+            {
+                TempData["Error"] = "Cảnh báo: Bạn không thể tự xóa tài khoản của chính mình đang đăng nhập!";
+                return Json(new { success = false, message = "Cannot delete your own account." });
+            }
             // New rule: Never allow deleting an account that currently has Admin role
             if (await _userManager.IsInRoleAsync(user, "Admin"))
             {
@@ -417,6 +441,9 @@ namespace DuAnCode.Web.Controllers
         {
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null) return NotFound();
+
+            var currentUserId = _userManager.GetUserId(User);
+
             if (await _userManager.IsLockedOutAsync(user))
             {
                 await _userManager.SetLockoutEndDateAsync(user, null);
@@ -424,6 +451,18 @@ namespace DuAnCode.Web.Controllers
             }
             else
             {
+                if (user.Id == currentUserId)
+                {
+                    TempData["Error"] = "Cảnh báo: Bạn không thể tự khóa tài khoản của chính mình đang đăng nhập!";
+                    return RedirectToAction("Users");
+                }
+                
+                if (await _userManager.IsInRoleAsync(user, "Admin"))
+                {
+                    TempData["Error"] = "Cảnh báo: Không được phép khóa tài khoản Quản trị viên (Admin) để tránh mất quyền kiểm soát hệ thống!";
+                    return RedirectToAction("Users");
+                }
+
                 await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100));
                 TempData["Message"] = "Khóa tài khoản thành công.";
             }
@@ -455,6 +494,8 @@ namespace DuAnCode.Web.Controllers
             try
             {
                 viewModel.Config = await _db.SystemConfigs.FirstOrDefaultAsync() ?? new SystemConfig();
+                var smtpConfig = DuAnCode.Web.Services.EnvHelper.GetSmtpConfig();
+                ViewBag.SmtpEmail = smtpConfig.Email;
             }
             catch
             {
@@ -1289,3 +1330,8 @@ namespace DuAnCode.Web.Controllers
         }
     }
 }
+
+
+
+
+

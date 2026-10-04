@@ -1,4 +1,4 @@
-@model DuAnCode.Web.Models.SettingsViewModel
+﻿@model DuAnCode.Web.Models.SettingsViewModel
 @{
     ViewData["Title"] = "Cấu hình hệ thống";
 }
@@ -134,6 +134,25 @@
                                         <input type="hidden" name="Config.EnableEmailAlerts" value="false" />
                                         <input class="form-check-input" type="checkbox" role="switch" name="Config.EnableEmailAlerts" id="EnableEmailAlerts" value="true" @((Model?.Config?.EnableEmailAlerts ?? true) ? "checked" : "")>
                                         <label class="form-check-label fw-semibold" for="EnableEmailAlerts">Gửi email cho Quản trị viên khi có cảnh báo</label>
+                                    </div>
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label class="form-label fw-semibold">Tài khoản gửi Email (SMTP)</label>
+                                    <div class="d-flex align-items-center gap-3">
+                                        @if (string.IsNullOrEmpty(ViewBag.SmtpEmail))
+                                        {
+                                            <span class="text-muted fst-italic">Chưa cấu hình</span>
+                                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalSmtpConfig">
+                                                <i class="fa-solid fa-plus me-1"></i> Thêm Email
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <span class="fw-bold text-success">@ViewBag.SmtpEmail</span>
+                                            <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#modalSmtpConfig">
+                                                <i class="fa-solid fa-pen me-1"></i> Đổi Email
+                                            </button>
+                                        }
                                     </div>
                                 </div>
                             </div>
@@ -361,5 +380,33 @@
             </div>
         </div>
 
+    </div>
+</div>
+
+<div class="modal fade" id="modalSmtpConfig" tabindex="-1">
+    <div class="modal-dialog">
+        <form asp-action="UpdateSmtpConfig" asp-controller="Admin" method="post">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Cấu hình Gửi Email (SMTP)</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tài khoản Email</label>
+                        <input type="email" class="form-control" name="SmtpEmail" required placeholder="Nhập email của bạn (vd: abc@gmail.com)" value="@(string.IsNullOrEmpty(ViewBag.SmtpEmail) ? "" : ViewBag.SmtpEmail)" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Mật khẩu Ứng dụng</label>
+                        <input type="password" class="form-control" name="SmtpPassword" required placeholder="Nhập mật khẩu ứng dụng 16 ký tự" />
+                        <div class="form-text">Mật khẩu này không được hiển thị lại vì lý do bảo mật. Vui lòng lấy "Mật khẩu ứng dụng" thay vì dùng mật khẩu đăng nhập gốc (đặc biệt với Gmail).</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Lưu cấu hình</button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>

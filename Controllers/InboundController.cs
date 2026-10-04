@@ -426,5 +426,17 @@ namespace DuAnCode.Web.Controllers
             return RedirectToAction("Index");
         }
 
-}
+        [HttpGet]
+        public async Task<IActionResult> PrintLabels(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return BadRequest();
+            var voucher = await _db.InventoryVouchers.Include(v => v.Lines).FirstOrDefaultAsync(v => v.VoucherId == id);
+            if (voucher == null) return NotFound();
+
+            var config = await _db.SystemConfigs.FirstOrDefaultAsync() ?? new SystemConfig();
+            
+            ViewBag.Config = config;
+            return View(voucher);
+        }
+    }
 }

@@ -1,8 +1,9 @@
-using DuAnCode.Web.Services;
+﻿using DuAnCode.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using DuAnCode.Web.Models;
 
@@ -14,12 +15,15 @@ namespace DuAnCode.Web.Controllers
         private readonly SignInManager<User> _signInManager;
         private readonly UserManager<User> _userManager;
         private readonly RoleManager<DuAnCode.Web.Models.Role> _roleManager;
-        public AccountController(IAuthService auth, SignInManager<User> signInManager, UserManager<User> userManager, RoleManager<DuAnCode.Web.Models.Role> roleManager)
+        private readonly IEmailSender _emailSender;
+
+        public AccountController(IAuthService auth, SignInManager<User> signInManager, UserManager<User> userManager, RoleManager<DuAnCode.Web.Models.Role> roleManager, IEmailSender emailSender)
         {
             _auth = auth;
             _signInManager = signInManager;
             _userManager = userManager;
             _roleManager = roleManager;
+            _emailSender = emailSender;
         }
 
         [HttpGet]
@@ -29,6 +33,10 @@ namespace DuAnCode.Web.Controllers
             if (string.Equals(message, "Restored", StringComparison.OrdinalIgnoreCase))
             {
                 ViewData["Info"] = "Khôi phục dữ liệu thành công. Vui lòng đăng nhập lại!";
+            }
+            else if (string.Equals(message, "PasswordResetSuccess", StringComparison.OrdinalIgnoreCase))
+            {
+                ViewData["Info"] = "Đổi mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới!";
             }
             return View();
         }
@@ -160,5 +168,89 @@ namespace DuAnCode.Web.Controllers
             }
             return RedirectToAction("Profile");
         }
+        [HttpGet]
+        [AllowAnonymous]
+        public IActionResult ForgotPassword()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        [AllowAnonymous]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ForgotPassword(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                ModelState.AddModelError("", "Vui lòng nhập tên đăng nhập.");
+                return View();
+            }
+
+            var user = await _userManager.FindByNameAsync(username);
+            if (user == null || string.IsNullOrWhiteSpace(user.Email))
+            {
+                // Don't reveal that the user does not exist or has no email
+                ViewData["Message"] = "Nếu tên đăng nhập hợp lệ và có liên kết Email, một liên kết khôi phục đã được gửi.";
+                return View("ForgotPasswordConfirmation");
+            }
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var callbackUrl = Url.Action("ResetPassword", "Account", new { token, email = user.Email }, Request.Scheme);
+
+            var emailBody = $"<p>Xin chào <b>{user.FullName ?? user.UserName}</b>,</p>" +
+                            $"<p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản <b>{user.UserName}</b>.</p>" +
+                            $"<p>Vui lòng click vào liên kết dưới đây để đặt lại mật khẩu của bạn:</p>" +
+                            $"<p><a href='{callbackUrl}' style='padding: 10px 20px; background-color: #0d6efd; color: #fff; text-decoration: none; border-radius: 5px;'>Đặt lại mật khẩu</a></p>" +
+                            $"<p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>";
+
+            await _emailSender.SendEmailAsync(user.Email, "[Hệ thống Kho] Đặt lại mật khẩu", emailBody);
+
+            ViewData["Message"] = "Nếu tên đăng nhập hợp lệ và có liên kết Email, một liên kết khôi phục đã được gửi.";
+            return View("ForgotPasswordConfirmation");
+        }
+
+        [HttpGet]
+        [AllowAnonymous]
+        public IActionResult ResetPassword(string token, string email)
+        {
+            if (token == null || email == null)
+            {
+                ModelState.AddModelError("", "Token không hợp lệ.");
+            }
+            return View();
+        }
+
+        [HttpPost]
+        [AllowAnonymous]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetPassword(string email, string token, string newPassword, string confirmPassword)
+        {
+            if (newPassword != confirmPassword)
+            {
+                ModelState.AddModelError("", "Mật khẩu không khớp.");
+                return View();
+            }
+
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+            {
+                // Don't reveal that the user does not exist
+                return RedirectToAction("Login", new { message = "PasswordResetSuccess" });
+            }
+
+            var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
+            if (result.Succeeded)
+            {
+                return RedirectToAction("Login", new { message = "PasswordResetSuccess" });
+            }
+
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError("", error.Description);
+            }
+            return View();
+        }
     }
 }
+
+

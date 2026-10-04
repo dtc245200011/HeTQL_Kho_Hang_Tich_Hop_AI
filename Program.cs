@@ -2,6 +2,7 @@ using DuAnCode.Web.Data;
 using DuAnCode.Web.Repositories;
 using DuAnCode.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,8 +24,10 @@ builder.Services.AddScoped<IAiService, AiService>();
 builder.Services.AddScoped<IInventoryServiceAdvanced, InventoryServiceAdvanced>();
 builder.Services.AddScoped<IApprovalWorkflowService, ApprovalWorkflowService>();
 builder.Services.AddScoped<IDamagedService, DamagedService>();
+builder.Services.AddTransient<DuAnCode.Web.Services.IEmailSender, DuAnCode.Web.Services.SmtpEmailSender>();
 builder.Services.AddHttpClient<IOllamaClient, OllamaClient>(c => { c.BaseAddress = new Uri("http://localhost:11434"); });
 builder.Services.AddHostedService<DuAnCode.Web.Background.AiMonitoringService>();
+builder.Services.AddHostedService<DuAnCode.Web.Background.DatabaseBackupService>();
 
 // Identity
 builder.Services.AddIdentity<DuAnCode.Web.Models.User, DuAnCode.Web.Models.Role>(options =>
@@ -34,7 +37,7 @@ builder.Services.AddIdentity<DuAnCode.Web.Models.User, DuAnCode.Web.Models.Role>
     options.User.RequireUniqueEmail = false;
 })
     .AddEntityFrameworkStores<ApplicationDbContext>()
-    ;
+    .AddDefaultTokenProviders();
 
 // Configure application cookie to redirect to Login / AccessDenied handlers
 builder.Services.ConfigureApplicationCookie(options =>
@@ -102,6 +105,34 @@ else
     // In development enable detailed exception page for easier debugging
     app.UseDeveloperExceptionPage();
 }
+
+app.Use(async (context, next) =>
+{
+    using (var scope = context.RequestServices.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<DuAnCode.Web.Data.ApplicationDbContext>();
+        var config = await db.SystemConfigs.FirstOrDefaultAsync();
+        if (config != null && !string.IsNullOrEmpty(config.DefaultLanguage))
+        {
+            try
+            {
+                var culture = new System.Globalization.CultureInfo(config.DefaultLanguage);
+                if (config.CurrencyFormat == "VND")
+                    culture.NumberFormat.CurrencySymbol = "₫";
+                else if (config.CurrencyFormat == "USD")
+                    culture.NumberFormat.CurrencySymbol = "$";
+                
+                System.Globalization.CultureInfo.CurrentCulture = culture;
+                System.Globalization.CultureInfo.CurrentUICulture = culture;
+                
+                context.Items["CurrencyFormat"] = config.CurrencyFormat ?? "VND";
+                context.Items["CurrencySymbol"] = culture.NumberFormat.CurrencySymbol;
+            }
+            catch { }
+        }
+    }
+    await next(context);
+});
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

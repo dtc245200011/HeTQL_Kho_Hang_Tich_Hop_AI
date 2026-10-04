@@ -46,12 +46,16 @@
                                 }
                             </td>
                             <td>@v.CreatedBy</td>
-                            <td>@v.TotalAmount.ToString("N0")</td>
+                            <td>@v.TotalAmount.ToString("C0")</td>
                             <td>
                                 <a asp-action="Create" asp-route-id="@v.VoucherId" class="btn btn-sm btn-info">Chi tiết / Sửa</a>
+                                @if (v.Status == "APPROVED")
+                                {
+                                    <a asp-action="PrintLabels" asp-route-id="@v.VoucherId" class="btn btn-sm btn-secondary ms-1" target="_blank"><i class="fa-solid fa-print"></i> In Tem</a>
+                                }
                                 @if (v.Status == "DRAFT" || v.Status == "PENDING")
                                 {
-                                    <form asp-action="Approve" asp-route-id="@v.VoucherId" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc muốn duyệt phiếu này? Sau khi duyệt sẽ cập nhật Tồn kho và không thể sửa đổi.');">
+                                    <form asp-action="Approve" asp-route-id="@v.VoucherId" method="post" class="d-inline ms-1" onsubmit="return confirm('Bạn có chắc muốn duyệt phiếu này? Sau khi duyệt sẽ cập nhật Tồn kho và không thể sửa đổi.');">
                                         <button type="submit" class="btn btn-sm btn-success">Duyệt Phiếu</button>
                                     </form>
                                 }

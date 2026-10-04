@@ -44,23 +44,78 @@
                         }
                     </td>
                     <td>
-                        <form method="post" asp-controller="Admin" asp-action="ToggleLock" class="d-inline">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="userId" value="@u.Id" />
-                            <button class="btn btn-sm btn-warning">@(@u.IsLockedOut ? "Mở khóa" : "Khóa")</button>
-                        </form>
-                        <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#resetModal_@u.Id">Đổi MK</button>
-                        @{ var totalUsers = ViewBag.TotalUsers as int? ?? 0; }
-                        @if(totalUsers > 1){
-                            <form class="deleteUserForm d-inline" style="display:inline">
-                                @Html.AntiForgeryToken()
-                                <button type="button" class="btn btn-sm btn-danger btn-delete-user" data-userid="@u.Id">Xóa</button>
-                            </form>
-                        } else {
-                            <button class="btn btn-sm btn-danger" disabled>Xóa</button>
-                        }
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Thao tác">
+                                <i class="fa-solid fa-ellipsis-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow">
+                                <li>
+                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#profileModal_@u.Id">
+                                        <i class="fa-solid fa-id-card text-info me-2"></i>Xem hồ sơ
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#resetModal_@u.Id">
+                                        <i class="fa-solid fa-key text-secondary me-2"></i>Đổi mật khẩu
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li>
+                                    <form method="post" asp-controller="Admin" asp-action="ToggleLock" class="d-block">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="userId" value="@u.Id" />
+                                        <button type="submit" class="dropdown-item">
+                                            @if (u.IsLockedOut)
+                                            {
+                                                <i class="fa-solid fa-unlock text-success me-2"></i><span>Mở khóa</span>
+                                            }
+                                            else
+                                            {
+                                                <i class="fa-solid fa-lock text-warning me-2"></i><span>Khóa tài khoản</span>
+                                            }
+                                        </button>
+                                    </form>
+                                </li>
+                                <li><hr class="dropdown-divider" /></li>
+                                @{ var totalUsers = ViewBag.TotalUsers as int? ?? 0; }
+                                @if(totalUsers > 1){
+                                <li>
+                                    <form class="deleteUserForm d-block">
+                                        @Html.AntiForgeryToken()
+                                        <button type="button" class="dropdown-item text-danger btn-delete-user" data-userid="@u.Id">
+                                            <i class="fa-solid fa-trash me-2"></i>Xóa tài khoản
+                                        </button>
+                                    </form>
+                                </li>
+                                } else {
+                                <li>
+                                    <button class="dropdown-item text-muted" disabled>
+                                        <i class="fa-solid fa-trash me-2"></i>Xóa (Vô hiệu)
+                                    </button>
+                                </li>
+                                }
+                            </ul>
+                        </div>
                     </td>
                 </tr>
+
+                <div class="modal fade" id="profileModal_@u.Id" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-info text-white"><h5 class="modal-title">Hồ sơ người dùng - @u.UserName</h5></div>
+                            <div class="modal-body">
+                                <p><strong>Họ và tên:</strong> @(string.IsNullOrEmpty(u.FullName) ? "(Chưa cập nhật)" : u.FullName)</p>
+                                <p><strong>Email:</strong> @u.Email</p>
+                                <p><strong>Số điện thoại:</strong> @(string.IsNullOrEmpty(u.PhoneNumber) ? "(Chưa cập nhật)" : u.PhoneNumber)</p>
+                                <p><strong>Phân quyền:</strong> @u.Roles</p>
+                                <p><strong>Trạng thái:</strong> @(u.IsLockedOut ? "Bị khóa" : "Hoạt động")</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="modal fade" id="resetModal_@u.Id" tabindex="-1">
                     <div class="modal-dialog">
@@ -70,11 +125,11 @@
                                 <div class="modal-header"><h5 class="modal-title">Reset mật khẩu - @u.UserName</h5></div>
                                 <div class="modal-body">
                                     <input type="hidden" name="userId" value="@u.Id" />
-                                    <div class="mb-2"><label>New password</label><input name="newPassword" class="form-control" /></div>
+                                    <div class="mb-2"><label>Mật khẩu mới</label><input name="newPassword" type="password" class="form-control" required minlength="6" /></div>
                                 </div>
                                 <div class="modal-footer">
-                                    <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                    <button class="btn btn-primary">Save</button>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                                    <button type="submit" class="btn btn-primary">Lưu mật khẩu</button>
                                 </div>
                             </form>
                         </div>
@@ -250,3 +305,5 @@ document.addEventListener('DOMContentLoaded', function(){
     });
 });
 </script>
+
+

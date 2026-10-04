@@ -46,7 +46,7 @@
                                 }
                             </td>
                             <td>@v.CreatedBy</td>
-                            <td>@v.TotalAmount.ToString("N0")</td>
+                            <td>@v.TotalAmount.ToString("C0")</td>
                             <td>
                                 <a asp-action="Create" asp-route-id="@v.VoucherId" class="btn btn-sm btn-info">Chi tiết / Sửa</a>
                                 @if (v.Status == "DRAFT" || v.Status == "PENDING")

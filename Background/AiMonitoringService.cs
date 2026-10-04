@@ -24,6 +24,7 @@ namespace DuAnCode.Web.Background
                     using var scope = _sp.CreateScope();
                     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                     var ollama = scope.ServiceProvider.GetRequiredService<IOllamaClient>();
+                    var emailSender = scope.ServiceProvider.GetRequiredService<IEmailSender>();
 
                     var config = await db.SystemConfigs.FirstOrDefaultAsync();
                     int lowStockThreshold = config?.LowStockAlertThreshold ?? 10;
@@ -69,6 +70,13 @@ namespace DuAnCode.Web.Background
                             if (!exists)
                             {
                                 db.AiSuggestions.Add(new AiSuggestion { SuggestionType = "LOW_STOCK", SkuId = skuCode, PayloadJson = System.Text.Json.JsonSerializer.Serialize(payload) });
+                                
+                                if (config?.EnableEmailAlerts == true && !string.IsNullOrWhiteSpace(config.Email))
+                                {
+                                    await emailSender.SendEmailAsync(config.Email, 
+                                        $"[CẢNH BÁO TỒN KHO] SKU: {skuCode}", 
+                                        $"<p>Hệ thống ghi nhận sản phẩm <b>{skuCode}</b> đang có mức tồn kho là {totalStock}, thấp hơn định mức tối thiểu ({lowStockThreshold}).</p><p>Vui lòng kiểm tra và lên kế hoạch nhập hàng.</p>");
+                                }
                             }
                         }
                     }
@@ -86,7 +94,19 @@ namespace DuAnCode.Web.Background
                             if (pct >= capacityAlertPercent)
                             {
                                 var payload = new { warehouse = wh.WarehouseId, percent = pct, threshold = capacityAlertPercent };
-                                db.AiSuggestions.Add(new AiSuggestion { SuggestionType = "CAPACITY_WARNING", PayloadJson = System.Text.Json.JsonSerializer.Serialize(payload) });
+                                // Check if unreviewed alert exists
+                                var existsCapacity = await db.AiSuggestions.AnyAsync(a => a.SuggestionType == "CAPACITY_WARNING" && a.Status == "PENDING_REVIEW" && a.PayloadJson.Contains(wh.WarehouseId));
+                                if (!existsCapacity)
+                                {
+                                    db.AiSuggestions.Add(new AiSuggestion { SuggestionType = "CAPACITY_WARNING", PayloadJson = System.Text.Json.JsonSerializer.Serialize(payload) });
+                                    
+                                    if (config?.EnableEmailAlerts == true && !string.IsNullOrWhiteSpace(config.Email))
+                                    {
+                                        await emailSender.SendEmailAsync(config.Email, 
+                                            $"[CẢNH BÁO SỨC CHỨA] Kho: {wh.WarehouseId}", 
+                                            $"<p>Kho <b>{wh.WarehouseId}</b> đã đạt sức chứa {Math.Round(pct, 2)}%, vượt qua mức cảnh báo ({capacityAlertPercent}%).</p><p>Vui lòng kiểm tra và điều chuyển hàng hóa.</p>");
+                                    }
+                                }
                             }
                         }
                     }

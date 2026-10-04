@@ -1,0 +1,189 @@
+@model DuAnCode.Web.Models.InventoryVoucher
+@{
+    Layout = null; // No layout, pure print view
+    var config = ViewBag.Config as DuAnCode.Web.Models.SystemConfig;
+    string format = config?.BarcodeFormat ?? "QR";
+    int width = config?.LabelWidth > 0 ? config.LabelWidth : 60;
+    int height = config?.LabelHeight > 0 ? config.LabelHeight : 40;
+    bool printPrice = config?.PrintPriceOnLabel ?? true;
+    bool printExpiry = config?.PrintExpiryOnLabel ?? true;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>In Tem Nhãn - @Model.VoucherNumber</title>
+    <!-- JsBarcode for BARCODE -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <!-- QRCode.js for QR -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #0d6efd;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        .print-area {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        .label {
+            background: white;
+            border: 1px dashed #ccc;
+            width: @(width)mm;
+            height: @(height)mm;
+            padding: 2mm;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            overflow: hidden;
+            page-break-inside: avoid;
+        }
+        .label-title {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+        }
+        .label-code {
+            font-size: 9px;
+            margin-top: 2px;
+        }
+        .label-price {
+            font-size: 9px;
+            font-weight: bold;
+        }
+        .label-expiry {
+            font-size: 8px;
+            color: #555;
+        }
+        
+        /* The container for the actual barcode/qr SVG/Canvas */
+        .barcode-container {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Print Specific Styles */
+        @@media print {
+            body {
+                background: white;
+                margin: 0;
+                padding: 0;
+            }
+            .controls {
+                display: none;
+            }
+            .print-area {
+                gap: 0;
+                justify-content: flex-start;
+            }
+            .label {
+                border: none;
+                margin: 0; /* Adjust depending on actual printer feed */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <button onclick="window.print()">🖨️ In @(Model.Lines.Sum(x => x.Quantity)) Tem</button>
+        <p><small>Định dạng: @format | Kích thước: @(width)x@(height)mm</small></p>
+    </div>
+
+    <div class="print-area">
+        @foreach (var line in Model.Lines)
+        {
+            // Print one label per item quantity
+            for (int i = 0; i < line.Quantity; i++)
+            {
+                <div class="label">
+                    <div class="label-title">@line.ProductName</div>
+                    
+                    <div class="barcode-container">
+                        @if (format == "QR")
+                        {
+                            <div class="qr-code" data-code="@line.SkuId"></div>
+                        }
+                        else
+                        {
+                            <svg class="barcode" data-code="@line.SkuId"></svg>
+                        }
+                    </div>
+
+                    @if (printPrice)
+                    {
+                        <div class="label-price">Giá: @line.UnitPrice.ToString("C0")</div>
+                    }
+                    @if (printExpiry && line.ExpiryDate.HasValue)
+                    {
+                        <div class="label-expiry">HSD: @line.ExpiryDate.Value.ToString("dd/MM/yyyy")</div>
+                    }
+                </div>
+            }
+        }
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var format = "@format";
+            
+            if (format === "QR") {
+                var qrs = document.querySelectorAll(".qr-code");
+                qrs.forEach(function(el) {
+                    var code = el.getAttribute("data-code");
+                    // QR Code generation
+                    new QRCode(el, {
+                        text: code,
+                        width: Math.min(@(width)*3, 80), // responsive sizing based on mm width
+                        height: Math.min(@(height)*3, 80),
+                        colorDark : "#000000",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.L
+                    });
+                });
+            } else {
+                // Barcode generation
+                var barcodes = document.querySelectorAll(".barcode");
+                barcodes.forEach(function(el) {
+                    var code = el.getAttribute("data-code");
+                    JsBarcode(el, code, {
+                        format: "CODE128",
+                        displayValue: true, // Show text below barcode
+                        fontSize: 12,
+                        margin: 0,
+                        width: 1.5,
+                        height: Math.min(@(height)*2, 40) // scale height
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>
