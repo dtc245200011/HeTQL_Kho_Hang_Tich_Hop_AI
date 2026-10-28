@@ -4,79 +4,743 @@
 }
 @if (Model == null) { return; }
 
-<div class="container-fluid">
-
+<div class="container-fluid px-3 px-md-4 py-3">
 
 <!-- Modals for full lists -->
 <div class="modal fade" id="modalAllInventory" tabindex="-1">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">Danh sách Tồn kho Chi tiết</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold text-primary"><i class="fa-solid fa-boxes-stacked me-2"></i>Danh sách Tồn kho Toàn bộ</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
       <div class="modal-body">
-        <div class="mb-2"><input id="invSearch" class="form-control" placeholder="Tìm trong danh sách..." /></div>
+        <div class="mb-3">
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+            <input id="invSearch" class="form-control" placeholder="Tìm kiếm nhanh theo mã SKU, tên hàng, kho..." />
+          </div>
+        </div>
         <div class="table-responsive">
-          <table class="table table-sm table-striped" id="tableAllInventory">
-            <thead><tr><th>SKU</th><th>Tên Sản phẩm</th><th>Kho</th><th>Trạng thái</th><th>Số lượng</th></tr></thead>
+          <table class="table table-hover align-middle" id="tableAllInventory">
+            <thead class="table-light"><tr><th>Mã SKU</th><th>Tên Sản phẩm</th><th>Kho</th><th>Trạng thái</th><th>Số lượng</th></tr></thead>
             <tbody id="modalInventoryTableBody">
-              @* Render server-side if Model contains full inventory; else will be loaded via JS *@
-              @* Preferred: render from Model.Inventory if available, else fall back to ViewBag or Model.AllInventory *@
               @if (Model?.Inventory != null && Model.Inventory.Any())
               {
                   foreach (var item in Model.Inventory)
                   {
                       <tr>
-                          <td>@item.SkuId</td>
+                          <td><span class="fw-bold text-primary">@item.SkuId</span></td>
                           <td>@item.ProductName</td>
-                          <td>@item.WarehouseId</td>
+                          <td><span class="badge bg-secondary">@item.WarehouseId</span></td>
                           <td>
-                              <span class="badge @(item.Status == "GOOD" ? "bg-success" : "bg-warning")">@item.Status</span>
+                              <span class="badge @(item.Status == "GOOD" || item.Status == "Available" ? "bg-success" : "bg-warning text-dark")">@item.Status</span>
                           </td>
                           <td><strong>@item.Quantity</strong></td>
-                      </tr>
-                  }
-              }
-              else if (ViewBag.AllInventory != null)
-              {
-                  foreach (var it in (IEnumerable<dynamic>)ViewBag.AllInventory)
-                  {
-                      <tr>
-                          <td>@it.SKU</td>
-                          <td>@it.ProductName</td>
-                          <td>@it.WarehouseName</td>
-                          <td><span class="badge bg-success">@it.Status</span></td>
-                          <td><strong>@it.Quantity</strong></td>
-                      </tr>
-                  }
-              }
-              else if (Model?.AllInventory != null)
-              {
-                  foreach (var it in Model.AllInventory)
-                  {
-                      <tr>
-                          <td>@it.SkuId</td>
-                          <td>@it.ProductName</td>
-                          <td>@it.WarehouseId</td>
-                          <td><span class="badge bg-success">@it.Status</span></td>
-                          <td><strong>@it.Quantity</strong></td>
                       </tr>
                   }
               }
               else
               {
                   <tr>
-                      <td colspan="5" class="text-center text-muted">Không có dữ liệu tồn kho</td>
+                      <td colspan="5" class="text-center text-muted py-4">Đang tải dữ liệu tồn kho...</td>
                   </tr>
               }
             </tbody>
           </table>
         </div>
       </div>
+      <div class="modal-footer bg-light py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+      </div>
     </div>
   </div>
 </div>
 
+<div class="modal fade" id="modalAllInbound" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold text-success"><i class="fa-solid fa-box-arrow-in-down me-2"></i>Lịch sử Nhập kho Chi tiết</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+            <input id="inSearch" class="form-control" placeholder="Tìm theo SKU, người thực hiện..." />
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle" id="tableAllInbound">
+            <thead class="table-light"><tr><th>Mã GD</th><th>SKU</th><th>Số lượng</th><th>Thực hiện bởi</th><th>Thời gian</th><th>Chứng từ</th></tr></thead>
+            <tbody id="inboundModalBody">
+              @if (Model?.AllInbound != null && Model.AllInbound.Any())
+              {
+                  foreach (var it in Model.AllInbound)
+                  {
+                      <tr>
+                          <td><span class="text-muted">#@it.MovementId</span></td>
+                          <td><strong>@it.SkuId</strong></td>
+                          <td><span class="badge bg-success rounded-pill px-3">+@it.QuantityDelta</span></td>
+                          <td>@it.PerformedBy</td>
+                          <td>@it.CreatedAt.ToLocalTime().ToString("g")</td>
+                          <td>@(it.ReferenceId ?? it.ReferenceType ?? "—")</td>
+                      </tr>
+                  }
+              }
+              else
+              {
+                  <tr>
+                      <td colspan="6" class="text-center text-muted py-4">Đang tải dữ liệu nhập kho...</td>
+                  </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer bg-light py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalAllOutbound" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold text-warning"><i class="fa-solid fa-box-arrow-up me-2"></i>Lịch sử Xuất kho Chi tiết</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+            <input id="outSearch" class="form-control" placeholder="Tìm theo SKU, người thực hiện..." />
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle" id="tableAllOutbound">
+            <thead class="table-light"><tr><th>Mã GD</th><th>SKU</th><th>Số lượng</th><th>Thực hiện bởi</th><th>Thời gian</th><th>Chứng từ</th></tr></thead>
+            <tbody id="outboundModalBody">
+              @if (Model?.AllOutbound != null && Model.AllOutbound.Any())
+              {
+                  foreach (var it in Model.AllOutbound)
+                  {
+                      <tr>
+                          <td><span class="text-muted">#@it.MovementId</span></td>
+                          <td><strong>@it.SkuId</strong></td>
+                          <td><span class="badge bg-warning text-dark rounded-pill px-3">@it.QuantityDelta</span></td>
+                          <td>@it.PerformedBy</td>
+                          <td>@it.CreatedAt.ToLocalTime().ToString("g")</td>
+                          <td>@(it.ReferenceId ?? it.ReferenceType ?? "—")</td>
+                      </tr>
+                  }
+              }
+              else
+              {
+                  <tr>
+                      <td colspan="6" class="text-center text-muted py-4">Đang tải dữ liệu xuất kho...</td>
+                  </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer bg-light py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 1. BĂNG CHÀO MỪNG & HƯỚNG DẪN DÀNH CHO NGƯỜI MỚI (ONBOARDING WORKFLOW) -->
+<div class="rounded-4 shadow-sm mb-4 p-4 text-white position-relative" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-primary px-3 py-1 rounded-pill small"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Hệ thống Tích hợp AI</span>
+                <span class="badge bg-success text-white px-2 py-1 rounded-pill small"><i class="fa-solid fa-circle me-1" style="font-size: 7px;"></i>Trực tuyến</span>
+            </div>
+            <h4 class="fw-bold mb-1 text-white">👋 Chào mừng bạn đến với Tổng quan Kho hàng DuAnCode WMS</h4>
+            <p class="text-white text-opacity-75 mb-0 small">Bảng điều khiển trung tâm giúp bạn giám sát tồn kho, theo dõi chứng từ xuất nhập và nhận gợi ý từ AI trong thời gian thực.</p>
+        </div>
+        <div class="d-flex gap-2 align-self-stretch align-self-md-auto">
+            <button type="button" class="btn btn-sm btn-outline-light text-nowrap rounded-pill px-3 shadow-none" data-bs-toggle="collapse" data-bs-target="#workflowGuide" aria-expanded="true" id="toggleGuideBtn">
+                <i class="fa-solid fa-map-location-dot me-1"></i> <span id="toggleGuideText">Ẩn Hướng dẫn quy trình</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- SƠ ĐỒ 4 BƯỚC QUY TRÌNH KHO CHO NGƯỜI MỚI -->
+    <div class="collapse show mt-4 pt-3 border-top border-secondary border-opacity-25" id="workflowGuide">
+        <div class="text-white text-opacity-75 small fw-semibold text-uppercase mb-3 letter-spacing-1">
+            <i class="fa-solid fa-circle-nodes text-info me-2"></i>Quy trình vận hành kho chuẩn 4 bước dành cho nhân viên mới:
+        </div>
+        <div class="row g-3">
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="p-3 rounded-3 h-100 position-relative" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15);">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-success text-white rounded-circle p-2" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;">1</span>
+                        <span class="fw-bold text-white small">Nhập kho (Inbound)</span>
+                    </div>
+                    <p class="text-white text-opacity-75 small mb-2" style="font-size: 0.8rem; line-height: 1.4;">Tiếp nhận hàng từ NCC, lập phiếu nhập kho, kiểm định chất lượng (QC) và phân loại lô hàng.</p>
+                    <a href="/Inbound" class="text-info text-decoration-none small fw-semibold"><i class="fa-solid fa-arrow-right me-1"></i>Quản lý Nhập kho</a>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="p-3 rounded-3 h-100 position-relative" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15);">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-primary text-white rounded-circle p-2" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;">2</span>
+                        <span class="fw-bold text-white small">Lưu trữ & Tồn kho</span>
+                    </div>
+                    <p class="text-white text-opacity-75 small mb-2" style="font-size: 0.8rem; line-height: 1.4;">Sắp xếp hàng vào vị trí, theo dõi trạng thái hàng khả dụng (Good) và hàng lỗi (Damaged).</p>
+                    <a href="#sectionInventory" class="text-info text-decoration-none small fw-semibold"><i class="fa-solid fa-arrow-down me-1"></i>Xem Bảng Tồn kho</a>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="p-3 rounded-3 h-100 position-relative" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15);">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-warning text-dark rounded-circle p-2" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;">3</span>
+                        <span class="fw-bold text-white small">Xuất kho (Outbound)</span>
+                    </div>
+                    <p class="text-white text-opacity-75 small mb-2" style="font-size: 0.8rem; line-height: 1.4;">Tạo phiếu xuất kho giao khách hoặc chuyển đi, hệ thống tự động trừ tồn theo nguyên tắc FIFO.</p>
+                    <a href="/Outbound" class="text-info text-decoration-none small fw-semibold"><i class="fa-solid fa-arrow-right me-1"></i>Quản lý Xuất kho</a>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="p-3 rounded-3 h-100 position-relative" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15);">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-info text-white rounded-circle p-2" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;">4</span>
+                        <span class="fw-bold text-white small">Kiểm kê & Điều phối</span>
+                    </div>
+                    <p class="text-white text-opacity-75 small mb-2" style="font-size: 0.8rem; line-height: 1.4;">Kiểm kê thực tế định kỳ, điều chuyển kho nội bộ và nhận khuyến nghị bù hàng từ AI.</p>
+                    <a href="/InventoryAudit" class="text-info text-decoration-none small fw-semibold"><i class="fa-solid fa-arrow-right me-1"></i>Lập Phiếu Kiểm kê</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. CỤM PHÍM TẮT THAO TÁC NHANH (QUICK ACTIONS FOR BEGINNERS) -->
+<div class="mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <h6 class="text-uppercase text-secondary fw-bold small mb-0"><i class="fa-solid fa-bolt text-warning me-2"></i>Thao tác nhanh thường dùng</h6>
+        <span class="text-muted small">Bấm để tạo chứng từ ngay</span>
+    </div>
+    <div class="row g-2 g-md-3">
+        <div class="col-6 col-md-4 col-lg">
+            <a href="/Inbound/Create" class="card card-hover-elevate border-0 shadow-sm text-decoration-none p-3 h-100 bg-white d-flex flex-row align-items-center gap-3 rounded-3 border-start border-4 border-success">
+                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; background: rgba(16, 185, 129, 0.15); color: #059669;">
+                    <i class="fa-solid fa-dolly fs-5"></i>
+                </div>
+                <div>
+                    <div class="fw-bold text-dark small">+ Tạo Phiếu Nhập</div>
+                    <div class="text-muted small" style="font-size: 0.75rem;">Nhận hàng từ NCC</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <a href="/Outbound/Create" class="card card-hover-elevate border-0 shadow-sm text-decoration-none p-3 h-100 bg-white d-flex flex-row align-items-center gap-3 rounded-3 border-start border-4 border-warning">
+                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; background: rgba(245, 158, 11, 0.15); color: #d97706;">
+                    <i class="fa-solid fa-truck-fast fs-5"></i>
+                </div>
+                <div>
+                    <div class="fw-bold text-dark small">+ Tạo Phiếu Xuất</div>
+                    <div class="text-muted small" style="font-size: 0.75rem;">Xuất đơn giao hàng</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <a href="/StockTransfer/Create" class="card card-hover-elevate border-0 shadow-sm text-decoration-none p-3 h-100 bg-white d-flex flex-row align-items-center gap-3 rounded-3 border-start border-4 border-primary">
+                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; background: rgba(59, 130, 246, 0.15); color: #2563eb;">
+                    <i class="fa-solid fa-arrows-rotate fs-5"></i>
+                </div>
+                <div>
+                    <div class="fw-bold text-dark small">🔄 Chuyển Kho</div>
+                    <div class="text-muted small" style="font-size: 0.75rem;">Điều phối giữa các kho</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-6 col-lg">
+            <a href="/InventoryAudit/Create" class="card card-hover-elevate border-0 shadow-sm text-decoration-none p-3 h-100 bg-white d-flex flex-row align-items-center gap-3 rounded-3 border-start border-4 border-info">
+                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; background: rgba(6, 182, 212, 0.15); color: #0891b2;">
+                    <i class="fa-solid fa-clipboard-check fs-5"></i>
+                </div>
+                <div>
+                    <div class="fw-bold text-dark small">📋 Kiểm Kê Kho</div>
+                    <div class="text-muted small" style="font-size: 0.75rem;">Đối chiếu số lượng thực</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-lg">
+            <a href="/Replenishment" class="card card-hover-elevate border-0 shadow-sm text-decoration-none p-3 h-100 bg-white d-flex flex-row align-items-center gap-3 rounded-3 border-start border-4" style="border-left-color: #6366f1 !important;">
+                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; background: rgba(99, 102, 241, 0.15); color: #4f46e5;">
+                    <i class="fa-solid fa-robot fs-5"></i>
+                </div>
+                <div>
+                    <div class="fw-bold text-dark small">🤖 Gợi Ý Tối Ưu AI</div>
+                    <div class="text-muted small" style="font-size: 0.75rem;">Dự báo hết hàng & ROP</div>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 3. HÀNG 4 THẺ CHỈ SỐ KPI TỔNG HỢP (STAT CARDS) -->
+<div class="row g-3 mb-4">
+    <!-- KPI 1: Tổng SKU -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-3 h-100 overflow-hidden position-relative">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.75rem;">Mã Hàng (SKU)</div>
+                        <h2 class="fw-bold text-primary mb-1">@Model.TotalSkus</h2>
+                        <div class="text-muted small"><i class="fa-solid fa-layer-group me-1 text-primary"></i>Phân loại sản phẩm</div>
+                    </div>
+                    <div class="p-3 bg-primary-subtle text-primary rounded-3">
+                        <i class="fa-solid fa-boxes-stacked fs-4"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="progress" style="height: 4px;">
+                <div class="progress-bar bg-primary" role="progressbar" style="width: 100%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 2: Tổng Tồn Khả Dụng -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-3 h-100 overflow-hidden position-relative">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.75rem;">Tồn Kho Khả Dụng</div>
+                        <h2 class="fw-bold text-success mb-1">@Model.TotalAvailableQuantity.ToString("N0")</h2>
+                        <div class="text-muted small"><i class="fa-solid fa-circle-check text-success me-1"></i>Sẵn sàng xuất kho</div>
+                    </div>
+                    <div class="p-3 bg-success-subtle text-success rounded-3">
+                        <i class="fa-solid fa-cubes fs-4"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="progress" style="height: 4px;">
+                <div class="progress-bar bg-success" role="progressbar" style="width: 100%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 3: Cảnh Báo Tồn Thấp -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-3 h-100 overflow-hidden position-relative">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.75rem;">Cảnh Báo Tồn Thấp</div>
+                        <h2 class="fw-bold @(Model.LowStockCount > 0 ? "text-danger" : "text-muted") mb-1">@Model.LowStockCount</h2>
+                        <div class="text-muted small">
+                            @if (Model.LowStockCount > 0)
+                            {
+                                <span class="text-danger fw-semibold"><i class="fa-solid fa-triangle-exclamation me-1"></i>Số lượng tồn &le; 5</span>
+                            }
+                            else
+                            {
+                                <span class="text-success"><i class="fa-solid fa-shield-check me-1"></i>Kho hàng an toàn</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="p-3 @(Model.LowStockCount > 0 ? "bg-danger-subtle text-danger" : "bg-light text-muted") rounded-3">
+                        <i class="fa-solid fa-triangle-exclamation fs-4"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="progress" style="height: 4px;">
+                <div class="progress-bar @(Model.LowStockCount > 0 ? "bg-danger" : "bg-secondary")" role="progressbar" style="width: 100%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 4: Phiếu Chờ Duyệt -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-3 h-100 overflow-hidden position-relative">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small fw-semibold text-uppercase mb-1" style="font-size: 0.75rem;">Chứng Từ Chờ Duyệt</div>
+                        <h2 class="fw-bold @(Model.PendingVouchersCount > 0 ? "text-warning" : "text-secondary") mb-1">@Model.PendingVouchersCount</h2>
+                        <div class="text-muted small">
+                            @if (Model.PendingVouchersCount > 0)
+                            {
+                                <span class="text-warning fw-semibold"><i class="fa-solid fa-hourglass-half me-1"></i>Cần kiểm tra & duyệt</span>
+                            }
+                            else
+                            {
+                                <span class="text-success"><i class="fa-solid fa-check-double me-1"></i>Đã xử lý xong</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="p-3 @(Model.PendingVouchersCount > 0 ? "bg-warning-subtle text-warning" : "bg-light text-muted") rounded-3">
+                        <i class="fa-solid fa-clock-rotate-left fs-4"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="progress" style="height: 4px;">
+                <div class="progress-bar @(Model.PendingVouchersCount > 0 ? "bg-warning" : "bg-secondary")" role="progressbar" style="width: 100%"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 4. KHU VỰC NỘI DUNG CHÍNH (BẢNG TỒN KHO & VIỆC CẦN LÀM / LỊCH SỬ) -->
+<div class="row g-4">
+    <!-- CỘT TRÁI (8 PHẦN): BẢNG TỒN KHO & TAB LỊCH SỬ GIAO DỊCH -->
+    <div class="col-12 col-xl-8">
+        
+        <!-- BẢNG TỒN KHO HÀNG HÓA -->
+        <div class="card shadow-sm border-0 mb-4" id="sectionInventory">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="p-2 bg-primary-subtle text-primary rounded-3"><i class="fa-solid fa-boxes-stacked"></i></span>
+                    <div>
+                        <strong class="text-dark fs-6 d-block">📦 Bảng Tồn kho Hàng hóa</strong>
+                        <span class="text-muted small">Tổng cộng @Model.InventoryTotal mặt hàng trong kho</span>
+                    </div>
+                </div>
+                <div>
+                    <a class="btn btn-sm btn-outline-primary rounded-pill px-3" href="#" data-bs-toggle="modal" data-bs-target="#modalAllInventory">
+                        <i class="fa-solid fa-expand me-1"></i>Xem tất cả
+                    </a>
+                </div>
+            </div>
+
+            <!-- Thanh tìm kiếm & Lọc -->
+            <div class="p-3 bg-light border-bottom">
+                <form method="get" asp-action="Index" class="row g-2 align-items-center">
+                    <input type="hidden" name="tab" value="inventory" />
+                    <div class="col-12 col-md-6">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                            <input type="text" name="search" class="form-control border-start-0 ps-0" placeholder="Tìm theo mã SKU, tên sản phẩm..." value="@Model?.Search" />
+                        </div>
+                    </div>
+                    <div class="col-7 col-md-4">
+                        <select name="status" class="form-select form-select-sm">
+                            <option value="">-- Tất cả trạng thái tồn --</option>
+                            <option value="Available" selected="@(Model?.Status == "Available" || Model?.Status == "GOOD")">Khả dụng (Available/Good)</option>
+                            <option value="Damaged" selected="@(Model?.Status == "Damaged" || Model?.Status == "DAMAGED")">Hàng lỗi / Hỏng (Damaged)</option>
+                        </select>
+                    </div>
+                    <div class="col-5 col-md-2 d-flex gap-1">
+                        <button type="submit" class="btn btn-sm btn-primary w-100"><i class="fa-solid fa-filter me-1"></i>Lọc</button>
+                        <a href="@Url.Action("Index", "Home")" class="btn btn-sm btn-outline-secondary" data-tooltip="Xóa bộ lọc"><i class="fa-solid fa-rotate-left"></i></a>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Mã SKU</th>
+                                <th>Tên Sản phẩm</th>
+                                <th>Kho lưu trữ</th>
+                                <th>Trạng thái</th>
+                                <th class="text-end pe-4">Số lượng tồn</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model?.Inventory == null || !Model.Inventory.Any())
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">
+                                        <i class="fa-regular fa-folder-open fs-2 d-block mb-2 opacity-50"></i>
+                                        Không tìm thấy hàng tồn kho nào khớp với từ khóa tìm kiếm
+                                    </td>
+                                </tr>
+                            }
+                            @foreach(var it in Model?.Inventory ?? new List<DuAnCode.Web.Models.ViewModels.StockLedgerVm>())
+                            {
+                                var isLow = (it.Status == "Available" || it.Status == "GOOD") && it.Quantity <= 5;
+                                <tr>
+                                    <td>
+                                        <a href="/Home/Index?tab=inventory&search=@it.SkuId" class="fw-bold text-primary text-decoration-none">@it.SkuId</a>
+                                    </td>
+                                    <td>
+                                        <span class="fw-medium text-dark">@(string.IsNullOrWhiteSpace(it.ProductName) ? it.SkuId : it.ProductName)</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary-subtle text-secondary border">@it.WarehouseId</span>
+                                    </td>
+                                    <td>
+                                        @if (it.Status == "Available" || it.Status == "GOOD")
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="fa-solid fa-check-circle me-1"></i>Tốt / Khả dụng</span>
+                                        }
+                                        else if (it.Status == "Damaged" || it.Status == "DAMAGED")
+                                        {
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1"><i class="fa-solid fa-triangle-exclamation me-1"></i>Hàng lỗi/hỏng</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">@it.Status</span>
+                                        }
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <div class="d-inline-flex align-items-center gap-2">
+                                            @if (isLow)
+                                            {
+                                                <span class="badge bg-danger rounded-pill px-3 py-1 fs-6" data-tooltip="Cảnh báo: Tồn kho sắp hết">&le; @it.Quantity cái</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-primary rounded-pill px-3 py-1 fs-6">@it.Quantity cái</span>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Phân trang -->
+            <div class="card-footer bg-white border-top-0 pt-3">
+                @if (!(Model?.ViewAll ?? false))
+                {
+                    var totalPages = (int)Math.Ceiling((Model?.InventoryTotal ?? 0) / (double)(Model?.PageSize ?? 1));
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <small class="text-muted">Hiển thị @(Model?.Inventory.Count ?? 0) / @Model?.InventoryTotal mặt hàng</small>
+                        <nav>
+                            <ul class="pagination pagination-sm justify-content-end mb-0">
+                                <li class="page-item @(Model?.Page<=1?"disabled":"")"><a class="page-link rounded-start-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)-1, tab = "inventory", search = Model?.Search, status = Model?.Status })">Trước</a></li>
+                                @for (int i=1;i<=totalPages;i++){
+                                    <li class="page-item @(i==(Model?.Page ?? 1)?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "inventory", search = Model?.Search, status = Model?.Status })">@i</a></li>
+                                }
+                                <li class="page-item @((Model?.Page ?? 1)>=totalPages?"disabled":"")"><a class="page-link rounded-end-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)+1, tab = "inventory", search = Model?.Search, status = Model?.Status })">Sau</a></li>
+                            </ul>
+                        </nav>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- TAB LỊCH SỬ GIAO DỊCH NHẬP / XUẤT KHO THÔNG MINH -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white pb-0 border-bottom-0">
+                <ul class="nav nav-tabs card-header-tabs" id="historyTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active fw-bold text-success d-flex align-items-center gap-2" id="inbound-tab" data-bs-toggle="tab" data-bs-target="#inboundPane" type="button" role="tab">
+                            <i class="fa-solid fa-box-arrow-in-down"></i> Giao dịch Nhập kho
+                            <span class="badge bg-success-subtle text-success border rounded-pill small">@Model.InboundTotal</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link fw-bold text-warning d-flex align-items-center gap-2" id="outbound-tab" data-bs-toggle="tab" data-bs-target="#outboundPane" type="button" role="tab">
+                            <i class="fa-solid fa-box-arrow-up"></i> Giao dịch Xuất kho
+                            <span class="badge bg-warning-subtle text-warning border rounded-pill small">@Model.OutboundTotal</span>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body p-0">
+                <div class="tab-content" id="historyTabsContent">
+                    <!-- Tab Nhập kho -->
+                    <div class="tab-pane fade show active" id="inboundPane" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom">
+                            <span class="small text-muted"><i class="fa-solid fa-clock-rotate-left me-1"></i>5 giao dịch nhập kho mới nhất</span>
+                            <a class="btn btn-sm btn-outline-success rounded-pill px-3" href="#" data-bs-toggle="modal" data-bs-target="#modalAllInbound">
+                                Xem toàn bộ lịch sử nhập &rarr;
+                            </a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr><th>Mã GD</th><th>Mã SKU</th><th class="text-center">Số lượng</th><th>Thao tác</th><th>Thời gian</th></tr>
+                                </thead>
+                                <tbody>
+                                    @if (!Model.Inbound.Any())
+                                    {
+                                        <tr><td colspan="5" class="text-center py-4 text-muted">Chưa có giao dịch nhập kho nào</td></tr>
+                                    }
+                                    @foreach(var it in Model.Inbound)
+                                    {
+                                        <tr>
+                                            <td><span class="text-muted fw-semibold">#@it.MovementId</span></td>
+                                            <td><span class="fw-bold text-dark">@it.SkuId</span></td>
+                                            <td class="text-center"><span class="badge bg-success rounded-pill px-3 py-1">+@it.QuantityDelta</span></td>
+                                            <td><span class="badge bg-light text-secondary border">@it.MovementType</span></td>
+                                            <td><small class="text-muted"><i class="fa-regular fa-clock me-1"></i>@it.CreatedAt.ToLocalTime().ToString("g")</small></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Tab Xuất kho -->
+                    <div class="tab-pane fade" id="outboundPane" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom">
+                            <span class="small text-muted"><i class="fa-solid fa-clock-rotate-left me-1"></i>5 giao dịch xuất kho mới nhất</span>
+                            <a class="btn btn-sm btn-outline-warning rounded-pill px-3" href="#" data-bs-toggle="modal" data-bs-target="#modalAllOutbound">
+                                Xem toàn bộ lịch sử xuất &rarr;
+                            </a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr><th>Mã GD</th><th>Mã SKU</th><th class="text-center">Số lượng</th><th>Thao tác</th><th>Thời gian</th></tr>
+                                </thead>
+                                <tbody>
+                                    @if (!Model.Outbound.Any())
+                                    {
+                                        <tr><td colspan="5" class="text-center py-4 text-muted">Chưa có giao dịch xuất kho nào</td></tr>
+                                    }
+                                    @foreach(var it in Model.Outbound)
+                                    {
+                                        <tr>
+                                            <td><span class="text-muted fw-semibold">#@it.MovementId</span></td>
+                                            <td><span class="fw-bold text-dark">@it.SkuId</span></td>
+                                            <td class="text-center"><span class="badge bg-warning text-dark rounded-pill px-3 py-1">@it.QuantityDelta</span></td>
+                                            <td><span class="badge bg-light text-secondary border">@it.MovementType</span></td>
+                                            <td><small class="text-muted"><i class="fa-regular fa-clock me-1"></i>@it.CreatedAt.ToLocalTime().ToString("g")</small></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- CỘT PHẢI (4 PHẦN): VIỆC CẦN CHÚ Ý & HỖ TRỢ TRỢ LÝ AI CHO NGƯỜI MỚI -->
+    <div class="col-12 col-xl-4">
+        
+        <!-- CARD 1: VIỆC CẦN XỬ LÝ HÔM NAY (ACTION CENTER) -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="p-2 bg-danger-subtle text-danger rounded-3"><i class="fa-solid fa-list-check"></i></span>
+                    <div>
+                        <strong class="text-dark fs-6 d-block">Việc cần xử lý ngay</strong>
+                        <span class="text-muted small">Cảnh báo tồn & Chứng từ chờ duyệt</span>
+                    </div>
+                </div>
+                <span class="badge bg-danger rounded-pill">@(Model.ActionItems.Count) việc</span>
+            </div>
+            <div class="card-body p-0">
+                @if (Model.ActionItems == null || !Model.ActionItems.Any())
+                {
+                    <div class="p-4 text-center text-muted">
+                        <i class="fa-solid fa-circle-check text-success fs-1 mb-2 d-block opacity-75"></i>
+                        <h6 class="fw-bold text-dark mb-1">Kho hàng đang vận hành tối ưu!</h6>
+                        <p class="small text-muted mb-0">Không có chứng từ chờ duyệt hay cảnh báo tồn kho cấp bách nào.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var item in Model.ActionItems)
+                        {
+                            <a href="@item.Url" class="list-group-item list-group-item-action p-3 border-bottom transition-all">
+                                <div class="d-flex align-items-start gap-3">
+                                    <div class="mt-1">
+                                        <i class="@item.IconClass fs-5"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="fw-bold text-dark small">@item.Title</span>
+                                            <span class="badge @item.BadgeClass small" style="font-size: 0.7rem;">@item.Type</span>
+                                        </div>
+                                        <div class="text-muted small mb-1" style="font-size: 0.8rem;">@item.Description</div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="text-muted" style="font-size: 0.7rem;"><i class="fa-regular fa-clock me-1"></i>@item.Time.ToLocalTime().ToString("g")</span>
+                                            <span class="text-primary small fw-semibold">Xử lý ngay &rarr;</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="card-footer bg-light text-center py-2">
+                <small class="text-muted">Tự động làm mới theo dữ liệu thời gian thực</small>
+            </div>
+        </div>
+
+        <!-- CARD 2: GỢI Ý HỖ TRỢ DÀNH CHO NGƯỜI MỚI (AI COMPANION FAQS) -->
+        <div class="card shadow-sm border-0 text-white overflow-hidden" style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);">
+            <div class="card-body p-4 position-relative">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="p-2 bg-white bg-opacity-20 rounded-circle text-white d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="fa-solid fa-robot fs-4"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0 text-white">Bạn mới làm quen hệ thống?</h6>
+                        <small class="text-white-50">Trợ lý AI sẵn sàng hỗ trợ bạn 24/7</small>
+                    </div>
+                </div>
+
+                <p class="small text-white-50 mb-3" style="font-size: 0.825rem;">
+                    Bấm vào câu hỏi mẫu bên dưới để Trợ lý AI giải đáp quy trình nghiệp vụ ngay lập tức:
+                </p>
+
+                <div class="d-flex flex-column gap-2 mb-3">
+                    <button type="button" class="btn btn-sm text-start bg-white bg-opacity-15 text-white border-0 py-2 px-3 rounded-3 ai-faq-btn" data-question="Làm thế nào để tạo một phiếu nhập kho mới từ nhà cung cấp?">
+                        <i class="fa-regular fa-circle-question me-2"></i>Quy trình lập phiếu nhập kho?
+                    </button>
+                    <button type="button" class="btn btn-sm text-start bg-white bg-opacity-15 text-white border-0 py-2 px-3 rounded-3 ai-faq-btn" data-question="Hệ thống có những mặt hàng nào đang sắp hết cần nhập bổ sung ngay không?">
+                        <i class="fa-regular fa-circle-question me-2"></i>Mặt hàng nào sắp hết cần nhập thêm?
+                    </button>
+                    <button type="button" class="btn btn-sm text-start bg-white bg-opacity-15 text-white border-0 py-2 px-3 rounded-3 ai-faq-btn" data-question="Cách đối chiếu số lượng thực tế và xử lý chênh lệch khi kiểm kê kho?">
+                        <i class="fa-regular fa-circle-question me-2"></i>Cách lập phiếu kiểm kê đối chiếu chênh lệch?
+                    </button>
+                </div>
+
+                <div class="pt-2 border-top border-white border-opacity-20 d-flex justify-content-between align-items-center">
+                    <span class="small text-white-50" style="font-size: 0.75rem;">Widget chat ở góc dưới bên phải</span>
+                    <button type="button" class="btn btn-sm btn-light rounded-pill px-3 fw-bold text-primary" onclick="document.getElementById('openChatBtn')?.click();">
+                        <i class="fa-solid fa-comments me-1"></i>Mở Chat AI
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+</div>
+
+<!-- STYLES & INTERACTIVE SCRIPTS -->
+<style>
+    .card-hover-elevate {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card-hover-elevate:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
+    }
+    .ai-faq-btn {
+        transition: all 0.2s ease;
+    }
+    .ai-faq-btn:hover {
+        background-color: rgba(255, 255, 255, 0.3) !important;
+        transform: translateX(4px);
+    }
+</style>
+
 <script>
-  // Utility to escape HTML when injecting rows
+  // Utility escapeHtml
   function escapeHtml(unsafe) {
     return String(unsafe)
       .replace(/&/g, "&amp;")
@@ -86,358 +750,100 @@
       .replace(/'/g, "&#039;");
   }
 
+  // Populate Modals via fetch
   async function populateModalIfEmpty(modalId, endpoint, tbodySelector) {
     const modal = document.getElementById(modalId);
     if(!modal) return;
     modal.addEventListener('show.bs.modal', async function () {
       const tbody = document.querySelector(tbodySelector);
       if (!tbody) return;
-      if (tbody.children.length > 0) return; // already populated
+      if (tbody.children.length > 1 && !tbody.innerText.includes('Đang tải')) return;
       try {
         const res = await fetch(endpoint);
         if (!res.ok) return;
         const data = await res.json();
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Không có dữ liệu</td></tr>';
+            return;
+        }
         tbody.innerHTML = data.map(d => {
           if (tbodySelector.includes('inventory')) {
-            return `<tr><td>${escapeHtml(d.SKU)}</td><td>${escapeHtml(d.ProductName)}</td><td>${escapeHtml(d.WarehouseName)}</td><td><span class=\"badge bg-success\">${escapeHtml(d.Status)}</span></td><td><strong>${escapeHtml(d.Quantity)}</strong></td></tr>`;
+            const badgeCls = d.Status === 'Available' || d.Status === 'GOOD' ? 'bg-success' : 'bg-warning text-dark';
+            return `<tr><td><strong class="text-primary">${escapeHtml(d.SKU)}</strong></td><td>${escapeHtml(d.ProductName)}</td><td><span class="badge bg-secondary">${escapeHtml(d.WarehouseName)}</span></td><td><span class="badge ${badgeCls}">${escapeHtml(d.Status)}</span></td><td><strong>${escapeHtml(d.Quantity)}</strong></td></tr>`;
           }
-          // inbound/outbound rows
-          return `<tr><td>${escapeHtml(d.MovementId)}</td><td>${escapeHtml(d.SkuId)}</td><td>${escapeHtml(d.QuantityDelta)}</td><td>${escapeHtml(d.PerformedBy)}</td><td>${new Date(d.CreatedAt).toLocaleString()}</td><td>${escapeHtml(d.Reference || '')}</td></tr>`;
+          return `<tr><td><span class="text-muted">#${escapeHtml(d.MovementId)}</span></td><td><strong>${escapeHtml(d.SkuId)}</strong></td><td><span class="badge ${d.QuantityDelta > 0 ? 'bg-success' : 'bg-warning text-dark'} rounded-pill px-3">${d.QuantityDelta > 0 ? '+' : ''}${escapeHtml(d.QuantityDelta)}</span></td><td>${escapeHtml(d.PerformedBy)}</td><td>${new Date(d.CreatedAt).toLocaleString()}</td><td>${escapeHtml(d.Reference || '—')}</td></tr>`;
         }).join('');
       } catch (e) {
-        console.error('Failed to load', endpoint, e);
+        console.error('Failed to load modal data', endpoint, e);
       }
     });
   }
 
-  // Filter helper bound to inputs
-  function bindSearch(inputId, tbodySelector) {
-    const input = document.getElementById(inputId);
-    if (!input) return;
-    input.addEventListener('keyup', function () {
-      const filter = this.value.toLowerCase();
-      const rows = document.querySelectorAll(tbodySelector + ' tr');
-      rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        row.style.display = text.includes(filter) ? '' : 'none';
-      });
-    });
-  }
-
-  // Wire up inventory + inbound/outbound modals
   populateModalIfEmpty('modalAllInventory', '/Home/GetAllInventory', '#modalInventoryTableBody');
   populateModalIfEmpty('modalAllInbound', '/Home/GetAllInboundLogs', '#inboundModalBody');
   populateModalIfEmpty('modalAllOutbound', '/Home/GetAllOutboundLogs', '#outboundModalBody');
 
-  // Prevent Enter from submitting the outer form when focus is inside modal search inputs
-  ['invSearch','inSearch','outSearch'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-      }
+  // Filter inside Modals
+  function wireModalSearch(inputId, tbodySelector){
+    const input = document.getElementById(inputId);
+    if(!input) return;
+    input.addEventListener('input', function(){
+      const q = this.value.toLowerCase().trim();
+      document.querySelectorAll(tbodySelector + ' tr').forEach(r => {
+        const txt = r.textContent.toLowerCase();
+        r.style.display = txt.indexOf(q) !== -1 ? '' : 'none';
+      });
     });
-  });
+  }
 
-  // Live input filtering for modal tables
-  document.getElementById('invSearch')?.addEventListener('input', function(){
-    const filter = this.value.toLowerCase().trim();
-    document.querySelectorAll('#modalInventoryTableBody tr').forEach(row => {
-      const text = row.textContent.toLowerCase();
-      row.style.display = text.includes(filter) ? '' : 'none';
+  document.addEventListener('DOMContentLoaded', function(){
+    wireModalSearch('invSearch','#modalInventoryTableBody');
+    wireModalSearch('inSearch','#inboundModalBody');
+    wireModalSearch('outSearch','#outboundModalBody');
+
+    // Onboarding guide collapse remember
+    const guideCollapse = document.getElementById('workflowGuide');
+    const toggleBtnText = document.getElementById('toggleGuideText');
+    const isHidden = localStorage.getItem('hideOverviewGuide') === '1';
+
+    if (isHidden && guideCollapse) {
+        const bsCollapse = bootstrap.Collapse.getInstance(guideCollapse) || new bootstrap.Collapse(guideCollapse, { toggle: false });
+        bsCollapse.hide();
+        if (toggleBtnText) toggleBtnText.textContent = 'Mở Hướng dẫn quy trình';
+    }
+
+    guideCollapse?.addEventListener('hidden.bs.collapse', function () {
+        localStorage.setItem('hideOverviewGuide', '1');
+        if (toggleBtnText) toggleBtnText.textContent = 'Mở Hướng dẫn quy trình';
     });
-  });
-  document.getElementById('inSearch')?.addEventListener('input', function(){
-    const filter = this.value.toLowerCase().trim();
-    document.querySelectorAll('#inboundModalBody tr').forEach(row => {
-      const text = row.textContent.toLowerCase();
-      row.style.display = text.includes(filter) ? '' : 'none';
+
+    guideCollapse?.addEventListener('shown.bs.collapse', function () {
+        localStorage.setItem('hideOverviewGuide', '0');
+        if (toggleBtnText) toggleBtnText.textContent = 'Ẩn Hướng dẫn quy trình';
     });
-  });
-  document.getElementById('outSearch')?.addEventListener('input', function(){
-    const filter = this.value.toLowerCase().trim();
-    document.querySelectorAll('#outboundModalBody tr').forEach(row => {
-      const text = row.textContent.toLowerCase();
-      row.style.display = text.includes(filter) ? '' : 'none';
+
+    // AI FAQ Quick Buttons Click Event
+    document.querySelectorAll('.ai-faq-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const question = this.getAttribute('data-question');
+            const openBtn = document.getElementById('openChatBtn');
+            const chatBox = document.getElementById('chatBox');
+            const chatInput = document.getElementById('chatInput');
+            const sendBtn = document.getElementById('sendChatBtn');
+
+            // Open chat widget if closed
+            if (chatBox && chatBox.style.display === 'none') {
+                openBtn?.click();
+            }
+
+            // Fill input and send
+            if (chatInput && sendBtn) {
+                chatInput.value = question;
+                setTimeout(() => {
+                    sendBtn.click();
+                }, 300);
+            }
+        });
     });
   });
 </script>
-<div class="modal fade" id="modalAllInbound" tabindex="-1">
-  <div class="modal-dialog modal-xl">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">Chi tiết Lịch sử Nhập kho</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-      <div class="modal-body">
-        <div class="mb-2"><input id="inSearch" class="form-control" placeholder="Tìm..." /></div>
-        <div class="table-responsive">
-          <table class="table table-sm table-striped" id="tableAllInbound">
-            <thead><tr><th>ID</th><th>SKU</th><th>Số lượng</th><th>Người thực hiện</th><th>Thời gian</th><th>Tham chiếu</th></tr></thead>
-            <tbody id="inboundModalBody">
-              @if (Model?.AllInbound != null && Model.AllInbound.Any())
-              {
-                  foreach (var it in Model.AllInbound)
-                  {
-                      <tr>
-                          <td>@it.MovementId</td>
-                          <td>@it.SkuId</td>
-                          <td>@it.QuantityDelta</td>
-                          <td>@it.PerformedBy</td>
-                          <td>@it.CreatedAt.ToLocalTime().ToString("g")</td>
-                          <td>@(it.ReferenceId ?? it.ReferenceType ?? "")</td>
-                      </tr>
-                  }
-              }
-              else if (ViewBag.AllInbound != null)
-              {
-                  foreach (var it in (IEnumerable<dynamic>)ViewBag.AllInbound)
-                  {
-                      <tr>
-                          <td>@it.MovementId</td>
-                          <td>@it.SkuId</td>
-                          <td>@it.QuantityDelta</td>
-                          <td>@it.PerformedBy</td>
-                          <td>@((DateTime)it.CreatedAt).ToLocalTime().ToString("g")</td>
-                          <td>@(it.Reference ?? "")</td>
-                      </tr>
-                  }
-              }
-              else
-              {
-                  <tr>
-                      <td colspan="6" class="text-center text-muted">Không có dữ liệu nhập kho</td>
-                  </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="modalAllOutbound" tabindex="-1">
-  <div class="modal-dialog modal-xl">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">Chi tiết Lịch sử Xuất kho</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-      <div class="modal-body">
-        <div class="mb-2"><input id="outSearch" class="form-control" placeholder="Tìm..." /></div>
-        <div class="table-responsive">
-          <table class="table table-sm table-striped" id="tableAllOutbound">
-            <thead><tr><th>ID</th><th>SKU</th><th>Số lượng</th><th>Người thực hiện</th><th>Thời gian</th><th>Tham chiếu</th></tr></thead>
-            <tbody id="outboundModalBody">
-              @if (Model?.AllOutbound != null && Model.AllOutbound.Any())
-              {
-                  foreach (var it in Model.AllOutbound)
-                  {
-                      <tr>
-                          <td>@it.MovementId</td>
-                          <td>@it.SkuId</td>
-                          <td>@it.QuantityDelta</td>
-                          <td>@it.PerformedBy</td>
-                          <td>@it.CreatedAt.ToLocalTime().ToString("g")</td>
-                          <td>@(it.ReferenceId ?? it.ReferenceType ?? "")</td>
-                      </tr>
-                  }
-              }
-              else if (ViewBag.AllOutbound != null)
-              {
-                  foreach (var it in (IEnumerable<dynamic>)ViewBag.AllOutbound)
-                  {
-                      <tr>
-                          <td>@it.MovementId</td>
-                          <td>@it.SkuId</td>
-                          <td>@it.QuantityDelta</td>
-                          <td>@it.PerformedBy</td>
-                          <td>@((DateTime)it.CreatedAt).ToLocalTime().ToString("g")</td>
-                          <td>@(it.Reference ?? "")</td>
-                      </tr>
-                  }
-              }
-              else
-              {
-                  <tr>
-                      <td colspan="6" class="text-center text-muted">Không có dữ liệu xuất kho</td>
-                  </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-// Optional: client-side filter inside modal
-function wireModalSearch(inputId, tableId){
-  const input = document.getElementById(inputId);
-  const table = document.getElementById(tableId);
-  if(!input || !table) return;
-  input.addEventListener('input', function(){
-    const q = this.value.toLowerCase();
-    table.querySelectorAll('tbody tr').forEach(r=>{
-      const txt = r.innerText.toLowerCase();
-      r.style.display = txt.indexOf(q) !== -1 ? '' : 'none';
-    });
-  });
-}
-document.addEventListener('DOMContentLoaded', function(){
-  wireModalSearch('invSearch','tableAllInventory');
-  wireModalSearch('inSearch','tableAllInbound');
-  wireModalSearch('outSearch','tableAllOutbound');
-});
-</script>
-
-
-    <div class="row">
-        <div class="col-12 mb-4">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseInventory">
-                    <strong class="text-primary"><i class="fa-solid fa-boxes-stacked me-2"></i>📦 Tồn kho</strong>
-                    <div>
-                        <a class="btn btn-sm btn-outline-primary rounded-pill me-2" href="#" data-bs-toggle="modal" data-bs-target="#modalAllInventory" onclick="event.stopPropagation()">Xem tất cả</a>
-                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
-                    </div>
-                </div>
-                <div class="collapse" id="collapseInventory">
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr><th>SKU</th><th>Sản phẩm</th><th>Kho</th><th>Trạng thái</th><th>Số lượng</th></tr>
-                                </thead>
-                                <tbody>
-                                    @foreach(var it in Model?.Inventory ?? new List<DuAnCode.Web.Models.ViewModels.StockLedgerVm>())
-                                    {
-                                        <tr>
-                                            <td><span class="fw-semibold">@it.SkuId</span></td>
-                                            <td>@it.ProductName</td>
-                                            <td><span class="badge bg-secondary">@it.WarehouseId</span></td>
-                                            <td><span class="badge @(it.Status == "Available" ? "bg-success" : (it.Status == "Damaged" ? "bg-danger" : "bg-warning"))">@it.Status</span></td>
-                                            <td><span class="badge bg-info text-dark rounded-pill px-3">@it.Quantity</span></td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-white border-top-0 pt-3">
-                        @if (!(Model?.ViewAll ?? false))
-                        {
-                            var totalPages = (int)Math.Ceiling((Model?.InventoryTotal ?? 0) / (double)(Model?.PageSize ?? 1));
-                            <nav>
-                                <ul class="pagination pagination-sm justify-content-end mb-0">
-                                    <li class="page-item @(Model?.Page<=1?"disabled":"")"><a class="page-link rounded-start-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)-1, tab = "inventory", search = Model?.Search, status = Model?.Status })">Trước</a></li>
-                                    @for (int i=1;i<=totalPages;i++){
-                                        <li class="page-item @(i==(Model?.Page ?? 1)?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "inventory", search = Model?.Search, status = Model?.Status })">@i</a></li>
-                                    }
-                                    <li class="page-item @((Model?.Page ?? 1)>=totalPages?"disabled":"")"><a class="page-link rounded-end-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)+1, tab = "inventory", search = Model?.Search, status = Model?.Status })">Sau</a></li>
-                                </ul>
-                            </nav>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12 mb-4">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseInbound">
-                    <strong class="text-success"><i class="fa-solid fa-arrow-down-to-bracket me-2"></i>📥 Lịch sử Nhập kho</strong>
-                    <div>
-                        <a class="btn btn-sm btn-outline-success rounded-pill me-2" href="#" data-bs-toggle="modal" data-bs-target="#modalAllInbound" onclick="event.stopPropagation()">Xem tất cả</a>
-                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
-                    </div>
-                </div>
-                <div class="collapse" id="collapseInbound">
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr><th>ID Lịch sử</th><th>SKU</th><th class="text-center">Số lượng</th><th>Thao tác</th><th>Thời gian</th></tr>
-                                </thead>
-                                <tbody>
-                                    @foreach(var it in Model.Inbound)
-                                    {
-                                        <tr>
-                                            <td><span class="text-muted">#@it.MovementId</span></td>
-                                            <td><span class="fw-semibold">@it.SkuId</span></td>
-                                            <td class="text-center"><span class="badge bg-success rounded-pill px-3">+@it.QuantityDelta</span></td>
-                                            <td>@it.MovementType</td>
-                                            <td><small class="text-muted"><i class="fa-regular fa-clock me-1"></i>@it.CreatedAt.ToLocalTime().ToString("g")</small></td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-white border-top-0 pt-3">
-                        @if (!Model.ViewAll)
-                        {
-                            var totalPages = (int)Math.Ceiling((Model?.InboundTotal ?? 0) / (double)(Model?.PageSize ?? 1));
-                            <nav>
-                                <ul class="pagination pagination-sm justify-content-end mb-0">
-                                    <li class="page-item @(Model?.Page<=1?"disabled":"")"><a class="page-link rounded-start-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)-1, tab = "inbound", search = Model?.Search })">Trước</a></li>
-                                    @for (int i=1;i<=totalPages;i++){
-                                        <li class="page-item @(i==(Model?.Page ?? 1)?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "inbound", search = Model?.Search })">@i</a></li>
-                                    }
-                                    <li class="page-item @((Model?.Page ?? 1)>=totalPages?"disabled":"")"><a class="page-link rounded-end-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)+1, tab = "inbound", search = Model?.Search })">Sau</a></li>
-                                </ul>
-                            </nav>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12 mb-4">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseOutbound">
-                    <strong class="text-warning"><i class="fa-solid fa-arrow-up-right-from-square me-2"></i>📤 Lịch sử Xuất kho</strong>
-                    <div>
-                        <a class="btn btn-sm btn-outline-warning rounded-pill me-2" href="#" data-bs-toggle="modal" data-bs-target="#modalAllOutbound" onclick="event.stopPropagation()">Xem tất cả</a>
-                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
-                    </div>
-                </div>
-                <div class="collapse" id="collapseOutbound">
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr><th>ID Lịch sử</th><th>SKU</th><th class="text-center">Số lượng</th><th>Thao tác</th><th>Thời gian</th></tr>
-                                </thead>
-                                <tbody>
-                                    @foreach(var it in Model.Outbound)
-                                    {
-                                        <tr>
-                                            <td><span class="text-muted">#@it.MovementId</span></td>
-                                            <td><span class="fw-semibold">@it.SkuId</span></td>
-                                            <td class="text-center"><span class="badge bg-warning text-dark rounded-pill px-3">@it.QuantityDelta</span></td>
-                                            <td>@it.MovementType</td>
-                                            <td><small class="text-muted"><i class="fa-regular fa-clock me-1"></i>@it.CreatedAt.ToLocalTime().ToString("g")</small></td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-white border-top-0 pt-3">
-                        @if (!Model.ViewAll)
-                        {
-                            var totalPages = (int)Math.Ceiling((Model?.OutboundTotal ?? 0) / (double)(Model?.PageSize ?? 1));
-                            <nav>
-                                <ul class="pagination pagination-sm justify-content-end mb-0">
-                                    <li class="page-item @(Model?.Page<=1?"disabled":"")"><a class="page-link rounded-start-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)-1, tab = "outbound", search = Model?.Search })">Trước</a></li>
-                                    @for (int i=1;i<=totalPages;i++){
-                                        <li class="page-item @(i==(Model?.Page ?? 1)?"active":"")"><a class="page-link" href="@Url.Action("Index","Home", new { page = i, tab = "outbound", search = Model?.Search })">@i</a></li>
-                                    }
-                                    <li class="page-item @((Model?.Page ?? 1)>=totalPages?"disabled":"")"><a class="page-link rounded-end-pill px-3" href="@Url.Action("Index","Home", new { page = (Model?.Page ?? 1)+1, tab = "outbound", search = Model?.Search })">Sau</a></li>
-                                </ul>
-                            </nav>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>

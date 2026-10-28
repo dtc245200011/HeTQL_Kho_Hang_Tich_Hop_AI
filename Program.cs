@@ -21,6 +21,7 @@ builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IAiService, AiService>();
+builder.Services.AddScoped<IAiChatGroundingService, AiChatGroundingService>();
 builder.Services.AddScoped<IInventoryServiceAdvanced, InventoryServiceAdvanced>();
 builder.Services.AddScoped<IApprovalWorkflowService, ApprovalWorkflowService>();
 builder.Services.AddScoped<IDamagedService, DamagedService>();
@@ -88,6 +89,35 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE Warehouses ADD Location NVARCHAR(255) NULL;
             END
         ");
+
+        // 3. Ensure SystemConfigs has Approval Workflow columns
+        await db.Database.ExecuteSqlRawAsync(@"
+            IF EXISTS (SELECT * FROM sys.tables WHERE name = 'SystemConfigs')
+            BEGIN
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE Name = N'EnableMultiLevelApproval' AND Object_ID = Object_ID(N'SystemConfigs'))
+                BEGIN
+                    ALTER TABLE SystemConfigs ADD 
+                        EnableMultiLevelApproval BIT NOT NULL DEFAULT 1,
+                        OutboundDirectorApprovalThreshold DECIMAL(18,2) NOT NULL DEFAULT 100000000,
+                        InboundRequireApproval BIT NOT NULL DEFAULT 1,
+                        TransferRequireApproval BIT NOT NULL DEFAULT 1,
+                        ApprovalRoleLevel1 NVARCHAR(50) NOT NULL DEFAULT 'Accountant',
+                        ApprovalRoleLevel2 NVARCHAR(50) NOT NULL DEFAULT 'WarehouseManager',
+                        ApprovalRoleLevel3 NVARCHAR(50) NOT NULL DEFAULT 'Director',
+                        AutoApproveLowValueOutbound BIT NOT NULL DEFAULT 0,
+                        AutoApproveThreshold DECIMAL(18,2) NOT NULL DEFAULT 0;
+                END
+            END
+        ");
+
+        // 4. Ensure InventoryAuditLines has a 'StockStatus' column
+        await db.Database.ExecuteSqlRawAsync(@" 
+            IF EXISTS (SELECT * FROM sys.tables WHERE name = 'InventoryAuditLines') 
+               AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('InventoryAuditLines') AND name = 'StockStatus')
+            BEGIN
+                ALTER TABLE InventoryAuditLines ADD StockStatus NVARCHAR(50) NOT NULL DEFAULT 'GOOD';
+            END
+        ");
     }
     catch
     {
@@ -111,24 +141,31 @@ app.Use(async (context, next) =>
     using (var scope = context.RequestServices.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<DuAnCode.Web.Data.ApplicationDbContext>();
-        var config = await db.SystemConfigs.FirstOrDefaultAsync();
-        if (config != null && !string.IsNullOrEmpty(config.DefaultLanguage))
+        var config = await db.SystemConfigs.AsNoTracking().FirstOrDefaultAsync();
+        if (config != null)
         {
-            try
+            if (!string.IsNullOrEmpty(config.DefaultLanguage))
             {
-                var culture = new System.Globalization.CultureInfo(config.DefaultLanguage);
-                if (config.CurrencyFormat == "VND")
-                    culture.NumberFormat.CurrencySymbol = "₫";
-                else if (config.CurrencyFormat == "USD")
-                    culture.NumberFormat.CurrencySymbol = "$";
-                
-                System.Globalization.CultureInfo.CurrentCulture = culture;
-                System.Globalization.CultureInfo.CurrentUICulture = culture;
-                
-                context.Items["CurrencyFormat"] = config.CurrencyFormat ?? "VND";
-                context.Items["CurrencySymbol"] = culture.NumberFormat.CurrencySymbol;
+                try
+                {
+                    var culture = new System.Globalization.CultureInfo(config.DefaultLanguage);
+                    if (config.CurrencyFormat == "VND")
+                        culture.NumberFormat.CurrencySymbol = "₫";
+                    else if (config.CurrencyFormat == "USD")
+                        culture.NumberFormat.CurrencySymbol = "$";
+                    
+                    System.Globalization.CultureInfo.CurrentCulture = culture;
+                    System.Globalization.CultureInfo.CurrentUICulture = culture;
+                }
+                catch { }
             }
-            catch { }
+
+            context.Items["CurrencyFormat"] = config.CurrencyFormat ?? "VND";
+            context.Items["CurrencySymbol"] = config.CurrencyFormat == "USD" ? "$" : "₫";
+            context.Items["CompanyName"] = !string.IsNullOrWhiteSpace(config.CompanyName) ? config.CompanyName : "DuAnCode WMS";
+            context.Items["CompanyAddress"] = config.Address ?? string.Empty;
+            context.Items["CompanyPhone"] = config.Phone ?? string.Empty;
+            context.Items["CompanyEmail"] = config.Email ?? string.Empty;
         }
     }
     await next(context);
@@ -140,6 +177,66 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Middleware: Enforce MaintenanceMode and StopApi settings
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path;
+
+    // Skip static assets, error page, maintenance page, login/logout/profile
+    if (path.StartsWithSegments("/css") || path.StartsWithSegments("/js") ||
+        path.StartsWithSegments("/lib") || path.StartsWithSegments("/images") ||
+        path.StartsWithSegments("/favicon.ico") || path.StartsWithSegments("/Home/Error") ||
+        path.StartsWithSegments("/Home/Maintenance") || path.StartsWithSegments("/Account/Login") ||
+        path.StartsWithSegments("/Account/Logout") || path.StartsWithSegments("/Account/AccessDenied"))
+    {
+        await next(context);
+        return;
+    }
+
+    using (var scope = context.RequestServices.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<DuAnCode.Web.Data.ApplicationDbContext>();
+        var config = await db.SystemConfigs.AsNoTracking().FirstOrDefaultAsync();
+        if (config != null)
+        {
+            bool isAdmin = context.User.Identity?.IsAuthenticated == true &&
+                           (context.User.IsInRole("Admin") || context.User.IsInRole("Quản trị viên") ||
+                            context.User.IsInRole("Director") || context.User.IsInRole("Giám đốc"));
+
+            // 1. Check StopApi: Lock third-party API access
+            if (config.StopApi && path.StartsWithSegments("/api"))
+            {
+                // Internal AI chat allowed for web users, otherwise block API calls
+                if (!isAdmin && !path.StartsWithSegments("/api/AiChat"))
+                {
+                    context.Response.StatusCode = 503;
+                    context.Response.ContentType = "application/json; charset=utf-8";
+                    await context.Response.WriteAsync("{\"ok\":false,\"status\":503,\"message\":\"Cổng API kết nối từ bên thứ ba hiện đang tạm khóa bởi Quản trị viên hệ thống.\"}");
+                    return;
+                }
+            }
+
+            // 2. Check MaintenanceMode: Lock out non-admin employees from accessing normal pages
+            if (config.MaintenanceMode && !isAdmin)
+            {
+                if (path.StartsWithSegments("/api") || context.Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    context.Response.StatusCode = 503;
+                    context.Response.ContentType = "application/json; charset=utf-8";
+                    await context.Response.WriteAsync("{\"ok\":false,\"status\":503,\"message\":\"Hệ thống đang trong chế độ bảo trì. Chỉ Quản trị viên mới được phép truy cập.\"}");
+                    return;
+                }
+
+                context.Response.Redirect("/Home/Maintenance");
+                return;
+            }
+        }
+    }
+
+    await next(context);
+});
+
+app.MapControllers();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");

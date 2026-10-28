@@ -114,7 +114,8 @@
 
     <div class="controls">
         <button onclick="window.print()">🖨️ In @(Model.Lines.Sum(x => x.Quantity)) Tem</button>
-        <p><small>Định dạng: @format | Kích thước: @(width)x@(height)mm</small></p>
+        <p class="mb-1"><small><strong>@(string.IsNullOrWhiteSpace(config?.CompanyName) ? "DuAnCode WMS" : config.CompanyName)</strong> @(!string.IsNullOrWhiteSpace(config?.Phone) ? $"• Hotline: {config.Phone}" : "") @(!string.IsNullOrWhiteSpace(config?.Address) ? $"• {config.Address}" : "")</small></p>
+        <p class="text-muted"><small>Định dạng: @format | Kích thước: @(width)x@(height)mm</small></p>
     </div>
 
     <div class="print-area">
@@ -124,6 +125,10 @@
             for (int i = 0; i < line.Quantity; i++)
             {
                 <div class="label">
+                    @if (!string.IsNullOrWhiteSpace(config?.CompanyName))
+                    {
+                        <div class="label-company text-muted" style="font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px;">@config.CompanyName</div>
+                    }
                     <div class="label-title">@line.ProductName</div>
                     
                     <div class="barcode-container">

@@ -1,0 +1,432 @@
+@model IEnumerable<DuAnCode.Web.Models.StockLedger>
+@{
+    ViewData["Title"] = "Kiểm định Chất lượng & Hàng hỏng (QC)";
+    var skus = ViewBag.Skus as Dictionary<string, DuAnCode.Web.Models.SkuVariant> ?? new();
+    var allSkus = ViewBag.AllSkus as List<DuAnCode.Web.Models.SkuVariant> ?? new();
+    var pmMap = ViewBag.ProductModels as Dictionary<string, DuAnCode.Web.Models.ProductModel> ?? new();
+    var whMap = ViewBag.WarehouseMap as Dictionary<string, string> ?? new();
+    var allWarehouses = ViewBag.AllWarehouses as List<DuAnCode.Web.Models.Warehouse> ?? new();
+    var recentRecords = ViewBag.RecentRecords as List<DuAnCode.Web.Models.DamagedRecord> ?? new();
+}
+
+<div class="container-fluid mt-4 px-4">
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+            <h3 class="mb-1"><i class="fa-solid fa-magnifying-glass text-primary me-2"></i>Kiểm định Chất lượng & Quản lý Hàng lỗi (QC)</h3>
+            <p class="text-muted small mb-0">Theo dõi, cách ly và xử lý các mặt hàng hỏng hóc, lỗi kỹ thuật hoặc chờ thẩm định.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modalRecordDamaged">
+                <i class="fa-solid fa-triangle-exclamation me-1"></i> Báo hỏng hàng hóa
+            </button>
+        </div>
+    </div>
+
+    <!-- Search bar -->
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body py-3">
+            <form method="get" class="row g-2 align-items-center">
+                <div class="col-12 col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                        <input type="text" name="search" class="form-control border-start-0 ps-0" placeholder="Tìm theo mã SKU, số lô..." value="@ViewBag.Search" />
+                    </div>
+                </div>
+                <div class="col-12 col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fa-solid fa-filter me-1"></i> Lọc</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Active Damaged Stock Table -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0 fw-semibold text-danger">
+                <i class="fa-solid fa-boxes-stacked me-2"></i>Kho Hàng lỗi / Cách ly hiện tại
+            </h5>
+            <span class="badge bg-danger">@Model.Count() mục</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Mã SKU</th>
+                            <th>Tên sản phẩm</th>
+                            <th>Kho lưu trữ</th>
+                            <th>Mã lô (Batch)</th>
+                            <th>Hạn sử dụng</th>
+                            <th class="text-center">Trạng thái</th>
+                            <th class="text-end" style="width: 120px">Số lượng lỗi</th>
+                            <th class="text-center" style="width: 220px">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <i class="fa-solid fa-circle-check text-success fa-3x mb-3 d-block"></i>
+                                    <h5>Hiện tại không có hàng hóa lỗi hỏng nào cần xử lý!</h5>
+                                    <p class="small mb-0">Kho hàng đang đạt chuẩn chất lượng 100%.</p>
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var item in Model)
+                        {
+                            var sku = skus.GetValueOrDefault(item.SkuId);
+                            var pm = sku != null && pmMap.TryGetValue(sku.ProductModelId, out var p) ? p : null;
+                            var whName = whMap.GetValueOrDefault(item.WarehouseId, item.WarehouseId);
+
+                            <tr>
+                                <td><strong class="text-dark">@item.SkuId</strong></td>
+                                <td>
+                                    <div class="fw-semibold">@(pm?.ProductName ?? item.SkuId)</div>
+                                    @if (sku != null && (!string.IsNullOrEmpty(sku.Color) || !string.IsNullOrEmpty(sku.Material)))
+                                    {
+                                        <div class="small text-muted">@(sku.Color) @(sku.Material)</div>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border"><i class="fa-solid fa-warehouse me-1 text-danger"></i>@whName</span>
+                                </td>
+                                <td>@(string.IsNullOrWhiteSpace(item.BatchNumber) ? "-" : item.BatchNumber)</td>
+                                <td>@(item.ExpiryDate?.ToString("dd/MM/yyyy") ?? "-")</td>
+                                <td class="text-center">
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                                        <i class="fa-solid fa-triangle-exclamation me-1"></i>Hàng lỗi / Hỏng
+                                    </span>
+                                </td>
+                                <td class="text-end fw-bold text-danger fs-6">
+                                    @item.Quantity.ToString("N0")
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-success btn-restore"
+                                                data-sku="@item.SkuId"
+                                                data-name="@(pm?.ProductName ?? item.SkuId)"
+                                                data-wh-id="@item.WarehouseId"
+                                                data-wh-name="@whName"
+                                                data-qty="@item.Quantity"
+                                                title="Khôi phục về trạng thái hàng tốt (GOOD)">
+                                            <i class="fa-solid fa-rotate-left me-1"></i>Phục hồi
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger btn-dispose"
+                                                data-sku="@item.SkuId"
+                                                data-name="@(pm?.ProductName ?? item.SkuId)"
+                                                data-wh-id="@item.WarehouseId"
+                                                data-wh-name="@whName"
+                                                data-qty="@item.Quantity"
+                                                title="Xuất thanh lý / Tiêu hủy hàng lỗi">
+                                            <i class="fa-solid fa-trash-can me-1"></i>Thanh lý
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent QC History -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white py-3">
+            <h5 class="card-title mb-0 fw-semibold text-secondary">
+                <i class="fa-solid fa-clock-rotate-left me-2"></i>Lịch sử ghi nhận & xử lý hàng hỏng gần đây
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Thời gian</th>
+                            <th>Mã SKU</th>
+                            <th>Kho hàng</th>
+                            <th class="text-center">Hành động</th>
+                            <th class="text-end">Số lượng</th>
+                            <th>Ghi chú / Lý do</th>
+                            <th>Người thực hiện</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!recentRecords.Any())
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted small">
+                                    Chưa có dữ liệu lịch sử ghi nhận gần đây.
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var rec in recentRecords)
+                        {
+                            var whName = whMap.GetValueOrDefault(rec.WarehouseId, rec.WarehouseId);
+                            <tr>
+                                <td class="small text-muted">@rec.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td><strong>@rec.SkuId</strong></td>
+                                <td><span class="badge bg-light text-dark border">@whName</span></td>
+                                <td class="text-center">
+                                    @if (rec.Action == "DISPOSAL")
+                                    {
+                                        <span class="badge bg-secondary">Thanh lý / Tiêu hủy</span>
+                                    }
+                                    else if (rec.Action == "RESTORE" || rec.Action == "CHANGE_STATUS")
+                                    {
+                                        <span class="badge bg-success">Phục hồi Hàng tốt</span>
+                                    }
+                                    else if (rec.Action == "QC_INBOUND")
+                                    {
+                                        <span class="badge bg-warning text-dark">Lỗi khi Nhập kho</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Báo hỏng nội bộ</span>
+                                    }
+                                </td>
+                                <td class="text-end fw-bold @(rec.Quantity < 0 ? "text-secondary" : "text-danger")">
+                                    @(rec.Quantity > 0 ? "+" + rec.Quantity.ToString("N0") : rec.Quantity.ToString("N0"))
+                                </td>
+                                <td class="small text-muted">@(string.IsNullOrWhiteSpace(rec.Notes) ? "-" : rec.Notes)</td>
+                                <td class="small">@(rec.CreatedBy ?? "Hệ thống")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 1: Báo hỏng hàng hóa -->
+<div class="modal fade" id="modalRecordDamaged" tabindex="-1" aria-labelledby="modalRecordDamagedLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form asp-controller="Quality" asp-action="RecordDamaged" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="modalRecordDamagedLabel">
+                        <i class="fa-solid fa-triangle-exclamation me-2"></i>Ghi nhận Hàng hỏng / Cách ly (QC)
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning small py-2 mb-3">
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        Hàng hóa sẽ được chuyển từ trạng thái <strong>Hàng tốt (GOOD)</strong> sang <strong>Hàng lỗi (DAMAGED)</strong> để cách ly khỏi luồng bán hàng.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Chọn sản phẩm (SKU) <span class="text-danger">*</span></label>
+                        <select name="skuId" class="form-select select2" required>
+                            <option value="">-- Chọn sản phẩm --</option>
+                            @foreach (var s in allSkus)
+                            {
+                                var pm = pmMap.TryGetValue(s.ProductModelId, out var p) ? p : null;
+                                <option value="@s.SkuId">@s.SkuId - @(pm?.ProductName ?? s.SkuId) (@s.Color @s.Material)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Kho hàng lưu trữ <span class="text-danger">*</span></label>
+                        <select name="warehouseId" class="form-select" required>
+                            <option value="">-- Chọn kho hàng --</option>
+                            @foreach (var wh in allWarehouses)
+                            {
+                                <option value="@wh.WarehouseId">@wh.WarehouseName (@wh.WarehouseId)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Số lượng hỏng <span class="text-danger">*</span></label>
+                            <input type="number" name="quantity" class="form-control" min="1" value="1" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Loại phân loại</label>
+                            <select name="action" class="form-select">
+                                <option value="QC_INSPECTION">Kiểm định nội bộ</option>
+                                <option value="QC_INBOUND">Lỗi từ nhà cung cấp</option>
+                                <option value="WAREHOUSE_DAMAGE">Hư hỏng quá trình lưu kho</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Lý do hư hỏng / Ghi chú</label>
+                        <textarea name="note" class="form-control" rows="2" placeholder="Mô tả hiện trạng móp méo, trầy xước, vỡ tem..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fa-solid fa-check me-1"></i> Xác nhận Báo hỏng
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 2: Phục hồi hàng tốt -->
+<div class="modal fade" id="modalRestoreGood" tabindex="-1" aria-labelledby="modalRestoreGoodLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form asp-controller="Quality" asp-action="RestoreGood" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="skuId" id="restoreSkuId" />
+                <input type="hidden" name="warehouseId" id="restoreWhId" />
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="modalRestoreGoodLabel">
+                        <i class="fa-solid fa-rotate-left me-2"></i>Phục hồi Hàng tốt (GOOD)
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info small py-2 mb-3">
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        Hàng hóa sau khi được kiểm định lại hoặc sửa chữa hoàn tất sẽ được chuyển lại trạng thái <strong>Hàng tốt (GOOD)</strong> để sẵn sàng xuất bán.
+                    </div>
+                    <div class="mb-2">
+                        <span class="text-muted small">Sản phẩm:</span>
+                        <div class="fw-bold" id="restoreProductName"></div>
+                        <div class="text-muted small" id="restoreSkuText"></div>
+                    </div>
+                    <div class="mb-3">
+                        <span class="text-muted small">Kho hàng:</span>
+                        <div class="fw-semibold text-primary" id="restoreWhText"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Số lượng khôi phục <span class="text-danger">*</span></label>
+                        <input type="number" name="quantity" id="restoreQuantity" class="form-control" min="1" value="1" required />
+                        <div class="form-text">Tối đa có thể khôi phục: <strong id="restoreMaxQty">0</strong></div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fa-solid fa-check me-1"></i> Xác nhận Phục hồi
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 3: Thanh lý hàng hỏng -->
+<div class="modal fade" id="modalDisposeDamaged" tabindex="-1" aria-labelledby="modalDisposeDamagedLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form asp-controller="Quality" asp-action="DisposeDamaged" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="skuId" id="disposeSkuId" />
+                <input type="hidden" name="warehouseId" id="disposeWhId" />
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title" id="modalDisposeDamagedLabel">
+                        <i class="fa-solid fa-trash-can me-2"></i>Thanh lý / Tiêu hủy Hàng lỗi
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger small py-2 mb-3">
+                        <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                        Hàng lỗi không thể sửa chữa sẽ được xuất hủy khỏi kho hoàn toàn. Thao tác này sẽ ghi nhận vào Sổ kho và không thể hoàn tác!
+                    </div>
+                    <div class="mb-2">
+                        <span class="text-muted small">Sản phẩm:</span>
+                        <div class="fw-bold" id="disposeProductName"></div>
+                        <div class="text-muted small" id="disposeSkuText"></div>
+                    </div>
+                    <div class="mb-3">
+                        <span class="text-muted small">Kho hàng:</span>
+                        <div class="fw-semibold text-danger" id="disposeWhText"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Số lượng xuất thanh lý <span class="text-danger">*</span></label>
+                        <input type="number" name="quantity" id="disposeQuantity" class="form-control" min="1" value="1" required />
+                        <div class="form-text">Tối đa có thể thanh lý: <strong id="disposeMaxQty">0</strong></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Lý do thanh lý / Biên bản tiêu hủy</label>
+                        <textarea name="reason" class="form-control" rows="2" placeholder="Biên bản hủy số..., hư hỏng không khắc phục được..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fa-solid fa-trash-can me-1"></i> Xác nhận Thanh lý
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Restore modal binding
+            const restoreButtons = document.querySelectorAll('.btn-restore');
+            const restoreModalEl = document.getElementById('modalRestoreGood');
+            let restoreModal = null;
+            if (restoreModalEl && typeof bootstrap !== 'undefined') {
+                restoreModal = new bootstrap.Modal(restoreModalEl);
+            }
+
+            restoreButtons.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const sku = this.dataset.sku;
+                    const name = this.dataset.name;
+                    const whId = this.dataset.whId;
+                    const whName = this.dataset.whName;
+                    const qty = parseInt(this.dataset.qty) || 1;
+
+                    document.getElementById('restoreSkuId').value = sku;
+                    document.getElementById('restoreWhId').value = whId;
+                    document.getElementById('restoreProductName').textContent = name;
+                    document.getElementById('restoreSkuText').textContent = 'Mã SKU: ' + sku;
+                    document.getElementById('restoreWhText').textContent = whName;
+                    document.getElementById('restoreMaxQty').textContent = qty;
+
+                    const qtyInput = document.getElementById('restoreQuantity');
+                    qtyInput.value = qty;
+                    qtyInput.max = qty;
+
+                    if (restoreModal) restoreModal.show();
+                });
+            });
+
+            // Dispose modal binding
+            const disposeButtons = document.querySelectorAll('.btn-dispose');
+            const disposeModalEl = document.getElementById('modalDisposeDamaged');
+            let disposeModal = null;
+            if (disposeModalEl && typeof bootstrap !== 'undefined') {
+                disposeModal = new bootstrap.Modal(disposeModalEl);
+            }
+
+            disposeButtons.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const sku = this.dataset.sku;
+                    const name = this.dataset.name;
+                    const whId = this.dataset.whId;
+                    const whName = this.dataset.whName;
+                    const qty = parseInt(this.dataset.qty) || 1;
+
+                    document.getElementById('disposeSkuId').value = sku;
+                    document.getElementById('disposeWhId').value = whId;
+                    document.getElementById('disposeProductName').textContent = name;
+                    document.getElementById('disposeSkuText').textContent = 'Mã SKU: ' + sku;
+                    document.getElementById('disposeWhText').textContent = whName;
+                    document.getElementById('disposeMaxQty').textContent = qty;
+
+                    const qtyInput = document.getElementById('disposeQuantity');
+                    qtyInput.value = qty;
+                    qtyInput.max = qty;
+
+                    if (disposeModal) disposeModal.show();
+                });
+            });
+        });
+    </script>
+}

@@ -1,23 +1,9 @@
-﻿@model DuAnCode.Web.Models.User
+@model DuAnCode.Web.Models.User
 @{
     ViewData["Title"] = "Hồ sơ cá nhân";
 }
 
 <div class="container-fluid py-4">
-    @if (TempData["Success"] != null)
-    {
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="fa-solid fa-check-circle me-2"></i>@TempData["Success"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    }
-    @if (TempData["Error"] != null)
-    {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fa-solid fa-triangle-exclamation me-2"></i>@TempData["Error"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    }
     <div class="row">
         <!-- Thông tin cá nhân -->
         <div class="col-md-6 mb-4">
@@ -33,7 +19,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Email</label>
-                            @if (User.IsInRole("Admin"))
+                            @if (User.IsInRole("Admin") || User.IsInRole("Quản trị viên"))
                             {
                                 <input name="Email" type="email" class="form-control bg-light" value="@Model.Email" readonly title="Không thể đổi Email tài khoản Admin" />
                                 <div class="form-text text-danger">Tài khoản Admin bị khóa đổi Email để bảo vệ hệ thống.</div>

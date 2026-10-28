@@ -48,12 +48,59 @@ namespace DuAnCode.Web.Controllers
             return list.OrderBy(x => x.SkuId).ToList();
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? search = null, string? status = null, DateTime? fromDate = null, DateTime? toDate = null)
         {
-            var vouchers = await _db.InventoryVouchers
+            var query = _db.InventoryVouchers
                 .Where(v => v.Type == "INBOUND")
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim();
+                query = query.Where(v => v.VoucherNumber.Contains(s) || (v.CreatedBy != null && v.CreatedBy.Contains(s)) || (v.ReferenceDocument != null && v.ReferenceDocument.Contains(s)) || (v.Reason != null && v.Reason.Contains(s)) || (v.Counterparty != null && v.Counterparty.Contains(s)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(v => v.Status == status);
+            }
+
+            if (fromDate.HasValue)
+            {
+                var start = fromDate.Value.Date;
+                query = query.Where(v => v.Date >= start);
+            }
+
+            if (toDate.HasValue)
+            {
+                var end = toDate.Value.Date.AddDays(1).AddTicks(-1);
+                query = query.Where(v => v.Date <= end);
+            }
+
+            var vouchers = await query
                 .OrderByDescending(v => v.Date)
                 .ToListAsync();
+
+            var rejectedIds = vouchers.Where(v => v.Status == "REJECTED").Select(v => v.VoucherId).ToList();
+            if (rejectedIds.Any())
+            {
+                var logs = await _db.AuditLogs
+                    .Where(a => a.Action == "REJECT" && a.EntityType == "InventoryVoucher" && rejectedIds.Contains(a.EntityId))
+                    .OrderByDescending(a => a.PerformedAt)
+                    .ToListAsync();
+                ViewBag.RejectionLogs = logs.GroupBy(a => a.EntityId).ToDictionary(g => g.Key, g => g.First());
+            }
+            else
+            {
+                ViewBag.RejectionLogs = new Dictionary<string, AuditLog>();
+            }
+
+            ViewBag.WarehouseMap = await _db.Warehouses.AsNoTracking().ToDictionaryAsync(w => w.WarehouseId, w => w.WarehouseName);
+            ViewBag.Search = search;
+            ViewBag.Status = status;
+            ViewBag.FromDate = fromDate?.ToString("yyyy-MM-dd");
+            ViewBag.ToDate = toDate?.ToString("yyyy-MM-dd");
+
             return View("List", vouchers);
         }
 
@@ -85,27 +132,70 @@ namespace DuAnCode.Web.Controllers
                 var existing = await _db.InventoryVouchers.Include(v => v.Lines).FirstOrDefaultAsync(v => v.VoucherId == id && v.Type == "INBOUND");
                 if (existing != null)
                 {
+                    var (originalReason, rejectionReason) = DuAnCode.Web.Services.RejectionHelper.ExtractReason(existing.Reason);
+                    DateTime? rejectedAt = null;
+                    string? rejectedBy = existing.ApprovedBy;
+                    if (existing.Status == "REJECTED")
+                    {
+                        var rejectLog = await _db.AuditLogs
+                            .Where(a => a.Action == "REJECT" && a.EntityType == "InventoryVoucher" && a.EntityId == existing.VoucherId)
+                            .OrderByDescending(a => a.PerformedAt)
+                            .FirstOrDefaultAsync();
+                        if (rejectLog != null)
+                        {
+                            rejectedAt = rejectLog.PerformedAt;
+                            if (!string.IsNullOrWhiteSpace(rejectLog.PerformedBy))
+                                rejectedBy = rejectLog.PerformedBy;
+                        }
+                    }
+
+                    var defaultSup = await _db.Suppliers.FirstOrDefaultAsync(s => s.IsActive) ?? await _db.Suppliers.FirstOrDefaultAsync();
+                    var counterparty = !string.IsNullOrWhiteSpace(existing.Counterparty) ? existing.Counterparty : (defaultSup?.Name ?? "NCC Nội Thất 1");
+                    var address = !string.IsNullOrWhiteSpace(existing.Address) ? existing.Address : (defaultSup?.Address ?? "Kho hàng nhà cung cấp");
+                    var warehouseId = !string.IsNullOrWhiteSpace(existing.WarehouseId) && vm.Warehouses.Any(w => w.WarehouseId == existing.WarehouseId && w.WarehouseType != "DAMAGED")
+                        ? existing.WarehouseId
+                        : (vm.Warehouses.FirstOrDefault(w => w.WarehouseType == "MAIN")?.WarehouseId ?? vm.Warehouses.FirstOrDefault()?.WarehouseId ?? existing.WarehouseId ?? "");
+
+                    var skuVariantsMap = await _db.SkuVariants.AsNoTracking().ToDictionaryAsync(s => s.SkuId, s => s);
+
                     vm.Form = new Models.ViewModels.VoucherFormViewModel
                     {
                         VoucherId = existing.VoucherId,
                         VoucherNumber = existing.VoucherNumber,
                         Date = existing.Date,
-                        Counterparty = existing.Counterparty ?? string.Empty,
-                        Address = existing.Address ?? string.Empty,
-                        Reason = existing.Reason ?? string.Empty,
+                        Counterparty = counterparty,
+                        Address = address,
+                        Reason = string.IsNullOrWhiteSpace(originalReason) ? existing.Reason : originalReason,
                         ReferenceDocument = existing.ReferenceDocument ?? string.Empty,
-                        WarehouseId = existing.WarehouseId ?? string.Empty,
-                        Lines = existing.Lines.Select(l => new Models.ViewModels.VoucherLineInput
+                        WarehouseId = warehouseId,
+                        Status = existing.Status,
+                        IsLocked = existing.IsLocked,
+                        CreatedBy = existing.CreatedBy,
+                        ApprovedBy = rejectedBy,
+                        RejectedAt = rejectedAt,
+                        RejectionReason = rejectionReason,
+                        OriginalReason = originalReason,
+                        Lines = existing.Lines.Select(l =>
                         {
-                            Id = l.Id,
-                            SkuId = l.SkuId,
-                            ProductName = l.ProductName ?? string.Empty,
-                            Unit = l.Unit ?? "Cái",
-                            Quantity = l.Quantity,
-                            DocumentQuantity = l.DocumentQuantity,
-                            BatchNumber = l.BatchNumber ?? string.Empty,
-                            ExpiryDate = l.ExpiryDate,
-                            UnitPrice = l.UnitPrice
+                            var skuOpt = vm.Skus.FirstOrDefault(s => s.SkuId == l.SkuId);
+                            skuVariantsMap.TryGetValue(l.SkuId, out var skuVar);
+
+                            var prodName = !string.IsNullOrWhiteSpace(l.ProductName) ? l.ProductName : (skuOpt?.ProductName ?? l.SkuId);
+                            var unit = !string.IsNullOrWhiteSpace(l.Unit) ? l.Unit : (skuOpt?.Unit ?? "Cái");
+                            var price = l.UnitPrice > 0 ? l.UnitPrice : (skuVar?.UnitPrice ?? 0m);
+
+                            return new Models.ViewModels.VoucherLineInput
+                            {
+                                Id = l.Id,
+                                SkuId = l.SkuId,
+                                ProductName = prodName,
+                                Unit = unit,
+                                Quantity = l.Quantity,
+                                DocumentQuantity = l.DocumentQuantity,
+                                BatchNumber = string.IsNullOrWhiteSpace(l.BatchNumber) ? $"LÔ-AI-{existing.Date:yyyyMMdd}" : l.BatchNumber,
+                                ExpiryDate = l.ExpiryDate,
+                                UnitPrice = price
+                            };
                         }).ToList()
                     };
                 }
@@ -165,13 +255,22 @@ namespace DuAnCode.Web.Controllers
                 if (!exists)
                 {
                     // Auto-create ProductModel and SkuVariant
-                    var pm = new ProductModel 
-                    { 
-                        ProductModelId = line.SkuId, 
-                        ProductName = string.IsNullOrWhiteSpace(line.ProductName) ? line.SkuId : line.ProductName, 
-                        Unit = string.IsNullOrWhiteSpace(line.Unit) ? "Cái" : line.Unit 
-                    };
-                    _db.ProductModels.Add(pm);
+                    var pm = await _db.ProductModels.FirstOrDefaultAsync(p => p.ProductModelId == line.SkuId);
+                    if (pm == null)
+                    {
+                        pm = new ProductModel 
+                        { 
+                            ProductModelId = line.SkuId, 
+                            ProductName = string.IsNullOrWhiteSpace(line.ProductName) ? line.SkuId : line.ProductName, 
+                            Unit = string.IsNullOrWhiteSpace(line.Unit) ? "Cái" : line.Unit 
+                        };
+                        _db.ProductModels.Add(pm);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(line.ProductName))
+                    {
+                        pm.ProductName = line.ProductName;
+                        if (!string.IsNullOrWhiteSpace(line.Unit)) pm.Unit = line.Unit;
+                    }
                     
                     var sku = new SkuVariant 
                     { 
@@ -199,6 +298,12 @@ namespace DuAnCode.Web.Controllers
 
             ModelState.Remove("VoucherId");
             ModelState.Remove("VoucherNumber");
+            ModelState.Remove("Form.VoucherId");
+            ModelState.Remove("Form.VoucherNumber");
+            ModelState.Remove("Date");
+            ModelState.Remove("Form.Date");
+            ModelState.Remove("CreatedBy");
+            ModelState.Remove("Form.CreatedBy");
 
             if (!ModelState.IsValid)
             {
@@ -220,10 +325,11 @@ namespace DuAnCode.Web.Controllers
             try
             {
                 await AutoCreateMissingSkus(form.Lines);
-                if (!string.IsNullOrWhiteSpace(form.VoucherId))
+                var targetVoucherId = !string.IsNullOrWhiteSpace(form.VoucherId) ? form.VoucherId : (Request != null && Request.HasFormContentType ? Request.Form["VoucherId"].FirstOrDefault() : null);
+                if (!string.IsNullOrWhiteSpace(targetVoucherId))
                 {
                     // UPDATE DRAFT FLOW
-                    var existing = await _db.InventoryVouchers.Include(v => v.Lines).FirstOrDefaultAsync(v => v.VoucherId == form.VoucherId);
+                    var existing = await _db.InventoryVouchers.Include(v => v.Lines).FirstOrDefaultAsync(v => v.VoucherId == targetVoucherId);
                     if (existing == null) { TempData["Error"] = "Phiếu không tồn tại."; return RedirectToAction("Index"); }
                     if (existing.IsLocked || existing.Status == "APPROVED")
                     {
@@ -233,12 +339,13 @@ namespace DuAnCode.Web.Controllers
                     }
 
                     existing.VoucherNumber = string.IsNullOrWhiteSpace(form.VoucherNumber) ? existing.VoucherNumber : form.VoucherNumber;
-                    existing.Date = form.Date;
+                    existing.Date = form.Date ?? existing.Date;
                     existing.Counterparty = form.Counterparty;
                     existing.Address = form.Address;
                     existing.Reason = form.Reason;
                     existing.ReferenceDocument = form.ReferenceDocument ?? string.Empty;
                     existing.WarehouseId = form.WarehouseId;
+                    if (!string.IsNullOrWhiteSpace(form.CreatedBy)) existing.CreatedBy = form.CreatedBy;
 
                     _db.VoucherLines.RemoveRange(existing.Lines);
                     existing.Lines.Clear();
@@ -264,7 +371,7 @@ namespace DuAnCode.Web.Controllers
                     var voucher = new InventoryVoucher
                     {
                         VoucherNumber = (string.IsNullOrWhiteSpace(form.VoucherNumber) || string.Equals(form.VoucherNumber, "AUTO", StringComparison.OrdinalIgnoreCase)) ? (prefix + DateTime.UtcNow.ToString("yyyyMMddHHmmss")) : form.VoucherNumber,
-                        Date = form.Date,
+                        Date = form.Date ?? DateTime.UtcNow,
                         Type = "INBOUND",
                         Status = "DRAFT",
                         Counterparty = form.Counterparty,
@@ -272,7 +379,7 @@ namespace DuAnCode.Web.Controllers
                         Reason = form.Reason,
                         ReferenceDocument = form.ReferenceDocument ?? string.Empty,
                         WarehouseId = form.WarehouseId,
-                        CreatedBy = User?.Identity?.Name
+                        CreatedBy = !string.IsNullOrWhiteSpace(form.CreatedBy) ? form.CreatedBy : (User?.Identity?.Name ?? "admin")
                     };
                     
                     decimal total = 0m;
@@ -338,9 +445,9 @@ namespace DuAnCode.Web.Controllers
             
             if (currentStep != null)
             {
-                if (!User.IsInRole(currentStep.ApproverRole) && !User.IsInRole("Admin"))
+                if (!DuAnCode.Web.Services.RoleHelper.IsUserInRole(User, currentStep.ApproverRole))
                 {
-                    TempData["Error"] = $"Bạn không có quyền duyệt phiếu này. Đang chờ chữ ký của: {currentStep.ApproverRole}.";
+                    TempData["Error"] = $"Bạn không có quyền duyệt phiếu này. Đang chờ chữ ký của: {DuAnCode.Web.Services.RoleHelper.ToVietnamese(currentStep.ApproverRole)}.";
                     return RedirectToAction("Index");
                 }
 
@@ -348,13 +455,13 @@ namespace DuAnCode.Web.Controllers
                 currentStep.ApprovedBy = User.Identity?.Name;
                 currentStep.ApprovedAt = DateTime.UtcNow;
                 
-                _db.AuditLogs.Add(new AuditLog { EntityType = "InventoryVoucher", EntityId = voucher.VoucherId, Action = $"APPROVE_LEVEL_{currentStep.Level}", PerformedBy = User.Identity?.Name ?? "System", Reason = $"Duyệt phiếu cấp {currentStep.Level} ({currentStep.ApproverRole})" });
+                _db.AuditLogs.Add(new AuditLog { EntityType = "InventoryVoucher", EntityId = voucher.VoucherId, Action = $"APPROVE_LEVEL_{currentStep.Level}", PerformedBy = User.Identity?.Name ?? "System", Reason = $"Duyệt phiếu cấp {currentStep.Level} ({DuAnCode.Web.Services.RoleHelper.ToVietnamese(currentStep.ApproverRole)})" });
                 await _db.SaveChangesAsync();
 
                 var nextStep = steps.FirstOrDefault(s => s.Status == "PENDING");
                 if (nextStep != null)
                 {
-                    TempData["Message"] = $"Đã ký duyệt cấp {currentStep.Level} thành công. Chờ {nextStep.ApproverRole} duyệt tiếp.";
+                    TempData["Message"] = $"Đã ký duyệt cấp {currentStep.Level} thành công. Chờ {DuAnCode.Web.Services.RoleHelper.ToVietnamese(nextStep.ApproverRole)} duyệt tiếp.";
                     return RedirectToAction("Index");
                 }
             }
@@ -363,29 +470,62 @@ namespace DuAnCode.Web.Controllers
             await using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
-                var skusToLock = voucher.Lines.Select(l => l.SkuId).Distinct().ToList();
-                var lockedLedgers = await _repo.LockLedgersForUpdateAsync(skusToLock, voucher.WarehouseId, "GOOD");
+                var comboIds = voucher.Lines.Select(l => l.SkuId).Distinct().ToList();
+                var combos = await _db.ComboProducts.Include(c => c.Components).Where(c => comboIds.Contains(c.ComboId)).ToListAsync();
 
+                // Flatten lines: explode Combos into BOM components
+                var itemsToAdd = new List<(string SkuId, string BatchNumber, DateTime? ExpiryDate, int Quantity)>();
                 foreach (var line in voucher.Lines)
                 {
                     if (string.IsNullOrWhiteSpace(line.SkuId) || line.Quantity <= 0) continue;
 
-                    var ledger = lockedLedgers.FirstOrDefault(l => l.SkuId == line.SkuId && l.BatchNumber == (line.BatchNumber ?? string.Empty));
+                    var combo = combos.FirstOrDefault(c => c.ComboId == line.SkuId);
+                    if (combo != null && combo.Components != null && combo.Components.Any())
+                    {
+                        foreach (var bom in combo.Components)
+                        {
+                            var compQty = line.Quantity * Math.Max(1, bom.QuantityPerSet);
+                            itemsToAdd.Add((bom.SkuId, line.BatchNumber ?? string.Empty, line.ExpiryDate, compQty));
+                        }
+                    }
+                    else
+                    {
+                        itemsToAdd.Add((line.SkuId, line.BatchNumber ?? string.Empty, line.ExpiryDate, line.Quantity));
+                    }
+                }
+
+                var skusToLock = itemsToAdd.Select(i => i.SkuId).Distinct().OrderBy(s => s).ToList();
+                var lockedLedgers = await _repo.LockLedgersForUpdateAsync(skusToLock, voucher.WarehouseId, "GOOD");
+
+                foreach (var item in itemsToAdd)
+                {
+                    var ledger = lockedLedgers.FirstOrDefault(l => l.SkuId == item.SkuId && l.BatchNumber == item.BatchNumber);
                     if (ledger == null)
                     {
-                        ledger = new StockLedger { SkuId = line.SkuId, WarehouseId = voucher.WarehouseId, Status = "GOOD", Quantity = 0, BatchNumber = line.BatchNumber ?? string.Empty, ExpiryDate = line.ExpiryDate };
+                        ledger = new StockLedger
+                        {
+                            SkuId = item.SkuId,
+                            WarehouseId = voucher.WarehouseId,
+                            Status = "GOOD",
+                            Quantity = item.Quantity,
+                            BatchNumber = item.BatchNumber,
+                            ExpiryDate = item.ExpiryDate
+                        };
                         await _repo.AddLedgerAsync(ledger);
                         lockedLedgers.Add(ledger);
                     }
-                    ledger.Quantity += line.Quantity;
-                    await _repo.UpdateLedgerAsync(ledger);
+                    else
+                    {
+                        ledger.Quantity += item.Quantity;
+                        await _repo.UpdateLedgerAsync(ledger);
+                    }
 
                     await _repo.AddMovementAsync(new StockMovement
                     {
-                        SkuId = line.SkuId,
+                        SkuId = item.SkuId,
                         WarehouseId = voucher.WarehouseId,
                         StockStatus = "GOOD",
-                        QuantityDelta = line.Quantity,
+                        QuantityDelta = item.Quantity,
                         MovementType = "INBOUND",
                         ReferenceType = "VOUCHER",
                         ReferenceId = voucher.VoucherId,
@@ -426,6 +566,58 @@ namespace DuAnCode.Web.Controllers
             return RedirectToAction("Index");
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Reject(string id, string? reason)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return BadRequest();
+
+            var voucher = await _db.InventoryVouchers.FirstOrDefaultAsync(v => v.VoucherId == id);
+            if (voucher == null) { TempData["Error"] = "Phiếu không tồn tại."; return RedirectToAction("Index"); }
+
+            if (voucher.Status != "DRAFT" && voucher.Status != "PENDING")
+            {
+                TempData["Error"] = "Chỉ có thể từ chối phiếu đang ở trạng thái Nháp hoặc Chờ duyệt.";
+                return RedirectToAction("Index");
+            }
+
+            var steps = await _db.ApprovalSteps.Where(s => s.EntityType == "VOUCHER" && s.EntityId == voucher.VoucherId).OrderBy(s => s.Level).ToListAsync();
+            var currentStep = steps.FirstOrDefault(s => s.Status == "PENDING");
+            if (currentStep != null)
+            {
+                if (!DuAnCode.Web.Services.RoleHelper.IsUserInRole(User, currentStep.ApproverRole))
+                {
+                    TempData["Error"] = $"Bạn không có quyền từ chối phiếu này. Đang chờ chữ ký của: {DuAnCode.Web.Services.RoleHelper.ToVietnamese(currentStep.ApproverRole)}.";
+                    return RedirectToAction("Index");
+                }
+
+                currentStep.Status = "REJECTED";
+                currentStep.ApprovedBy = User.Identity?.Name;
+                currentStep.ApprovedAt = DateTime.UtcNow;
+            }
+
+            voucher.Status = "REJECTED";
+            voucher.IsLocked = true;
+            voucher.ApprovedBy = User?.Identity?.Name;
+            var rejectNote = string.IsNullOrWhiteSpace(reason) ? "Không có lý do cụ thể" : reason.Trim();
+            voucher.Reason = string.IsNullOrWhiteSpace(voucher.Reason) 
+                ? $"[TỪ CHỐI DUYỆT: {rejectNote}]" 
+                : $"{voucher.Reason} | [TỪ CHỐI DUYỆT: {rejectNote}]";
+
+            _db.AuditLogs.Add(new AuditLog
+            {
+                EntityType = "InventoryVoucher",
+                EntityId = voucher.VoucherId,
+                Action = "REJECT",
+                PerformedBy = User?.Identity?.Name ?? "System",
+                Reason = $"Từ chối duyệt phiếu nhập kho. Lý do: {rejectNote}"
+            });
+
+            await _db.SaveChangesAsync();
+            TempData["Message"] = "Đã từ chối duyệt phiếu nhập kho thành công.";
+            return RedirectToAction("Index");
+        }
+
         [HttpGet]
         public async Task<IActionResult> PrintLabels(string id)
         {
@@ -437,6 +629,35 @@ namespace DuAnCode.Web.Controllers
             
             ViewBag.Config = config;
             return View(voucher);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetRejectionDetails(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return BadRequest(new { success = false, message = "Mã phiếu không hợp lệ." });
+
+            var voucher = await _db.InventoryVouchers.FirstOrDefaultAsync(v => v.VoucherId == id);
+            if (voucher == null) return NotFound(new { success = false, message = "Không tìm thấy phiếu." });
+
+            var (originalReason, rejectionReason) = DuAnCode.Web.Services.RejectionHelper.ExtractReason(voucher.Reason);
+            var rejectLog = await _db.AuditLogs
+                .Where(a => a.Action == "REJECT" && a.EntityType == "InventoryVoucher" && a.EntityId == voucher.VoucherId)
+                .OrderByDescending(a => a.PerformedAt)
+                .FirstOrDefaultAsync();
+
+            return Json(new
+            {
+                success = true,
+                voucherId = voucher.VoucherId,
+                voucherNumber = voucher.VoucherNumber,
+                status = voucher.Status,
+                createdBy = voucher.CreatedBy ?? "Không xác định",
+                createdAt = voucher.Date.ToLocalTime().ToString("dd/MM/yyyy HH:mm"),
+                rejectedBy = rejectLog?.PerformedBy ?? voucher.ApprovedBy ?? "Quản lý kho",
+                rejectedAt = (rejectLog?.PerformedAt ?? voucher.Date).ToLocalTime().ToString("dd/MM/yyyy HH:mm"),
+                rejectionReason = rejectionReason,
+                originalReason = originalReason
+            });
         }
     }
 }

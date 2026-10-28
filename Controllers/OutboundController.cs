@@ -48,13 +48,60 @@ namespace DuAnCode.Web.Controllers
             return list.OrderBy(x => x.SkuId).ToList();
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? search = null, string? status = null, DateTime? fromDate = null, DateTime? toDate = null)
         {
-            var vouchers = await _db.InventoryVouchers
+            var query = _db.InventoryVouchers
                 .Where(v => v.Type == "OUTBOUND")
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim();
+                query = query.Where(v => v.VoucherNumber.Contains(s) || (v.CreatedBy != null && v.CreatedBy.Contains(s)) || (v.ReferenceDocument != null && v.ReferenceDocument.Contains(s)) || (v.Reason != null && v.Reason.Contains(s)) || (v.Counterparty != null && v.Counterparty.Contains(s)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(v => v.Status == status);
+            }
+
+            if (fromDate.HasValue)
+            {
+                var start = fromDate.Value.Date;
+                query = query.Where(v => v.Date >= start);
+            }
+
+            if (toDate.HasValue)
+            {
+                var end = toDate.Value.Date.AddDays(1).AddTicks(-1);
+                query = query.Where(v => v.Date <= end);
+            }
+
+            var vouchers = await query
                 .OrderByDescending(v => v.Date)
                 .ToListAsync();
-            return View("List", vouchers); // We will create a List view for it.
+
+            var rejectedIds = vouchers.Where(v => v.Status == "REJECTED").Select(v => v.VoucherId).ToList();
+            if (rejectedIds.Any())
+            {
+                var logs = await _db.AuditLogs
+                    .Where(a => a.Action == "REJECT" && a.EntityType == "InventoryVoucher" && rejectedIds.Contains(a.EntityId))
+                    .OrderByDescending(a => a.PerformedAt)
+                    .ToListAsync();
+                ViewBag.RejectionLogs = logs.GroupBy(a => a.EntityId).ToDictionary(g => g.Key, g => g.First());
+            }
+            else
+            {
+                ViewBag.RejectionLogs = new Dictionary<string, AuditLog>();
+            }
+
+            ViewBag.WarehouseMap = await _db.Warehouses.AsNoTracking().ToDictionaryAsync(w => w.WarehouseId, w => w.WarehouseName);
+            ViewBag.Search = search;
+            ViewBag.Status = status;
+            ViewBag.FromDate = fromDate?.ToString("yyyy-MM-dd");
+            ViewBag.ToDate = toDate?.ToString("yyyy-MM-dd");
+
+            return View("List", vouchers);
         }
 
         [HttpGet]
@@ -85,6 +132,23 @@ namespace DuAnCode.Web.Controllers
                 var existing = await _db.InventoryVouchers.Include(v => v.Lines).FirstOrDefaultAsync(v => v.VoucherId == id && v.Type == "OUTBOUND");
                 if (existing != null)
                 {
+                    var (originalReason, rejectionReason) = DuAnCode.Web.Services.RejectionHelper.ExtractReason(existing.Reason);
+                    DateTime? rejectedAt = null;
+                    string? rejectedBy = existing.ApprovedBy;
+                    if (existing.Status == "REJECTED")
+                    {
+                        var rejectLog = await _db.AuditLogs
+                            .Where(a => a.Action == "REJECT" && a.EntityType == "InventoryVoucher" && a.EntityId == existing.VoucherId)
+                            .OrderByDescending(a => a.PerformedAt)
+                            .FirstOrDefaultAsync();
+                        if (rejectLog != null)
+                        {
+                            rejectedAt = rejectLog.PerformedAt;
+                            if (!string.IsNullOrWhiteSpace(rejectLog.PerformedBy))
+                                rejectedBy = rejectLog.PerformedBy;
+                        }
+                    }
+
                     vm.Form = new Models.ViewModels.VoucherFormViewModel
                     {
                         VoucherId = existing.VoucherId,
@@ -92,9 +156,16 @@ namespace DuAnCode.Web.Controllers
                         Date = existing.Date,
                         Counterparty = existing.Counterparty ?? string.Empty,
                         Address = existing.Address ?? string.Empty,
-                        Reason = existing.Reason ?? string.Empty,
+                        Reason = string.IsNullOrWhiteSpace(originalReason) ? existing.Reason : originalReason,
                         ReferenceDocument = existing.ReferenceDocument ?? string.Empty,
                         WarehouseId = existing.WarehouseId ?? string.Empty,
+                        Status = existing.Status,
+                        IsLocked = existing.IsLocked,
+                        CreatedBy = existing.CreatedBy,
+                        ApprovedBy = rejectedBy,
+                        RejectedAt = rejectedAt,
+                        RejectionReason = rejectionReason,
+                        OriginalReason = originalReason,
                         Lines = existing.Lines.Select(l => new Models.ViewModels.VoucherLineInput
                         {
                             Id = l.Id,
@@ -121,6 +192,7 @@ namespace DuAnCode.Web.Controllers
 
             return View("Create", vm); // Outbound uses Create.cshtml as its create form
         }
+
 
         private async Task<Dictionary<string, int>> FlattenLinesAsync(IEnumerable<Models.ViewModels.VoucherLineInput> lines)
         {
@@ -160,6 +232,12 @@ namespace DuAnCode.Web.Controllers
 
             ModelState.Remove("VoucherId");
             ModelState.Remove("VoucherNumber");
+            ModelState.Remove("Form.VoucherId");
+            ModelState.Remove("Form.VoucherNumber");
+            ModelState.Remove("Date");
+            ModelState.Remove("Form.Date");
+            ModelState.Remove("CreatedBy");
+            ModelState.Remove("Form.CreatedBy");
 
             if (!ModelState.IsValid)
             {
@@ -180,10 +258,11 @@ namespace DuAnCode.Web.Controllers
             await using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
-                if (!string.IsNullOrWhiteSpace(form.VoucherId))
+                var targetVoucherId = !string.IsNullOrWhiteSpace(form.VoucherId) ? form.VoucherId : (Request != null && Request.HasFormContentType ? Request.Form["VoucherId"].FirstOrDefault() : null);
+                if (!string.IsNullOrWhiteSpace(targetVoucherId))
                 {
                     // UPDATE DRAFT FLOW
-                    var existing = await _db.InventoryVouchers.Include(v => v.Lines).FirstOrDefaultAsync(v => v.VoucherId == form.VoucherId);
+                    var existing = await _db.InventoryVouchers.Include(v => v.Lines).FirstOrDefaultAsync(v => v.VoucherId == targetVoucherId);
                     if (existing == null) { TempData["Error"] = "Phiếu không tồn tại."; return RedirectToAction("Index"); }
                     if (existing.IsLocked || existing.Status == "APPROVED")
                     {
@@ -193,12 +272,13 @@ namespace DuAnCode.Web.Controllers
                     }
 
                     existing.VoucherNumber = string.IsNullOrWhiteSpace(form.VoucherNumber) ? existing.VoucherNumber : form.VoucherNumber;
-                    existing.Date = form.Date;
+                    existing.Date = form.Date ?? existing.Date;
                     existing.Counterparty = form.Counterparty;
                     existing.Address = form.Address;
                     existing.Reason = form.Reason;
                     existing.ReferenceDocument = form.ReferenceDocument ?? string.Empty;
                     existing.WarehouseId = form.WarehouseId;
+                    if (!string.IsNullOrWhiteSpace(form.CreatedBy)) existing.CreatedBy = form.CreatedBy;
 
                     _db.VoucherLines.RemoveRange(existing.Lines);
                     existing.Lines.Clear();
@@ -224,7 +304,7 @@ namespace DuAnCode.Web.Controllers
                     var voucher = new InventoryVoucher
                     {
                         VoucherNumber = (string.IsNullOrWhiteSpace(form.VoucherNumber) || string.Equals(form.VoucherNumber, "AUTO", StringComparison.OrdinalIgnoreCase)) ? (prefix + DateTime.UtcNow.ToString("yyyyMMddHHmmss")) : form.VoucherNumber,
-                        Date = form.Date,
+                        Date = form.Date ?? DateTime.UtcNow,
                         Type = "OUTBOUND",
                         Status = "DRAFT",
                         Counterparty = form.Counterparty,
@@ -232,7 +312,7 @@ namespace DuAnCode.Web.Controllers
                         Reason = form.Reason,
                         ReferenceDocument = form.ReferenceDocument ?? string.Empty,
                         WarehouseId = form.WarehouseId,
-                        CreatedBy = User?.Identity?.Name
+                        CreatedBy = !string.IsNullOrWhiteSpace(form.CreatedBy) ? form.CreatedBy : (User?.Identity?.Name ?? "admin")
                     };
                     
                     decimal total = 0m;
@@ -249,6 +329,25 @@ namespace DuAnCode.Web.Controllers
                     voucher.TotalAmount = total;
                     _db.InventoryVouchers.Add(voucher);
                     await _db.SaveChangesAsync();
+
+                    // Kiểm tra cấu hình Tự động duyệt phiếu xuất giá trị nhỏ (AutoApproveLowValueOutbound)
+                    if (config != null && config.AutoApproveLowValueOutbound && config.AutoApproveThreshold > 0 && voucher.TotalAmount <= config.AutoApproveThreshold)
+                    {
+                        var (approved, errMsg) = await ExecuteVoucherApprovalDeductionAsync(voucher, "Tự động duyệt (Hệ thống)", $"Tự động phê duyệt Phiếu Xuất giá trị nhỏ ({voucher.TotalAmount:N0} đ <= Ngưỡng {config.AutoApproveThreshold:N0} đ)");
+                        if (approved)
+                        {
+                            await transaction.CommitAsync();
+                            TempData["Message"] = $"Tạo và TỰ ĐỘNG DUYỆT phiếu xuất thành công! (Giá trị {voucher.TotalAmount:N0} VNĐ <= Ngưỡng tự động duyệt {config.AutoApproveThreshold:N0} VNĐ). Tồn kho đã được trừ.";
+                            return RedirectToAction("Index");
+                        }
+                        else
+                        {
+                            await transaction.CommitAsync();
+                            TempData["Warning"] = $"Phiếu xuất đã tạo thành công ở trạng thái NHÁP. Chưa thể tự động duyệt vì: {errMsg}";
+                            return RedirectToAction("Index");
+                        }
+                    }
+
                     await transaction.CommitAsync();
                     TempData["Message"] = "Tạo phiếu xuất (NHÁP) thành công.";
                     return RedirectToAction("Index");
@@ -285,6 +384,27 @@ namespace DuAnCode.Web.Controllers
                 return RedirectToAction("Index");
             }
 
+            var config = await _db.SystemConfigs.AsNoTracking().FirstOrDefaultAsync();
+
+            // Tự động duyệt nếu bật cấu hình giá trị nhỏ
+            if (config != null && config.AutoApproveLowValueOutbound && config.AutoApproveThreshold > 0 && voucher.TotalAmount <= config.AutoApproveThreshold)
+            {
+                await using var autoTx = await _db.Database.BeginTransactionAsync();
+                var (autoApproved, autoErr) = await ExecuteVoucherApprovalDeductionAsync(voucher, "Tự động duyệt (Hệ thống)", $"Tự động phê duyệt Phiếu Xuất giá trị nhỏ ({voucher.TotalAmount:N0} đ <= Ngưỡng {config.AutoApproveThreshold:N0} đ)");
+                if (autoApproved)
+                {
+                    await autoTx.CommitAsync();
+                    TempData["Message"] = $"Phiếu xuất giá trị nhỏ ({voucher.TotalAmount:N0} VNĐ <= {config.AutoApproveThreshold:N0} VNĐ) đã được TỰ ĐỘNG DUYỆT thành công!";
+                    return RedirectToAction("Index");
+                }
+                else
+                {
+                    await autoTx.RollbackAsync();
+                    TempData["Error"] = autoErr;
+                    return RedirectToAction("Index");
+                }
+            }
+
             // --- WORKFLOW LOGIC ---
             if (voucher.Status == "DRAFT")
             {
@@ -298,9 +418,9 @@ namespace DuAnCode.Web.Controllers
             
             if (currentStep != null)
             {
-                if (!User.IsInRole(currentStep.ApproverRole) && !User.IsInRole("Admin"))
+                if (!DuAnCode.Web.Services.RoleHelper.IsUserInRole(User, currentStep.ApproverRole))
                 {
-                    TempData["Error"] = $"Bạn không có quyền duyệt phiếu này. Đang chờ chữ ký của: {currentStep.ApproverRole}.";
+                    TempData["Error"] = $"Bạn không có quyền duyệt phiếu này. Đang chờ chữ ký của: {DuAnCode.Web.Services.RoleHelper.ToVietnamese(currentStep.ApproverRole)}.";
                     return RedirectToAction("Index");
                 }
 
@@ -308,13 +428,13 @@ namespace DuAnCode.Web.Controllers
                 currentStep.ApprovedBy = User.Identity?.Name;
                 currentStep.ApprovedAt = DateTime.UtcNow;
                 
-                _db.AuditLogs.Add(new AuditLog { EntityType = "InventoryVoucher", EntityId = voucher.VoucherId, Action = $"APPROVE_LEVEL_{currentStep.Level}", PerformedBy = User.Identity?.Name ?? "System", Reason = $"Duyệt phiếu cấp {currentStep.Level} ({currentStep.ApproverRole})" });
+                _db.AuditLogs.Add(new AuditLog { EntityType = "InventoryVoucher", EntityId = voucher.VoucherId, Action = $"APPROVE_LEVEL_{currentStep.Level}", PerformedBy = User.Identity?.Name ?? "System", Reason = $"Duyệt phiếu cấp {currentStep.Level} ({DuAnCode.Web.Services.RoleHelper.ToVietnamese(currentStep.ApproverRole)})" });
                 await _db.SaveChangesAsync();
 
                 var nextStep = steps.FirstOrDefault(s => s.Status == "PENDING");
                 if (nextStep != null)
                 {
-                    TempData["Message"] = $"Đã ký duyệt cấp {currentStep.Level} thành công. Chờ {nextStep.ApproverRole} duyệt tiếp.";
+                    TempData["Message"] = $"Đã ký duyệt cấp {currentStep.Level} thành công. Chờ {DuAnCode.Web.Services.RoleHelper.ToVietnamese(nextStep.ApproverRole)} duyệt tiếp.";
                     return RedirectToAction("Index");
                 }
             }
@@ -323,66 +443,15 @@ namespace DuAnCode.Web.Controllers
             await using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
-                var skusToLock = voucher.Lines.Select(l => l.SkuId).Distinct().ToList();
-                var lockedLedgers = await _repo.LockLedgersForUpdateAsync(skusToLock, voucher.WarehouseId, "GOOD");
-
-                // Check Overstock (vượt tồn)
-                foreach (var line in voucher.Lines)
+                var (success, errMsg) = await ExecuteVoucherApprovalDeductionAsync(voucher, User?.Identity?.Name ?? "Quản lý kho", "Duyệt phiếu xuất kho");
+                if (!success)
                 {
-                    if (string.IsNullOrWhiteSpace(line.SkuId) || line.Quantity <= 0) continue;
-                    
-                    var ledger = lockedLedgers.FirstOrDefault(l => l.SkuId == line.SkuId && l.BatchNumber == (line.BatchNumber ?? string.Empty));
-                    if (ledger == null || ledger.Quantity < line.Quantity)
-                    {
-                        TempData["Error"] = $"Không đủ tồn kho cho sản phẩm {line.ProductName} (Lô: {line.BatchNumber}). Tồn hiện tại: {ledger?.Quantity ?? 0}, Yêu cầu xuất: {line.Quantity}";
-                        await transaction.RollbackAsync();
-                        return RedirectToAction("Index");
-                    }
+                    TempData["Error"] = errMsg;
+                    await transaction.RollbackAsync();
+                    return RedirectToAction("Index");
                 }
 
-                // Apply deduction
-                foreach (var line in voucher.Lines)
-                {
-                    if (string.IsNullOrWhiteSpace(line.SkuId) || line.Quantity <= 0) continue;
-                    var ledger = lockedLedgers.First(l => l.SkuId == line.SkuId && l.BatchNumber == (line.BatchNumber ?? string.Empty));
-                    
-                    ledger.Quantity -= line.Quantity;
-                    await _repo.UpdateLedgerAsync(ledger);
-
-                    await _repo.AddMovementAsync(new StockMovement
-                    {
-                        SkuId = line.SkuId,
-                        WarehouseId = voucher.WarehouseId,
-                        StockStatus = "GOOD",
-                        QuantityDelta = -line.Quantity,
-                        MovementType = "OUTBOUND",
-                        ReferenceType = "VOUCHER",
-                        ReferenceId = voucher.VoucherId,
-                        PerformedBy = User?.Identity?.Name,
-                        CreatedAt = DateTime.UtcNow
-                    });
-                }
-
-                voucher.Status = "APPROVED";
-                voucher.IsLocked = true;
-                voucher.ApprovedBy = User?.Identity?.Name;
-                
-                // Cập nhật lại ngày chứng từ thực xuất
-                voucher.Date = DateTime.UtcNow;
-
-                // BR-08: Ghi AuditLog
-                _db.AuditLogs.Add(new AuditLog
-                {
-                    EntityType = "InventoryVoucher",
-                    EntityId = voucher.VoucherId,
-                    Action = "APPROVE",
-                    PerformedBy = User?.Identity?.Name ?? "System",
-                    Reason = "Duyệt phiếu xuất kho"
-                });
-
-                await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
-
                 TempData["Message"] = "Duyệt phiếu xuất kho thành công! Tồn kho đã được trừ.";
             }
             catch (Exception ex)
@@ -394,6 +463,256 @@ namespace DuAnCode.Web.Controllers
 
             return RedirectToAction("Index");
         }
+
+        private async Task<(bool Success, string? ErrorMessage)> ExecuteVoucherApprovalDeductionAsync(InventoryVoucher voucher, string approverName, string reason)
+        {
+            var comboIds = voucher.Lines.Select(l => l.SkuId).Distinct().ToList();
+            var combos = await _db.ComboProducts.Include(c => c.Components).Where(c => comboIds.Contains(c.ComboId)).ToListAsync();
+
+            // Aggregate required quantities across all lines (including Combo explosion)
+            var skuRequirements = new Dictionary<string, (int TotalNeeded, string PreferredBatch, string DisplayName, bool IsCombo)>();
+
+            foreach (var line in voucher.Lines)
+            {
+                if (string.IsNullOrWhiteSpace(line.SkuId) || line.Quantity <= 0) continue;
+
+                var combo = combos.FirstOrDefault(c => c.ComboId == line.SkuId);
+                if (combo != null && combo.Components != null && combo.Components.Any())
+                {
+                    foreach (var bom in combo.Components)
+                    {
+                        var needed = line.Quantity * Math.Max(1, bom.QuantityPerSet);
+                        if (skuRequirements.TryGetValue(bom.SkuId, out var existing))
+                        {
+                            skuRequirements[bom.SkuId] = (existing.TotalNeeded + needed, existing.PreferredBatch, existing.DisplayName, true);
+                        }
+                        else
+                        {
+                            skuRequirements[bom.SkuId] = (needed, string.Empty, $"{bom.SkuId} (thuộc combo {combo.ComboName})", true);
+                        }
+                    }
+                }
+                else
+                {
+                    var displayName = line.ProductName ?? line.SkuId;
+                    var preferredBatch = line.BatchNumber?.Trim() ?? string.Empty;
+                    if (skuRequirements.TryGetValue(line.SkuId, out var existing))
+                    {
+                        var mergedBatch = string.IsNullOrEmpty(existing.PreferredBatch) ? preferredBatch : existing.PreferredBatch;
+                        skuRequirements[line.SkuId] = (existing.TotalNeeded + line.Quantity, mergedBatch, displayName, false);
+                    }
+                    else
+                    {
+                        skuRequirements[line.SkuId] = (line.Quantity, preferredBatch, displayName, false);
+                    }
+                }
+            }
+
+            var skusToLock = skuRequirements.Keys.OrderBy(s => s).ToList();
+            var lockedLedgers = await _repo.LockLedgersForUpdateAsync(skusToLock, voucher.WarehouseId, "GOOD");
+
+            // 1. Check Overstock against aggregated totals
+            foreach (var (skuId, req) in skuRequirements)
+            {
+                var available = lockedLedgers.Where(l => l.SkuId == skuId).Sum(l => l.Quantity);
+                if (available < req.TotalNeeded)
+                {
+                    var errCode = req.IsCombo ? "ERR-STOCK-002" : "ERR-STOCK-001";
+                    return (false, $"{errCode}: Không đủ tồn kho cho sản phẩm/cấu kiện {req.DisplayName}. Tồn hiện tại: {available}, Tổng yêu cầu xuất: {req.TotalNeeded}");
+                }
+            }
+
+            // 2. Apply deduction using preferred batch when available, then automatic FIFO across all available batches
+            foreach (var (skuId, req) in skuRequirements)
+            {
+                var remaining = req.TotalNeeded;
+                var ledgersForSku = lockedLedgers.Where(l => l.SkuId == skuId).ToList();
+
+                if (!string.IsNullOrWhiteSpace(req.PreferredBatch))
+                {
+                    var preferredLedger = ledgersForSku.FirstOrDefault(l => l.BatchNumber == req.PreferredBatch && l.Quantity > 0);
+                    if (preferredLedger != null)
+                    {
+                        var take = Math.Min(remaining, preferredLedger.Quantity);
+                        preferredLedger.Quantity -= take;
+                        remaining -= take;
+                        await _repo.UpdateLedgerAsync(preferredLedger);
+
+                        await _repo.AddMovementAsync(new StockMovement
+                        {
+                            SkuId = skuId,
+                            WarehouseId = voucher.WarehouseId,
+                            StockStatus = "GOOD",
+                            QuantityDelta = -take,
+                            MovementType = "OUTBOUND",
+                            ReferenceType = "VOUCHER",
+                            ReferenceId = voucher.VoucherId,
+                            PerformedBy = approverName,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+
+                if (remaining > 0)
+                {
+                    var fifoLedgers = ledgersForSku
+                        .Where(l => l.Quantity > 0)
+                        .OrderBy(l => l.ExpiryDate.HasValue ? l.ExpiryDate.Value : DateTime.MaxValue)
+                        .ThenBy(l => l.BatchNumber)
+                        .ToList();
+
+                    foreach (var l in fifoLedgers)
+                    {
+                        if (remaining <= 0) break;
+                        var take = Math.Min(remaining, l.Quantity);
+                        l.Quantity -= take;
+                        remaining -= take;
+                        await _repo.UpdateLedgerAsync(l);
+
+                        await _repo.AddMovementAsync(new StockMovement
+                        {
+                            SkuId = skuId,
+                            WarehouseId = voucher.WarehouseId,
+                            StockStatus = "GOOD",
+                            QuantityDelta = -take,
+                            MovementType = "OUTBOUND",
+                            ReferenceType = "VOUCHER",
+                            ReferenceId = voucher.VoucherId,
+                            PerformedBy = approverName,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+
+                if (remaining > 0 && ledgersForSku.Any())
+                {
+                    var fallback = ledgersForSku.First();
+                    fallback.Quantity -= remaining;
+                    await _repo.UpdateLedgerAsync(fallback);
+
+                    await _repo.AddMovementAsync(new StockMovement
+                    {
+                        SkuId = skuId,
+                        WarehouseId = voucher.WarehouseId,
+                        StockStatus = "GOOD",
+                        QuantityDelta = -remaining,
+                        MovementType = "OUTBOUND",
+                        ReferenceType = "VOUCHER",
+                        ReferenceId = voucher.VoucherId,
+                        PerformedBy = approverName,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
+            voucher.Status = "APPROVED";
+            voucher.IsLocked = true;
+            voucher.ApprovedBy = approverName;
+            voucher.Date = DateTime.UtcNow;
+
+            // Mark all pending approval steps as approved if any
+            var steps = await _db.ApprovalSteps.Where(s => s.EntityType == "VOUCHER" && s.EntityId == voucher.VoucherId).ToListAsync();
+            foreach (var st in steps.Where(s => s.Status == "PENDING"))
+            {
+                st.Status = "APPROVED";
+                st.ApprovedBy = approverName;
+                st.ApprovedAt = DateTime.UtcNow;
+            }
+
+            _db.AuditLogs.Add(new AuditLog
+            {
+                EntityType = "InventoryVoucher",
+                EntityId = voucher.VoucherId,
+                Action = "APPROVE",
+                PerformedBy = approverName,
+                Reason = reason
+            });
+
+            await _db.SaveChangesAsync();
+                        return (true, null);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Reject(string id, string? reason)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return BadRequest();
+
+            var voucher = await _db.InventoryVouchers.FirstOrDefaultAsync(v => v.VoucherId == id);
+            if (voucher == null) { TempData["Error"] = "Phiếu không tồn tại."; return RedirectToAction("Index"); }
+
+            if (voucher.Status != "DRAFT" && voucher.Status != "PENDING")
+            {
+                TempData["Error"] = "Chỉ có thể từ chối phiếu đang ở trạng thái Nháp hoặc Chờ duyệt.";
+                return RedirectToAction("Index");
+            }
+
+            var steps = await _db.ApprovalSteps.Where(s => s.EntityType == "VOUCHER" && s.EntityId == voucher.VoucherId).OrderBy(s => s.Level).ToListAsync();
+            var currentStep = steps.FirstOrDefault(s => s.Status == "PENDING");
+            if (currentStep != null)
+            {
+                if (!DuAnCode.Web.Services.RoleHelper.IsUserInRole(User, currentStep.ApproverRole))
+                {
+                    TempData["Error"] = $"Bạn không có quyền từ chối phiếu này. Đang chờ chữ ký của: {DuAnCode.Web.Services.RoleHelper.ToVietnamese(currentStep.ApproverRole)}.";
+                    return RedirectToAction("Index");
+                }
+
+                currentStep.Status = "REJECTED";
+                currentStep.ApprovedBy = User.Identity?.Name;
+                currentStep.ApprovedAt = DateTime.UtcNow;
+            }
+
+            voucher.Status = "REJECTED";
+            voucher.IsLocked = true;
+            voucher.ApprovedBy = User?.Identity?.Name;
+            var rejectNote = string.IsNullOrWhiteSpace(reason) ? "Không có lý do cụ thể" : reason.Trim();
+            voucher.Reason = string.IsNullOrWhiteSpace(voucher.Reason) 
+                ? $"[TỪ CHỐI DUYỆT: {rejectNote}]" 
+                : $"{voucher.Reason} | [TỪ CHỐI DUYỆT: {rejectNote}]";
+
+            _db.AuditLogs.Add(new AuditLog
+            {
+                EntityType = "InventoryVoucher",
+                EntityId = voucher.VoucherId,
+                Action = "REJECT",
+                PerformedBy = User?.Identity?.Name ?? "System",
+                Reason = $"Từ chối duyệt phiếu xuất kho. Lý do: {rejectNote}"
+            });
+
+            await _db.SaveChangesAsync();
+            TempData["Message"] = "Đã từ chối duyệt phiếu xuất kho thành công.";
+            return RedirectToAction("Index");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetRejectionDetails(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return BadRequest(new { success = false, message = "Mã phiếu không hợp lệ." });
+
+            var voucher = await _db.InventoryVouchers.FirstOrDefaultAsync(v => v.VoucherId == id);
+            if (voucher == null) return NotFound(new { success = false, message = "Không tìm thấy phiếu." });
+
+            var (originalReason, rejectionReason) = DuAnCode.Web.Services.RejectionHelper.ExtractReason(voucher.Reason);
+            var rejectLog = await _db.AuditLogs
+                .Where(a => a.Action == "REJECT" && a.EntityType == "InventoryVoucher" && a.EntityId == voucher.VoucherId)
+                .OrderByDescending(a => a.PerformedAt)
+                .FirstOrDefaultAsync();
+
+            return Json(new
+            {
+                success = true,
+                voucherId = voucher.VoucherId,
+                voucherNumber = voucher.VoucherNumber,
+                status = voucher.Status,
+                createdBy = voucher.CreatedBy ?? "Không xác định",
+                createdAt = voucher.Date.ToLocalTime().ToString("dd/MM/yyyy HH:mm"),
+                rejectedBy = rejectLog?.PerformedBy ?? voucher.ApprovedBy ?? "Quản lý kho",
+                rejectedAt = (rejectLog?.PerformedAt ?? voucher.Date).ToLocalTime().ToString("dd/MM/yyyy HH:mm"),
+                rejectionReason = rejectionReason,
+                originalReason = originalReason
+            });
+        }
+
 
 }
 }

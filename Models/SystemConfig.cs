@@ -40,5 +40,18 @@ namespace DuAnCode.Web.Models
         // 4. I18N and Localization
         public string DefaultLanguage { get; set; } = "vi-VN"; // "vi-VN" or "en-US"
         public string CurrencyFormat { get; set; } = "VND"; // "VND" or "USD"
+
+        // 5. Cấu hình Quy trình Phê duyệt (Approval Workflow)
+        public bool EnableMultiLevelApproval { get; set; } = true; // Bật quy trình duyệt phân cấp (Cấp 1 -> Cấp 2 -> Cấp 3)
+        [System.ComponentModel.DataAnnotations.Schema.Column(TypeName = "decimal(18,2)")]
+        public decimal OutboundDirectorApprovalThreshold { get; set; } = 100000000M; // Ngưỡng giá trị phiếu xuất cần Giám đốc phê duyệt (VNĐ)
+        public bool InboundRequireApproval { get; set; } = true; // Yêu cầu duyệt 2 cấp đối với Phiếu Nhập
+        public bool TransferRequireApproval { get; set; } = true; // Yêu cầu duyệt đối với Phiếu Chuyển kho nội bộ
+        public string ApprovalRoleLevel1 { get; set; } = "Accountant"; // Vai trò duyệt Cấp 1 (Mặc định: Kế toán)
+        public string ApprovalRoleLevel2 { get; set; } = "WarehouseManager"; // Vai trò duyệt Cấp 2 (Mặc định: Quản lý kho)
+        public string ApprovalRoleLevel3 { get; set; } = "Director"; // Vai trò duyệt Cấp 3 (Mặc định: Giám đốc)
+        public bool AutoApproveLowValueOutbound { get; set; } = false; // Tự động duyệt phiếu xuất giá trị nhỏ
+        [System.ComponentModel.DataAnnotations.Schema.Column(TypeName = "decimal(18,2)")]
+        public decimal AutoApproveThreshold { get; set; } = 0M; // Ngưỡng giá trị tự động duyệt (VNĐ)
     }
 }

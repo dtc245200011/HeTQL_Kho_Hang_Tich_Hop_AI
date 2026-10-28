@@ -1,4 +1,4 @@
-﻿using DuAnCode.Web.Services;
+using DuAnCode.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -71,6 +71,16 @@ namespace DuAnCode.Web.Controllers
                             }
                             await _userManager.AddToRoleAsync(user, "Admin");
                             // refresh sign-in to update claims
+                            await _signInManager.SignInAsync(user, isPersistent: false);
+                        }
+
+                        if (!await _userManager.IsInRoleAsync(user, "Quản trị viên"))
+                        {
+                            if (!await _roleManager.RoleExistsAsync("Quản trị viên"))
+                            {
+                                await _roleManager.CreateAsync(new DuAnCode.Web.Models.Role { Name = "Quản trị viên" });
+                            }
+                            await _userManager.AddToRoleAsync(user, "Quản trị viên");
                             await _signInManager.SignInAsync(user, isPersistent: false);
                         }
                     }

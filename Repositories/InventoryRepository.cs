@@ -35,6 +35,14 @@ namespace DuAnCode.Web.Repositories
             var distinctIds = skuIds.Distinct().ToList();
             if (!distinctIds.Any()) return new List<StockLedger>();
 
+            if (!_db.Database.IsSqlServer())
+            {
+                return await _db.StockLedgers
+                    .Where(x => distinctIds.Contains(x.SkuId) && x.WarehouseId == warehouseId && x.Status == status)
+                    .OrderBy(x => x.SkuId)
+                    .ToListAsync();
+            }
+
             var paramNames = new List<string>();
             var parameters = new List<object>();
             for (int i = 0; i < distinctIds.Count; i++)
@@ -56,7 +64,15 @@ namespace DuAnCode.Web.Repositories
 
         public async Task UpdateLedgerAsync(StockLedger ledger)
         {
-            _db.StockLedgers.Update(ledger);
+            var entry = _db.Entry(ledger);
+            if (entry.State == EntityState.Detached)
+            {
+                _db.StockLedgers.Update(ledger);
+            }
+            else if (entry.State != EntityState.Added)
+            {
+                entry.State = EntityState.Modified;
+            }
             await Task.CompletedTask;
         }
 

@@ -1,4 +1,4 @@
-﻿@model DuAnCode.Web.Models.SettingsViewModel
+@model DuAnCode.Web.Models.SettingsViewModel
 @{
     ViewData["Title"] = "Cấu hình hệ thống";
 }
@@ -8,20 +8,6 @@
         <h3 class="fw-bold m-0"><i class="fa-solid fa-gears me-2 text-primary"></i>Cấu hình hệ thống</h3>
     </div>
 
-    @if(TempData["Error"] != null)
-    {
-        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
-            <i class="fa-solid fa-triangle-exclamation me-2"></i>@TempData["Error"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    }
-    @if(TempData["Message"] != null || TempData["Success"] != null)
-    {
-        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
-            <i class="fa-solid fa-circle-check me-2"></i>@(TempData["Message"] ?? TempData["Success"])
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    }
 
     <div class="row">
         <!-- FORM CHÍNH CHO CÁC CẤU HÌNH HỆ THỐNG -->
@@ -160,8 +146,186 @@
                     </div>
                 </div>
 
-                
-                <!-- 4. Cấu hình Tiền tố Mã Chứng Từ (Prefix) -->
+                <!-- 4. Cấu hình Quy trình Phê duyệt (Approval Workflow) -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapseApproval">
+                        <strong style="color: #4f46e5;"><i class="fa-solid fa-stamp me-2"></i>Cấu hình Quy trình Phê duyệt Chứng Từ</strong>
+                        <i class="fa-solid fa-chevron-down text-muted transition-transform"></i>
+                    </div>
+                    <div class="collapse" id="collapseApproval">
+                        <div class="card-body">
+                            <!-- Visual Workflow Preview -->
+                            <div class="p-3 mb-4 rounded-3 border" style="background: linear-gradient(135deg, #f8faff 0%, #f1f5f9 100%);">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                                    <span class="fw-bold text-dark small text-uppercase"><i class="fa-solid fa-diagram-project text-primary me-2"></i>Sơ đồ Quy trình Phê duyệt Mô phỏng</span>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 small" id="workflowStatusBadge">Quy trình phân cấp đang BẬT</span>
+                                </div>
+                                <div class="d-flex align-items-center justify-content-center flex-wrap gap-2 py-2 text-center" id="workflowPipelinePreview">
+                                    <div class="px-3 py-2 bg-white rounded shadow-sm border border-light-subtle">
+                                        <div class="small text-muted fw-semibold">Khởi tạo</div>
+                                        <div class="fw-bold text-secondary"><i class="fa-solid fa-file-lines me-1"></i>Bản nháp (DRAFT)</div>
+                                    </div>
+                                    <i class="fa-solid fa-arrow-right text-muted"></i>
+                                    <div class="px-3 py-2 bg-white rounded shadow-sm border border-primary-subtle" id="previewStep1">
+                                        <div class="small text-primary fw-semibold">Cấp 1: Kiểm duyệt sơ bộ</div>
+                                        <div class="fw-bold text-dark" id="previewRole1">
+                                            <i class="fa-solid fa-calculator text-primary me-1"></i>@(Model?.Config?.ApprovalRoleLevel1 == "Accountant" ? "Kế toán" : (Model?.Config?.ApprovalRoleLevel1 ?? "Kế toán"))
+                                        </div>
+                                    </div>
+                                    <i class="fa-solid fa-arrow-right text-muted" id="previewArrow1"></i>
+                                    <div class="px-3 py-2 bg-white rounded shadow-sm border border-info-subtle" id="previewStep2">
+                                        <div class="small text-info fw-semibold">Cấp 2: Quản lý kho duyệt</div>
+                                        <div class="fw-bold text-dark" id="previewRole2">
+                                            <i class="fa-solid fa-user-tie text-info me-1"></i>@(Model?.Config?.ApprovalRoleLevel2 == "WarehouseManager" ? "Quản lý kho" : (Model?.Config?.ApprovalRoleLevel2 ?? "Quản lý kho"))
+                                        </div>
+                                    </div>
+                                    <i class="fa-solid fa-arrow-right text-muted" id="previewArrow2"></i>
+                                    <div class="px-3 py-2 bg-white rounded shadow-sm border border-warning-subtle" id="previewStep3">
+                                        <div class="small text-warning fw-semibold">Cấp 3: Giám đốc duyệt (&gt; Ngưỡng)</div>
+                                        <div class="fw-bold text-dark" id="previewRole3">
+                                            <i class="fa-solid fa-crown text-warning me-1"></i>@(Model?.Config?.ApprovalRoleLevel3 == "Director" ? "Giám đốc" : (Model?.Config?.ApprovalRoleLevel3 ?? "Giám đốc"))
+                                        </div>
+                                    </div>
+                                    <i class="fa-solid fa-arrow-right text-muted"></i>
+                                    <div class="px-3 py-2 bg-success text-white rounded shadow-sm">
+                                        <div class="small opacity-75">Hoàn tất</div>
+                                        <div class="fw-bold"><i class="fa-solid fa-circle-check me-1"></i>Đã duyệt (APPROVED)</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-3">
+                                <!-- Switch 1: Multi-level toggle -->
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch mb-3 p-3 bg-light rounded border">
+                                        <input type="hidden" name="Config.EnableMultiLevelApproval" value="false" />
+                                        <input class="form-check-input ms-0 me-3" type="checkbox" role="switch" name="Config.EnableMultiLevelApproval" id="EnableMultiLevelApproval" value="true" @((Model?.Config?.EnableMultiLevelApproval ?? true) ? "checked" : "") onchange="updateWorkflowPreview()">
+                                        <label class="form-check-label fw-bold text-dark" for="EnableMultiLevelApproval">
+                                            <i class="fa-solid fa-layer-group text-primary me-1"></i>Bật Quy trình Phê duyệt Nhiều Cấp
+                                        </label>
+                                        <div class="form-text mt-1 text-muted">
+                                            Bắt buộc chứng từ phải qua đủ các cấp phê duyệt tuần tự (Cấp 1 ➔ Cấp 2 ➔ Cấp 3). Nếu tắt, chỉ cần cấp phê duyệt quyết định (Cấp 2) là hoàn tất.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Switch 2: Inbound multi-level toggle -->
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch mb-3 p-3 bg-light rounded border">
+                                        <input type="hidden" name="Config.InboundRequireApproval" value="false" />
+                                        <input class="form-check-input ms-0 me-3" type="checkbox" role="switch" name="Config.InboundRequireApproval" id="InboundRequireApproval" value="true" @((Model?.Config?.InboundRequireApproval ?? true) ? "checked" : "")>
+                                        <label class="form-check-label fw-bold text-dark" for="InboundRequireApproval">
+                                            <i class="fa-solid fa-dolly text-success me-1"></i>Áp dụng 2 cấp duyệt cho Phiếu Nhập Kho
+                                        </label>
+                                        <div class="form-text mt-1 text-muted">
+                                            Kế toán kiểm tra chứng từ nhà cung cấp (Cấp 1) trước khi Quản lý kho duyệt chính thức cập nhật tồn (Cấp 2).
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Switch 3: Stock transfer toggle -->
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch mb-3 p-3 bg-light rounded border">
+                                        <input type="hidden" name="Config.TransferRequireApproval" value="false" />
+                                        <input class="form-check-input ms-0 me-3" type="checkbox" role="switch" name="Config.TransferRequireApproval" id="TransferRequireApproval" value="true" @((Model?.Config?.TransferRequireApproval ?? true) ? "checked" : "")>
+                                        <label class="form-check-label fw-bold text-dark" for="TransferRequireApproval">
+                                            <i class="fa-solid fa-arrow-right-arrow-left text-info me-1"></i>Yêu cầu duyệt Phiếu Chuyển Kho nội bộ
+                                        </label>
+                                        <div class="form-text mt-1 text-muted">
+                                            Phiếu chuyển giữa các kho phải được phê duyệt trước khi hàng được trừ tại kho xuất và cộng tại kho đích.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Switch 4: Auto approve low value outbound -->
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch mb-3 p-3 bg-light rounded border">
+                                        <input type="hidden" name="Config.AutoApproveLowValueOutbound" value="false" />
+                                        <input class="form-check-input ms-0 me-3" type="checkbox" role="switch" name="Config.AutoApproveLowValueOutbound" id="AutoApproveLowValueOutbound" value="true" @((Model?.Config?.AutoApproveLowValueOutbound ?? false) ? "checked" : "")>
+                                        <label class="form-check-label fw-bold text-dark" for="AutoApproveLowValueOutbound">
+                                            <i class="fa-solid fa-bolt text-warning me-1"></i>Tự động duyệt Phiếu Xuất giá trị nhỏ
+                                        </label>
+                                        <div class="form-text mt-1 text-muted">
+                                            Tự động duyệt các phiếu xuất có tổng giá trị nhỏ hơn hoặc bằng ngưỡng quy định bên dưới.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Input: Director threshold -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold text-dark">
+                                        <i class="fa-solid fa-crown text-warning me-1"></i>Ngưỡng giá trị bắt buộc Giám đốc duyệt (VNĐ)
+                                    </label>
+                                    <div class="input-group">
+                                        <input type="number" step="1000000" class="form-control" name="Config.OutboundDirectorApprovalThreshold" id="OutboundDirectorApprovalThreshold" value="@(Model?.Config?.OutboundDirectorApprovalThreshold > 0 ? Model.Config.OutboundDirectorApprovalThreshold : 100000000M)" placeholder="100000000">
+                                        <span class="input-group-text fw-semibold">VNĐ</span>
+                                    </div>
+                                    <div class="form-text">Mặc định: 100.000.000 VNĐ. Phiếu xuất vượt mức này sẽ yêu cầu chữ ký Cấp 3 (Giám đốc).</div>
+                                </div>
+
+                                <!-- Input: Auto approve threshold -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold text-dark">
+                                        <i class="fa-solid fa-shield-halved text-secondary me-1"></i>Ngưỡng tự động duyệt tối đa (VNĐ)
+                                    </label>
+                                    <div class="input-group">
+                                        <input type="number" step="500000" class="form-control" name="Config.AutoApproveThreshold" value="@(Model?.Config?.AutoApproveThreshold ?? 0M)" placeholder="0">
+                                        <span class="input-group-text fw-semibold">VNĐ</span>
+                                    </div>
+                                    <div class="form-text">Chỉ áp dụng khi bật tùy chọn "Tự động duyệt Phiếu Xuất giá trị nhỏ". Đặt 0 để tắt.</div>
+                                </div>
+
+                                <div class="col-12 mt-2">
+                                    <hr class="text-muted opacity-25">
+                                    <h6 class="fw-bold text-dark mb-3"><i class="fa-solid fa-users-gear text-primary me-2"></i>Chỉ định Vai trò Phê duyệt theo từng Cấp</h6>
+                                </div>
+
+                                <!-- Role Level 1 -->
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold text-primary">
+                                        <i class="fa-solid fa-1 me-1"></i>Vai trò duyệt Cấp 1 (Sơ bộ)
+                                    </label>
+                                    <select name="Config.ApprovalRoleLevel1" id="ApprovalRoleLevel1" class="form-select border-primary-subtle" onchange="updateWorkflowPreview()">
+                                        <option value="Accountant" selected="@((Model?.Config?.ApprovalRoleLevel1 ?? "Accountant") == "Accountant")">Kế toán (Accountant)</option>
+                                        <option value="WarehouseKeeper" selected="@(Model?.Config?.ApprovalRoleLevel1 == "WarehouseKeeper")">Thủ kho (WarehouseKeeper)</option>
+                                        <option value="QC" selected="@(Model?.Config?.ApprovalRoleLevel1 == "QC")">Kiểm định chất lượng (QC)</option>
+                                        <option value="WarehouseManager" selected="@(Model?.Config?.ApprovalRoleLevel1 == "WarehouseManager")">Quản lý kho (WarehouseManager)</option>
+                                    </select>
+                                    <div class="form-text">Đối chiếu số liệu chứng từ ban đầu.</div>
+                                </div>
+
+                                <!-- Role Level 2 -->
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold text-info">
+                                        <i class="fa-solid fa-2 me-1"></i>Vai trò duyệt Cấp 2 (Quản lý kho)
+                                    </label>
+                                    <select name="Config.ApprovalRoleLevel2" id="ApprovalRoleLevel2" class="form-select border-info-subtle" onchange="updateWorkflowPreview()">
+                                        <option value="WarehouseManager" selected="@((Model?.Config?.ApprovalRoleLevel2 ?? "WarehouseManager") == "WarehouseManager")">Quản lý kho (WarehouseManager)</option>
+                                        <option value="Accountant" selected="@(Model?.Config?.ApprovalRoleLevel2 == "Accountant")">Kế toán (Accountant)</option>
+                                        <option value="Director" selected="@(Model?.Config?.ApprovalRoleLevel2 == "Director")">Giám đốc (Director)</option>
+                                        <option value="Admin" selected="@(Model?.Config?.ApprovalRoleLevel2 == "Admin")">Quản trị viên (Admin)</option>
+                                    </select>
+                                    <div class="form-text">Chịu trách nhiệm xuất / nhập kho thực tế.</div>
+                                </div>
+
+                                <!-- Role Level 3 -->
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-semibold text-warning">
+                                        <i class="fa-solid fa-3 me-1"></i>Vai trò duyệt Cấp 3 (Giám đốc)
+                                    </label>
+                                    <select name="Config.ApprovalRoleLevel3" id="ApprovalRoleLevel3" class="form-select border-warning-subtle" onchange="updateWorkflowPreview()">
+                                        <option value="Director" selected="@((Model?.Config?.ApprovalRoleLevel3 ?? "Director") == "Director")">Giám đốc (Director)</option>
+                                        <option value="WarehouseManager" selected="@(Model?.Config?.ApprovalRoleLevel3 == "WarehouseManager")">Quản lý kho (WarehouseManager)</option>
+                                        <option value="Admin" selected="@(Model?.Config?.ApprovalRoleLevel3 == "Admin")">Quản trị viên (Admin)</option>
+                                    </select>
+                                    <div class="form-text">Phê duyệt đơn hàng / phiếu xuất giá trị lớn.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Cấu hình Tiền tố Mã Chứng Từ (Prefix) -->
                 <div class="card shadow-sm border-0 mb-4">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center" style="cursor:pointer; user-select:none;" data-bs-toggle="collapse" data-bs-target="#collapsePrefix">
                         <strong class="text-info"><i class="fa-solid fa-file-invoice-dollar me-2"></i>Cấu hình Tiền tố Mã Chứng Từ</strong>
@@ -410,3 +574,49 @@
         </form>
     </div>
 </div>
+
+<script>
+    function updateWorkflowPreview() {
+        const isMulti = document.getElementById('EnableMultiLevelApproval')?.checked;
+        const role1Select = document.getElementById('ApprovalRoleLevel1');
+        const role2Select = document.getElementById('ApprovalRoleLevel2');
+        const role3Select = document.getElementById('ApprovalRoleLevel3');
+
+        const role1Text = role1Select ? role1Select.options[role1Select.selectedIndex]?.text.split('(')[0].trim() : 'Kế toán';
+        const role2Text = role2Select ? role2Select.options[role2Select.selectedIndex]?.text.split('(')[0].trim() : 'Quản lý kho';
+        const role3Text = role3Select ? role3Select.options[role3Select.selectedIndex]?.text.split('(')[0].trim() : 'Giám đốc';
+
+        const pRole1 = document.getElementById('previewRole1');
+        const pRole2 = document.getElementById('previewRole2');
+        const pRole3 = document.getElementById('previewRole3');
+        const pStep1 = document.getElementById('previewStep1');
+        const pArrow1 = document.getElementById('previewArrow1');
+        const statusBadge = document.getElementById('workflowStatusBadge');
+
+        if (pRole1) pRole1.innerHTML = `<i class="fa-solid fa-calculator text-primary me-1"></i>${role1Text}`;
+        if (pRole2) pRole2.innerHTML = `<i class="fa-solid fa-user-tie text-info me-1"></i>${role2Text}`;
+        if (pRole3) pRole3.innerHTML = `<i class="fa-solid fa-crown text-warning me-1"></i>${role3Text}`;
+
+        if (statusBadge) {
+            if (isMulti) {
+                statusBadge.className = "badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 small";
+                statusBadge.innerText = "Quy trình phân cấp đang BẬT";
+            } else {
+                statusBadge.className = "badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 small";
+                statusBadge.innerText = "Quy trình phân cấp đang TẮT (Chỉ 1 cấp duyệt kho)";
+            }
+        }
+
+        if (pStep1 && pArrow1) {
+            if (isMulti) {
+                pStep1.style.display = "block";
+                pArrow1.style.display = "inline-block";
+            } else {
+                pStep1.style.display = "none";
+                pArrow1.style.display = "none";
+            }
+        }
+    }
+    document.addEventListener("DOMContentLoaded", updateWorkflowPreview);
+</script>
+

@@ -5,5 +5,6 @@ namespace DuAnCode.Web.Services
         Task<string> SuggestReplenishmentAsync(string skuId);
         Task<IEnumerable<dynamic>> GetAllSkusAsync();
         Task<IEnumerable<dynamic>> GetAllLedgersAsync();
+        Task RunAnalysisAsync(CancellationToken cancellationToken = default);
     }
 }

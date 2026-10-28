@@ -18,7 +18,10 @@ namespace DuAnCode.Web.Data
 
             await db.Database.MigrateAsync();
 
-            var roles = new[] { "Admin", "Director", "WarehouseManager", "Accountant", "QC", "WarehouseKeeper", "Staff" };
+            var roles = new[] { 
+                "Quản trị viên", "Giám đốc", "Quản lý kho", "Kế toán", "QC", "Kiểm định chất lượng (QC)", "Thủ kho", "Nhân viên",
+                "Admin", "Director", "WarehouseManager", "Accountant", "WarehouseKeeper", "Staff" 
+            };
             foreach (var r in roles)
             {
                 if (!await roleManager.RoleExistsAsync(r))
@@ -33,31 +36,66 @@ namespace DuAnCode.Web.Data
             {
                 admin = new User { UserName = "admin", Email = adminEmail, EmailConfirmed = true, FullName = "System Administrator" };
                 if ((await userManager.CreateAsync(admin, "Admin@123456")).Succeeded)
+                {
                     await userManager.AddToRoleAsync(admin, "Admin");
+                    await userManager.AddToRoleAsync(admin, "Quản trị viên");
+                }
+            }
+            else
+            {
+                if (!await userManager.IsInRoleAsync(admin, "Quản trị viên"))
+                    await userManager.AddToRoleAsync(admin, "Quản trị viên");
             }
 
             var accountantEmail = "ketoan@wms.com";
-            if (await userManager.FindByEmailAsync(accountantEmail) == null)
+            var accountant = await userManager.FindByEmailAsync(accountantEmail);
+            if (accountant == null)
             {
                 var user = new User { UserName = "ketoan", Email = accountantEmail, EmailConfirmed = true, FullName = "Nhân viên Kế toán" };
                 if ((await userManager.CreateAsync(user, "Ketoan@123")).Succeeded)
+                {
                     await userManager.AddToRoleAsync(user, "Accountant");
+                    await userManager.AddToRoleAsync(user, "Kế toán");
+                }
+            }
+            else
+            {
+                if (!await userManager.IsInRoleAsync(accountant, "Kế toán"))
+                    await userManager.AddToRoleAsync(accountant, "Kế toán");
             }
 
             var managerEmail = "quanly@wms.com";
-            if (await userManager.FindByEmailAsync(managerEmail) == null)
+            var manager = await userManager.FindByEmailAsync(managerEmail);
+            if (manager == null)
             {
                 var user = new User { UserName = "quanly", Email = managerEmail, EmailConfirmed = true, FullName = "Quản lý Kho" };
                 if ((await userManager.CreateAsync(user, "Quanly@123")).Succeeded)
+                {
                     await userManager.AddToRoleAsync(user, "WarehouseManager");
+                    await userManager.AddToRoleAsync(user, "Quản lý kho");
+                }
+            }
+            else
+            {
+                if (!await userManager.IsInRoleAsync(manager, "Quản lý kho"))
+                    await userManager.AddToRoleAsync(manager, "Quản lý kho");
             }
 
             var directorEmail = "giamdoc@wms.com";
-            if (await userManager.FindByEmailAsync(directorEmail) == null)
+            var director = await userManager.FindByEmailAsync(directorEmail);
+            if (director == null)
             {
                 var user = new User { UserName = "giamdoc", Email = directorEmail, EmailConfirmed = true, FullName = "Giám đốc" };
                 if ((await userManager.CreateAsync(user, "Giamdoc@123")).Succeeded)
+                {
                     await userManager.AddToRoleAsync(user, "Director");
+                    await userManager.AddToRoleAsync(user, "Giám đốc");
+                }
+            }
+            else
+            {
+                if (!await userManager.IsInRoleAsync(director, "Giám đốc"))
+                    await userManager.AddToRoleAsync(director, "Giám đốc");
             }
 
             if (!await db.Warehouses.AnyAsync())

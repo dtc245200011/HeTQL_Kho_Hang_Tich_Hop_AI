@@ -30,7 +30,21 @@ namespace DuAnCode.Web.Controllers
             if (!string.IsNullOrWhiteSpace(vm.Search))
             {
                 var s = vm.Search.Trim();
-                invQuery = invQuery.Where(x => x.SkuId.Contains(s));
+                var matchingSkuIds = await _db.SkuVariants.AsNoTracking()
+                    .Where(sv => sv.SkuId.Contains(s) || (sv.Color != null && sv.Color.Contains(s)) || (sv.Material != null && sv.Material.Contains(s)))
+                    .Select(sv => sv.SkuId)
+                    .ToListAsync();
+                var matchingPmIds = await _db.ProductModels.AsNoTracking()
+                    .Where(pm => pm.ProductName.Contains(s))
+                    .Select(pm => pm.ProductModelId)
+                    .ToListAsync();
+                var skusFromPm = await _db.SkuVariants.AsNoTracking()
+                    .Where(sv => matchingPmIds.Contains(sv.ProductModelId))
+                    .Select(sv => sv.SkuId)
+                    .ToListAsync();
+
+                var allMatched = matchingSkuIds.Union(skusFromPm).ToHashSet();
+                invQuery = invQuery.Where(x => x.SkuId.Contains(s) || allMatched.Contains(x.SkuId));
             }
             if (!string.IsNullOrWhiteSpace(vm.Status))
             {
@@ -101,6 +115,99 @@ namespace DuAnCode.Web.Controllers
             vm.Inbound = await inOrdered.Skip((vm.Page - 1) * vm.PageSize).Take(vm.PageSize).ToListAsync();
             vm.Outbound = await outOrdered.Skip((vm.Page - 1) * vm.PageSize).Take(vm.PageSize).ToListAsync();
 
+            // 1. KPI Statistics
+            vm.TotalSkus = await _db.SkuVariants.AsNoTracking().CountAsync();
+            vm.TotalAvailableQuantity = await _db.StockLedgers.AsNoTracking()
+                .Where(x => x.Status == "GOOD" || x.Status == "Available")
+                .SumAsync(x => (int?)x.Quantity) ?? 0;
+            vm.TotalDamagedQuantity = await _db.StockLedgers.AsNoTracking()
+                .Where(x => x.Status == "DAMAGED" || x.Status == "Damaged")
+                .SumAsync(x => (int?)x.Quantity) ?? 0;
+            vm.LowStockCount = await _db.StockLedgers.AsNoTracking()
+                .Where(x => (x.Status == "GOOD" || x.Status == "Available") && x.Quantity <= 5)
+                .CountAsync();
+
+            var pendingVouchers = await _db.InventoryVouchers.AsNoTracking()
+                .Where(v => v.Status == "PENDING")
+                .OrderByDescending(v => v.Date)
+                .Take(5)
+                .ToListAsync();
+            vm.PendingVouchersCount = await _db.InventoryVouchers.AsNoTracking()
+                .Where(v => v.Status == "PENDING")
+                .CountAsync();
+
+            // 2. Action items / Alerts for new users
+            vm.ActionItems = new List<PendingActionItemVm>();
+
+            // Pending Inbound & Outbound vouchers
+            foreach (var pv in pendingVouchers)
+            {
+                var isIb = pv.Type == "INBOUND";
+                vm.ActionItems.Add(new PendingActionItemVm
+                {
+                    Title = isIb ? "Phiếu Nhập kho chờ duyệt" : "Phiếu Xuất kho chờ duyệt",
+                    Code = string.IsNullOrWhiteSpace(pv.VoucherNumber) ? pv.VoucherId[..Math.Min(8, pv.VoucherId.Length)] : pv.VoucherNumber,
+                    Type = isIb ? "Nhập kho" : "Xuất kho",
+                    BadgeClass = isIb ? "bg-primary" : "bg-warning text-dark",
+                    Url = isIb ? $"/Inbound/Details/{pv.VoucherId}" : $"/Outbound/Details/{pv.VoucherId}",
+                    Time = pv.Date,
+                    Description = $"Đối tác: {pv.Counterparty} • Trị giá: {pv.TotalAmount:N0} đ",
+                    IconClass = isIb ? "fa-solid fa-box-arrow-in-down text-primary" : "fa-solid fa-box-arrow-up text-warning"
+                });
+            }
+
+            // Low stock warning items (top 3)
+            var lowStockItems = await (from sl in _db.StockLedgers.AsNoTracking()
+                                      where (sl.Status == "GOOD" || sl.Status == "Available") && sl.Quantity <= 5
+                                      join sv in _db.SkuVariants.AsNoTracking() on sl.SkuId equals sv.SkuId into svj
+                                      from sv in svj.DefaultIfEmpty()
+                                      join pm in _db.ProductModels.AsNoTracking() on sv.ProductModelId equals pm.ProductModelId into pmj
+                                      from pm in pmj.DefaultIfEmpty()
+                                      orderby sl.Quantity ascending
+                                      select new {
+                                          sl.SkuId,
+                                          sl.Quantity,
+                                          sl.WarehouseId,
+                                          ProductName = pm != null ? pm.ProductName : sl.SkuId
+                                      }).Take(3).ToListAsync();
+
+            foreach (var ls in lowStockItems)
+            {
+                vm.ActionItems.Add(new PendingActionItemVm
+                {
+                    Title = $"Cảnh báo tồn kho thấp ({ls.Quantity} cái)",
+                    Code = ls.SkuId,
+                    Type = "Cảnh báo tồn",
+                    BadgeClass = "bg-danger",
+                    Url = $"/Home/Index?tab=inventory&search={ls.SkuId}",
+                    Time = DateTime.UtcNow,
+                    Description = $"{ls.ProductName} ({ls.WarehouseId}) sắp hết hàng",
+                    IconClass = "fa-solid fa-triangle-exclamation text-danger"
+                });
+            }
+
+            // Draft audits needing completion
+            var draftAudits = await _db.InventoryAudits.AsNoTracking()
+                .Where(a => a.Status == "DRAFT")
+                .OrderByDescending(a => a.Date)
+                .Take(2)
+                .ToListAsync();
+
+            foreach (var da in draftAudits)
+            {
+                vm.ActionItems.Add(new PendingActionItemVm
+                {
+                    Title = "Phiếu Kiểm kê chưa hoàn tất",
+                    Code = string.IsNullOrWhiteSpace(da.AuditNumber) ? da.AuditId[..Math.Min(8, da.AuditId.Length)] : da.AuditNumber,
+                    Type = "Kiểm kê",
+                    BadgeClass = "bg-info text-white",
+                    Url = $"/InventoryAudit/Details/{da.AuditId}",
+                    Time = da.Date,
+                    Description = $"Kho {da.WarehouseId} - Đang kiểm tra số lượng thực tế",
+                    IconClass = "fa-solid fa-clipboard-check text-info"
+                });
+            }
+
             return View(vm);
         }
 
@@ -149,6 +256,13 @@ namespace DuAnCode.Web.Controllers
                 Reference = m.ReferenceId ?? m.ReferenceType
             }).ToListAsync();
             return Json(list);
+        }
+
+        [HttpGet]
+        [AllowAnonymous]
+        public IActionResult Maintenance()
+        {
+            return View();
         }
     }
 }

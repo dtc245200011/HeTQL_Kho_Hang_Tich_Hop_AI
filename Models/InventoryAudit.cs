@@ -26,6 +26,7 @@ namespace DuAnCode.Web.Models
         public InventoryAudit? Audit { get; set; }
         public string SkuId { get; set; } = string.Empty;
         public string BatchNumber { get; set; } = string.Empty;
+        public string StockStatus { get; set; } = "GOOD";
         public int SystemQuantity { get; set; }
         public int ActualQuantity { get; set; }
         public string? Notes { get; set; }

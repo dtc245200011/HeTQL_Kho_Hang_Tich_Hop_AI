@@ -1,40 +1,42 @@
 @using DuAnCode.Web.Models
+@using DuAnCode.Web.Services
 @using Microsoft.AspNetCore.Identity
 @inject SignInManager<User> SignInManager
 @inject UserManager<User> UserManager
 
 @{
+    var companyName = (Context.Items["CompanyName"] as string) ?? "DuAnCode WMS";
     var isAuthenticated = User.Identity?.IsAuthenticated == true;
-    string userDisplay = User.Identity?.Name ?? "Khách";
+    string userDisplay = User.Identity?.Name ?? LocaleHelper.T("Khách", "Guest");
     IList<string> roles = new List<string>();
     if (isAuthenticated)
     {
         var currentUser = await UserManager.GetUserAsync(User);
             if (currentUser != null)
             {
-                userDisplay = string.IsNullOrWhiteSpace(currentUser.FullName) ? (currentUser.UserName ?? User.Identity?.Name ?? "Khách") : currentUser.FullName;
+                userDisplay = string.IsNullOrWhiteSpace(currentUser.FullName) ? (currentUser.UserName ?? User.Identity?.Name ?? LocaleHelper.T("Khách", "Guest")) : currentUser.FullName;
                 roles = await UserManager.GetRolesAsync(currentUser);
             }
     }
 
-    bool isAdmin = roles.Contains("Admin") || roles.Contains("Director");
-    bool isWarehouse = roles.Contains("WarehouseManager") || roles.Contains("WarehouseKeeper");
-    bool isAccountant = roles.Contains("Accountant");
-    bool isQc = roles.Contains("QC");
-    bool isStaff = roles.Contains("Staff");
+    bool isAdmin = roles.Contains("Admin") || roles.Contains("Quản trị viên") || roles.Contains("Director") || roles.Contains("Giám đốc");
+    bool isWarehouse = roles.Contains("WarehouseManager") || roles.Contains("Quản lý kho") || roles.Contains("WarehouseKeeper") || roles.Contains("Thủ kho");
+    bool isAccountant = roles.Contains("Accountant") || roles.Contains("Kế toán");
+    bool isQc = roles.Contains("QC") || roles.Contains("Kiểm định chất lượng (QC)");
+    bool isStaff = roles.Contains("Staff") || roles.Contains("Nhân viên");
 }
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="@(LocaleHelper.IsEnglish ? "en" : "vi")">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - DuAnCode WMS</title>
+    <title>@ViewData["Title"] - @companyName</title>
     <!-- Bootstrap 5 CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <link rel="stylesheet" href="/css/site.css" />
+    <link rel="stylesheet" href="/css/site.css" asp-append-version="true" />
 
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -160,8 +162,90 @@
             font-size: 0.875em;
             margin-top: 0.25rem;
             display: block;
+        /* Top-Right Notification Toast Styles */
+        .toast-container {
+            z-index: 99999 !important;
+            pointer-events: none;
+        }
+        .custom-toast {
+            border-radius: 12px;
+            overflow: hidden;
+            animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            position: relative;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+            pointer-events: auto !important;
+            background: #ffffff;
+            border: 1px solid rgba(0,0,0,0.06) !important;
+        }
+        .custom-toast.toast-hiding {
+            animation: toastSlideOut 0.35s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+        }
+        .custom-toast .toast-header {
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-bottom: none;
+        }
+        .custom-toast .toast-body {
+            font-size: 0.925rem;
+            line-height: 1.5;
+            padding: 0.9rem 1.1rem;
+        }
+        .custom-toast .toast-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3.5px;
+            width: 100%;
+            animation: toastProgress 5s linear forwards;
+        }
+        .hover-bg-light:hover {
+            background-color: #f1f5f9;
+        }
+        @@keyframes toastSlideIn {
+            from {
+                opacity: 0;
+                transform: translateX(110%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        @@keyframes toastSlideOut {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(110%);
+            }
+        }
+        @@keyframes toastProgress {
+            from { width: 100%; }
+            to { width: 0%; }
         }
 
+        /* Global Quick Search Styles */
+        .global-search-box {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 24px;
+            transition: all 0.2s ease-in-out;
+        }
+        .global-search-box:focus-within {
+            background-color: #ffffff;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+        .search-result-item {
+            transition: background-color 0.15s ease;
+            text-decoration: none;
+            color: inherit;
+        }
+        .search-result-item:hover {
+            background-color: #f1f5f9;
+        }
     </style>
 
 
@@ -194,63 +278,207 @@
                 }
             });
         }
-        document.addEventListener('DOMContentLoaded', initSidebar);
+
+        // Global Omnisearch for Products and Vouchers
+        function initGlobalSearch() {
+            const input = document.getElementById('globalOmniSearchInput');
+            const resultsContainer = document.getElementById('globalOmniSearchResults');
+            if (!input || !resultsContainer) return;
+
+            let debounceTimer = null;
+
+            // Global shortcut Ctrl+K
+            document.addEventListener('keydown', function (e) {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                    e.preventDefault();
+                    input.focus();
+                    input.select();
+                }
+            });
+
+            input.addEventListener('input', function () {
+                clearTimeout(debounceTimer);
+                const q = this.value.trim();
+                if (q.length < 1) {
+                    resultsContainer.classList.add('d-none');
+                    resultsContainer.classList.remove('show');
+                    resultsContainer.innerHTML = '';
+                    return;
+                }
+
+                debounceTimer = setTimeout(async () => {
+                    try {
+                        resultsContainer.innerHTML = '<div class="p-3 text-center text-muted small"><i class="fa fa-spinner fa-spin me-2 text-primary"></i>Đang tìm kiếm...</div>';
+                        resultsContainer.classList.remove('d-none');
+                        resultsContainer.classList.add('show');
+
+                        const res = await fetch('/api/quick-search?q=' + encodeURIComponent(q));
+                        if (!res.ok) throw new Error('Search failed');
+                        const data = await res.json();
+
+                        renderSearchResults(data, q);
+                    } catch (err) {
+                        resultsContainer.innerHTML = '<div class="p-3 text-center text-danger small">Lỗi khi tìm kiếm dữ liệu</div>';
+                        resultsContainer.classList.remove('d-none');
+                        resultsContainer.classList.add('show');
+                    }
+                }, 250);
+            });
+
+            // Re-open if input focused and has value
+            input.addEventListener('focus', function() {
+                if (resultsContainer.children.length > 0 && this.value.trim().length >= 1) {
+                    resultsContainer.classList.remove('d-none');
+                    resultsContainer.classList.add('show');
+                }
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function (e) {
+                if (!input.contains(e.target) && !resultsContainer.contains(e.target)) {
+                    resultsContainer.classList.add('d-none');
+                    resultsContainer.classList.remove('show');
+                }
+            });
+
+            function renderSearchResults(data, query) {
+                const products = data.products || [];
+                const vouchers = data.vouchers || [];
+
+                if (products.length === 0 && vouchers.length === 0) {
+                    resultsContainer.innerHTML = `
+                        <div class="p-4 text-center text-muted">
+                            <i class="fa-regular fa-folder-open fs-3 d-block mb-2 opacity-50"></i>
+                            <div class="small fw-semibold">Không tìm thấy kết quả nào cho "${escapeHtml(query)}"</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">Hãy thử tìm với mã SKU, tên nội thất hoặc mã phiếu</div>
+                        </div>
+                    `;
+                    resultsContainer.classList.remove('d-none');
+                    resultsContainer.classList.add('show');
+                    return;
+                }
+
+                let html = '';
+
+                if (products.length > 0) {
+                    html += `
+                        <div class="px-3 py-2 bg-light border-bottom d-flex justify-content-between align-items-center">
+                            <span class="small fw-bold text-uppercase text-primary"><i class="fa-solid fa-boxes-stacked me-1"></i> Hàng hóa & Tồn kho (${products.length})</span>
+                            <a href="/Home/Index?tab=inventory&search=${encodeURIComponent(query)}" class="small text-decoration-none text-muted" style="font-size:0.75rem;">Xem tất cả &rarr;</a>
+                        </div>
+                    `;
+                    products.forEach(p => {
+                        html += `
+                            <a href="${p.url}" class="search-result-item p-2 px-3 border-bottom d-block">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="fw-semibold text-dark small">${escapeHtml(p.title)}</div>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill small">Hàng hóa</span>
+                                </div>
+                                <div class="text-muted small" style="font-size: 0.75rem;">${escapeHtml(p.subtitle)}</div>
+                            </a>
+                        `;
+                    });
+                }
+
+                if (vouchers.length > 0) {
+                    html += `
+                        <div class="px-3 py-2 bg-light border-bottom ${products.length > 0 ? 'border-top' : ''} d-flex justify-content-between align-items-center">
+                            <span class="small fw-bold text-uppercase text-success"><i class="fa-solid fa-file-invoice me-1"></i> Chứng từ & Phiếu kho (${vouchers.length})</span>
+                        </div>
+                    `;
+                    vouchers.forEach(v => {
+                        const badgeClass = v.statusCode === 'APPROVED' ? 'bg-success' : (v.statusCode === 'PENDING' ? 'bg-warning text-dark' : (v.statusCode === 'REJECTED' ? 'bg-danger' : 'bg-secondary'));
+                        html += `
+                            <a href="${v.url}" class="search-result-item p-2 px-3 border-bottom d-block">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="fw-semibold text-dark small">
+                                        <span class="badge bg-light text-dark border me-1">${escapeHtml(v.type)}</span>
+                                        <strong>${escapeHtml(v.number)}</strong>
+                                    </div>
+                                    <span class="badge ${badgeClass} small">${escapeHtml(v.status)}</span>
+                                </div>
+                                <div class="text-muted small" style="font-size: 0.75rem;">${escapeHtml(v.subtitle)}</div>
+                            </a>
+                        `;
+                    });
+                }
+
+                resultsContainer.innerHTML = html;
+                resultsContainer.classList.remove('d-none');
+                resultsContainer.classList.add('show');
+            }
+
+            function escapeHtml(text) {
+                if (!text) return '';
+                return String(text)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initSidebar();
+            initGlobalSearch();
+        });
     </script>
 
-    <script src="/js/site.js" defer></script>
+    <script src="/js/site.js" asp-append-version="true" defer></script>
 </head>
 <body>
     <div class="app-root">
         <aside class="sidebar" role="complementary">
             <div class="sidebar-header">
-                <button id="sidebarToggle" class="btn btn-sm btn-light" title="Toggle sidebar"><i class="fa fa-bars"></i></button>
-                <a asp-controller="Dashboard" asp-action="Index" class="brand text-white ms-2">DuAnCode WMS</a>
+                <button id="sidebarToggle" class="btn btn-sm btn-light btn-icon-only" data-tooltip="Thu gọn / Mở rộng thanh điều hướng bên trái" data-tt-type="func"><i class="fa fa-bars"></i></button>
+                <a asp-controller="Dashboard" asp-action="Index" class="brand text-white ms-2 text-truncate" style="max-width: 180px;" data-tooltip="@companyName" data-tt-type="func">@companyName</a>
             </div>
 
             <div class="profile d-flex align-items-center">
-                <div class="avatar me-2"><i class="fa fa-user"></i></div>
+                <div class="avatar me-2" data-tooltip="Ảnh đại diện tài khoản người dùng" data-tt-type="func"><i class="fa fa-user"></i></div>
                 <div class="meta">
-                    <div class="fw-bold"><a href="/Account/Profile" class="text-white text-decoration-none" title="Xem hồ sơ">@userDisplay</a></div>
-                    <div class="small text-white-50">@string.Join(", ", roles)</div>
+                    <div class="fw-bold"><a href="/Account/Profile" class="text-white text-decoration-none" data-tooltip="Xem và cập nhật thông tin hồ sơ tài khoản cá nhân" data-tt-type="func">@userDisplay</a></div>
+                    <div class="small text-white-50" data-tooltip="Vai trò phân quyền trong hệ thống (RBAC)" data-tt-type="func">@string.Join(", ", roles.Select(DuAnCode.Web.Services.RoleHelper.ToVietnamese).Distinct())</div>
                 </div>
             </div>
 
             <nav class="nav-links">
-                <a asp-controller="Dashboard" asp-action="Index" class="nav-link"><i class="fa-solid fa-chart-pie"></i> <span class="text">Tổng quan</span></a>
+                <a asp-controller="Dashboard" asp-action="Index" class="nav-link" data-tooltip="Dashboard trung tâm, tổng hợp các chỉ số KPI kho vận và biểu đồ thời gian thực" data-tt-type="func" data-tt-title="@LocaleHelper.T("Tổng quan", "Dashboard")"><i class="fa-solid fa-chart-pie"></i> <span class="text">@LocaleHelper.T("Tổng quan", "Dashboard")</span></a>
                 @if (isAdmin || isWarehouse || isStaff || isQc || isAccountant)
                 {
-                    <a asp-controller="Inbound" asp-action="Index" class="nav-link"><i class="fa-solid fa-box-arrow-in-down"></i> <span class="text">Nhập kho</span></a>
-                    <a asp-controller="Outbound" asp-action="Index" class="nav-link"><i class="fa-solid fa-box-arrow-up"></i> <span class="text">Xuất kho</span></a>
-                    <a asp-controller="StockTransfer" asp-action="Index" class="nav-link"><i class="fa-solid fa-exchange-alt"></i> <span class="text">Chuyển kho</span></a>
-                    <a asp-controller="InventoryAudit" asp-action="Index" class="nav-link"><i class="fa-solid fa-clipboard-check"></i> <span class="text">Kiểm kê</span></a>
+                    <a asp-controller="Inbound" asp-action="Index" class="nav-link" data-tooltip="Quản lý quy trình nhập kho từ nhà cung cấp hoặc điều chuyển, theo dõi chứng từ gốc và lô hàng" data-tt-type="func" data-tt-title="@LocaleHelper.T("Nhập kho", "Inbound")"><i class="fa-solid fa-box-arrow-in-down"></i> <span class="text">@LocaleHelper.T("Nhập kho", "Inbound")</span></a>
+                    <a asp-controller="Outbound" asp-action="Index" class="nav-link" data-tooltip="Quản lý quy trình xuất kho giao hàng đối tác, kiểm tra tồn khả dụng theo FIFO/FEFO" data-tt-type="func" data-tt-title="@LocaleHelper.T("Xuất kho", "Outbound")"><i class="fa-solid fa-box-arrow-up"></i> <span class="text">@LocaleHelper.T("Xuất kho", "Outbound")</span></a>
+                    <a asp-controller="StockTransfer" asp-action="Index" class="nav-link" data-tooltip="Quản lý điều chuyển hàng hóa giữa các kho nội bộ, theo dõi xuất kho gửi và nhận kho nhận" data-tt-type="func" data-tt-title="@LocaleHelper.T("Chuyển kho", "Transfer")"><i class="fa-solid fa-exchange-alt"></i> <span class="text">@LocaleHelper.T("Chuyển kho", "Transfer")</span></a>
+                    <a asp-controller="InventoryAudit" asp-action="Index" class="nav-link" data-tooltip="Lập phiếu kiểm kê thực tế định kỳ, tự động đối chiếu số liệu và sinh chênh lệch tồn" data-tt-type="func" data-tt-title="@LocaleHelper.T("Kiểm kê", "Audit")"><i class="fa-solid fa-clipboard-check"></i> <span class="text">@LocaleHelper.T("Kiểm kê", "Audit")</span></a>
                 }
                 @if (isAdmin || isWarehouse)
                 {
-                    <a asp-controller="Replenishment" asp-action="Index" class="nav-link"><i class="fa-solid fa-robot"></i> <span class="text">Gợi ý AI</span></a>
+                    <a asp-controller="Replenishment" asp-action="Index" class="nav-link" data-tooltip="Thuật toán AI phân tích xu hướng tiêu thụ, cảnh báo hàng sắp hết và gợi ý điểm đặt hàng ROP/EOQ" data-tt-type="func" data-tt-title="@LocaleHelper.T("Gợi ý AI", "AI Insights")"><i class="fa-solid fa-robot"></i> <span class="text">@LocaleHelper.T("Gợi ý AI", "AI Insights")</span></a>
                 }
                 @if (isAdmin || isAccountant || isWarehouse)
                 {
-                    <a asp-controller="Report" asp-action="Index" class="nav-link"><i class="fa-solid fa-file-chart-line"></i> <span class="text">Báo cáo</span></a>
+                    <a asp-controller="Report" asp-action="Index" class="nav-link" data-tooltip="Báo cáo tổng hợp Nhập - Xuất - Tồn, giá trị hàng tồn kho và nhật ký vận hành kho" data-tt-type="func" data-tt-title="@LocaleHelper.T("Báo cáo", "Reports")"><i class="fa-solid fa-file-chart-line"></i> <span class="text">@LocaleHelper.T("Báo cáo", "Reports")</span></a>
                 }
                 @if (isAdmin)
                 {
-                    <a asp-controller="Admin" asp-action="Index" class="nav-link"><i class="fa-solid fa-gear"></i> <span class="text">Quản lý Hệ thống</span></a>
+                    <a asp-controller="Admin" asp-action="Index" class="nav-link" data-tooltip="Quản lý tài khoản người dùng, phân quyền vai trò (RBAC), cấu hình và sao lưu dữ liệu" data-tt-type="func" data-tt-title="@LocaleHelper.T("Quản lý Hệ thống", "System Admin")"><i class="fa-solid fa-gear"></i> <span class="text">@LocaleHelper.T("Quản lý Hệ thống", "System Admin")</span></a>
                 }
                 @if (isQc)
                 {
-                    <a asp-controller="Quality" asp-action="Index" class="nav-link"><i class="fa-solid fa-magnifying-glass"></i> <span class="text">QC Hàng hỏng</span></a>
+                    <a asp-controller="Quality" asp-action="Index" class="nav-link" data-tooltip="Kiểm định chất lượng hàng hóa, ghi nhận hàng lỗi hỏng, lập biên bản trả hàng hoặc xử lý phế phẩm" data-tt-type="func" data-tt-title="@LocaleHelper.T("QC Hàng hỏng", "QC & Damaged")"><i class="fa-solid fa-magnifying-glass"></i> <span class="text">@LocaleHelper.T("QC Hàng hỏng", "QC & Damaged")</span></a>
                 }
             </nav>
 
             <div class="logout mt-auto">
                 @if (!isAuthenticated)
                 {
-                    <a asp-controller="Account" asp-action="Login" class="btn btn-outline-light w-100" title="Đăng nhập"><i class="fa-solid fa-sign-in-alt"></i><span class="text ms-2 d-none d-md-inline">Đăng nhập</span></a>
+                    <a asp-controller="Account" asp-action="Login" class="btn btn-outline-light w-100" data-tooltip="@LocaleHelper.T("Đăng nhập vào hệ thống", "Login to system")" data-tt-type="action"><i class="fa-solid fa-sign-in-alt"></i><span class="text ms-2 d-none d-md-inline">@LocaleHelper.T("Đăng nhập", "Login")</span></a>
                 }
                 else
                 {
                     <form asp-controller="Account" asp-action="LogoutPost" method="post">@Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-danger w-100" title="Đăng xuất"><i class="fa-solid fa-sign-out-alt"></i><span class="text ms-2 d-none d-md-inline">Đăng xuất</span></button>
+                        <button type="submit" class="btn btn-danger w-100" data-tooltip="@LocaleHelper.T("Đăng xuất tài khoản", "Logout account")" data-tt-type="action"><i class="fa-solid fa-sign-out-alt"></i><span class="text ms-2 d-none d-md-inline">@LocaleHelper.T("Đăng xuất", "Logout")</span></button>
                     </form>
                 }
             </div>
@@ -258,21 +486,176 @@
 
         <div class="main-content">
             <header class="main-header d-flex justify-content-between align-items-center">
-                <div class="ms-3">@ViewData["Title"]</div>
+                <div class="ms-3 fw-bold fs-5 text-dark d-flex align-items-center gap-2">
+                    <span class="text-primary"><i class="fa-solid fa-layer-group"></i></span>
+                    <span>@ViewData["Title"]</span>
+                </div>
+
+                <!-- Global Quick Search Omnibar (Center) -->
+                <div class="global-search-container mx-3 position-relative flex-grow-1 d-none d-md-block" style="max-width: 480px;">
+                    <div class="input-group input-group-sm global-search-box overflow-hidden">
+                        <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-2"><i class="fa-solid fa-magnifying-glass"></i></span>
+                        <input type="text" id="globalOmniSearchInput" class="form-control bg-transparent border-0 py-2 shadow-none" placeholder="Tìm nhanh hàng hóa (SKU), phiếu nhập/xuất/chuyển... (Ctrl + K)" autocomplete="off" />
+                        <span class="input-group-text bg-transparent border-0 pe-3">
+                            <kbd class="bg-white border text-secondary px-1 py-0 rounded shadow-xs small" style="font-size: 0.7rem; font-family: inherit;">Ctrl K</kbd>
+                        </span>
+                    </div>
+
+                    <!-- Search Results Dropdown Menu -->
+                    <div id="globalOmniSearchResults" class="dropdown-menu shadow-lg border-0 p-0 position-absolute w-100 mt-2 d-none" style="z-index: 1055; border-radius: 14px; overflow: hidden; max-height: 480px; overflow-y: auto;">
+                        <!-- Dynamically populated via JS -->
+                    </div>
+                </div>
                 
+                <div class="header-right d-flex align-items-center gap-3 me-3">
+                    <!-- Notification Bell Dropdown (Top-Right) -->
+                    <div class="dropdown">
+                        <button class="btn btn-light rounded-circle position-relative p-2 border shadow-sm btn-icon-only" type="button" id="notifDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-tooltip="Xem danh sách thông báo và cảnh báo hệ thống" data-tt-type="func">
+                            <i class="fa-solid fa-bell text-secondary fs-5"></i>
+                            <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle @(TempData["Message"] != null || TempData["Success"] != null || TempData["Error"] != null ? "" : "d-none")">
+                                <span class="visually-hidden">New alerts</span>
+                            </span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-0" style="width: 340px; border-radius: 14px; overflow: hidden;" aria-labelledby="notifDropdown">
+                            <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-bell me-2 text-primary"></i>Thông báo hệ thống</h6>
+                                <span class="badge bg-primary rounded-pill small" id="notifCountText">@(TempData["Message"] != null || TempData["Success"] != null || TempData["Error"] != null ? "1 mới" : "0 mới")</span>
+                            </div>
+                            <div id="notifList" class="p-2" style="max-height: 300px; overflow-y: auto;">
+                                @if (TempData["Success"] != null || TempData["Message"] != null)
+                                {
+                                    var m = TempData["Success"] ?? TempData["Message"];
+                                    <div class="p-2 border-bottom hover-bg-light rounded mb-1">
+                                        <div class="d-flex align-items-start">
+                                            <div class="text-success me-2 mt-1"><i class="fa-solid fa-circle-check"></i></div>
+                                            <div class="flex-grow-1">
+                                                <div class="fw-semibold small text-success">Thành công</div>
+                                                <div class="text-muted small">@m</div>
+                                                <div class="text-muted" style="font-size: 0.7rem;">Vừa xong</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                @if (TempData["Error"] != null)
+                                {
+                                    <div class="p-2 border-bottom hover-bg-light rounded mb-1">
+                                        <div class="d-flex align-items-start">
+                                            <div class="text-danger me-2 mt-1"><i class="fa-solid fa-circle-exclamation"></i></div>
+                                            <div class="flex-grow-1">
+                                                <div class="fw-semibold small text-danger">Thông báo lỗi</div>
+                                                <div class="text-muted small">@TempData["Error"]</div>
+                                                <div class="text-muted" style="font-size: 0.7rem;">Vừa xong</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                @if (TempData["Message"] == null && TempData["Success"] == null && TempData["Error"] == null)
+                                {
+                                    <div class="text-center text-muted py-4 small" id="emptyNotifMsg">
+                                        <i class="fa-regular fa-bell-slash fs-3 d-block mb-2 opacity-50"></i>
+                                        Không có thông báo mới nào
+                                    </div>
+                                }
+                            </div>
+                            <div class="p-2 bg-light border-top text-center">
+                                <a href="javascript:void(0)" onclick="clearAllNotifications()" class="small text-decoration-none text-muted me-3">Đã đọc tất cả</a>
+                                <a href="/Dashboard" class="small text-decoration-none text-primary fw-medium">Xem tổng quan kho</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Profile Quick Badge -->
+                    <div class="d-flex align-items-center">
+                        <a href="/Account/Profile" class="d-flex align-items-center text-decoration-none text-dark bg-light px-2 py-1 rounded-pill border shadow-sm">
+                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px; font-weight: 600; font-size: 0.9rem;">
+                                @(string.IsNullOrEmpty(userDisplay) ? "U" : userDisplay.Substring(0, 1).ToUpper())
+                            </div>
+                            <div class="d-none d-md-block text-start lh-sm pe-2">
+                                <div class="fw-semibold small">@userDisplay</div>
+                                <div class="text-muted" style="font-size: 0.7rem;">@string.Join(", ", roles)</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
             </header>
 
             <div class="main-body">
-                
-                @if (TempData["Message"] != null)
+                @RenderBody()
+            </div>
+
+            <!-- Top-Right Notification Toast Container -->
+            <div id="toastNotificationContainer" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 99999; pointer-events: none; max-width: 420px; width: 100%;">
+                @if (TempData["Success"] != null || TempData["Message"] != null)
                 {
-                    <div class="alert alert-success m-3">@TempData["Message"]</div>
+                    var msg = TempData["Success"] ?? TempData["Message"];
+                    <div class="toast custom-toast show shadow-lg border-0 mb-3" role="alert" aria-live="assertive" aria-atomic="true" style="pointer-events: auto;">
+                        <div class="toast-header bg-success text-white py-2">
+                            <i class="fa-solid fa-circle-check me-2 fs-5"></i>
+                            <strong class="me-auto">Thành công</strong>
+                            <small class="text-white-50">Vừa xong</small>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body bg-white text-dark py-3 fw-medium">
+                            <div>@msg</div>
+                            @if (TempData["CreatedVoucherId"] != null)
+                            {
+                                var targetCtrl = TempData["CreatedVoucherType"]?.ToString() == "TRANSFER" ? "StockTransfer" : "Inbound";
+                                <div class="mt-2 pt-2 border-top">
+                                    <a href="/@targetCtrl/Create?id=@TempData["CreatedVoucherId"]" class="btn btn-sm btn-dark shadow-sm text-white">
+                                        <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Xem & Sửa phiếu (@TempData["CreatedVoucherNumber"])
+                                    </a>
+                                </div>
+                            }
+                        </div>
+                        <div class="toast-progress bg-success"></div>
+                    </div>
                 }
                 @if (TempData["Error"] != null)
                 {
-                    <div class="alert alert-danger m-3">@TempData["Error"]</div>
+                    <div class="toast custom-toast show shadow-lg border-0 mb-3" role="alert" aria-live="assertive" aria-atomic="true" style="pointer-events: auto;">
+                        <div class="toast-header bg-danger text-white py-2">
+                            <i class="fa-solid fa-circle-exclamation me-2 fs-5"></i>
+                            <strong class="me-auto">Thông báo Lỗi</strong>
+                            <small class="text-white-50">Vừa xong</small>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body bg-white text-dark py-3 fw-medium">
+                            @TempData["Error"]
+                        </div>
+                        <div class="toast-progress bg-danger"></div>
+                    </div>
                 }
-                @RenderBody()
+                @if (TempData["Warning"] != null)
+                {
+                    <div class="toast custom-toast show shadow-lg border-0 mb-3" role="alert" aria-live="assertive" aria-atomic="true" style="pointer-events: auto;">
+                        <div class="toast-header bg-warning text-dark py-2">
+                            <i class="fa-solid fa-triangle-exclamation me-2 fs-5"></i>
+                            <strong class="me-auto">Cảnh báo</strong>
+                            <small class="text-muted">Vừa xong</small>
+                            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body bg-white text-dark py-3 fw-medium">
+                            @TempData["Warning"]
+                        </div>
+                        <div class="toast-progress bg-warning"></div>
+                    </div>
+                }
+                @if (TempData["Info"] != null || ViewData["Info"] != null)
+                {
+                    var infoMsg = TempData["Info"] ?? ViewData["Info"];
+                    <div class="toast custom-toast show shadow-lg border-0 mb-3" role="alert" aria-live="assertive" aria-atomic="true" style="pointer-events: auto;">
+                        <div class="toast-header bg-info text-white py-2">
+                            <i class="fa-solid fa-circle-info me-2 fs-5"></i>
+                            <strong class="me-auto">Thông tin</strong>
+                            <small class="text-white-50">Vừa xong</small>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body bg-white text-dark py-3 fw-medium">
+                            @infoMsg
+                        </div>
+                        <div class="toast-progress bg-info"></div>
+                    </div>
+                }
             </div>
 
             <footer class="mt-auto py-3 bg-light">
@@ -282,37 +665,188 @@
     </div>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script>
+        // Global override for window.alert - redirects all legacy alert() calls to top-right toast
+        window.alert = function(msg) {
+            window.showToast(msg, 'warning');
+        };
+
+        // Global showToast function - places notifications in top-right corner
+        window.showToast = function(message, type = 'success', title = null, duration = 5000) {
+            let container = document.getElementById('toastNotificationContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toastNotificationContainer';
+                container.className = 'toast-container position-fixed top-0 end-0 p-3';
+                container.style.cssText = 'z-index: 99999; pointer-events: none; max-width: 420px; width: 100%;';
+                document.body.appendChild(container);
+            }
+
+            const icons = {
+                success: 'fa-circle-check',
+                error: 'fa-circle-exclamation',
+                danger: 'fa-circle-exclamation',
+                warning: 'fa-triangle-exclamation',
+                info: 'fa-circle-info'
+            };
+            const defaultTitles = {
+                success: 'Thành công',
+                error: 'Thông báo Lỗi',
+                danger: 'Thông báo Lỗi',
+                warning: 'Cảnh báo',
+                info: 'Thông tin'
+            };
+            const bgClasses = {
+                success: 'bg-success text-white',
+                error: 'bg-danger text-white',
+                danger: 'bg-danger text-white',
+                warning: 'bg-warning text-dark',
+                info: 'bg-info text-white'
+            };
+            const progressBgs = {
+                success: 'bg-success',
+                error: 'bg-danger',
+                danger: 'bg-danger',
+                warning: 'bg-warning',
+                info: 'bg-info'
+            };
+
+            const toastType = (type === 'error') ? 'danger' : type;
+            const toastTitle = title || defaultTitles[type] || 'Thông báo';
+            const icon = icons[type] || 'fa-bell';
+            const bg = bgClasses[toastType] || 'bg-primary text-white';
+            const pBg = progressBgs[toastType] || 'bg-primary';
+            const closeBtnClass = (toastType === 'warning') ? 'btn-close' : 'btn-close btn-close-white';
+
+            const toastEl = document.createElement('div');
+            toastEl.className = 'toast custom-toast show shadow-lg border-0 mb-3';
+            toastEl.style.pointerEvents = 'auto';
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+
+            toastEl.innerHTML = `
+                <div class="toast-header ${bg} py-2">
+                    <i class="fa-solid ${icon} me-2 fs-5"></i>
+                    <strong class="me-auto">${toastTitle}</strong>
+                    <small class="${toastType === 'warning' ? 'text-muted' : 'text-white-50'}">Vừa xong</small>
+                    <button type="button" class="${closeBtnClass}" aria-label="Close"></button>
+                </div>
+                <div class="toast-body bg-white text-dark py-3 fw-medium">
+                    ${message}
+                </div>
+                <div class="toast-progress ${pBg}" style="animation: toastProgress ${duration}ms linear forwards;"></div>
+            `;
+
+            container.appendChild(toastEl);
+
+            // Add to dropdown notification center
+            addNotificationToDropdown(toastTitle, message, type);
+
+            const closeBtn = toastEl.querySelector('.btn-close');
+            const dismiss = () => {
+                toastEl.classList.add('toast-hiding');
+                setTimeout(() => toastEl.remove(), 350);
+            };
+
+            if (closeBtn) closeBtn.onclick = dismiss;
+            if (duration > 0) setTimeout(dismiss, duration);
+        };
+
+        function addNotificationToDropdown(title, message, type) {
+            const list = document.getElementById('notifList');
+            const badge = document.getElementById('notifBadge');
+            const countText = document.getElementById('notifCountText');
+            const emptyMsg = document.getElementById('emptyNotifMsg');
+            if (!list) return;
+
+            if (emptyMsg) emptyMsg.remove();
+            if (badge) badge.classList.remove('d-none');
+
+            const item = document.createElement('div');
+            item.className = 'p-2 border-bottom hover-bg-light rounded mb-1';
+            const colorClass = (type === 'error' || type === 'danger') ? 'text-danger' : (type === 'warning' ? 'text-warning' : 'text-success');
+            const iconClass = (type === 'error' || type === 'danger') ? 'fa-circle-exclamation' : (type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-check');
+            item.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="${colorClass} me-2 mt-1"><i class="fa-solid ${iconClass}"></i></div>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold small ${colorClass}">${title}</div>
+                        <div class="text-muted small">${message}</div>
+                        <div class="text-muted" style="font-size: 0.7rem;">Vừa xong</div>
+                    </div>
+                </div>
+            `;
+            list.prepend(item);
+
+            const currentCount = list.querySelectorAll('.hover-bg-light').length;
+            if (countText) countText.textContent = currentCount + ' mới';
+        }
+
+        function clearAllNotifications() {
+            const list = document.getElementById('notifList');
+            const badge = document.getElementById('notifBadge');
+            const countText = document.getElementById('notifCountText');
+            if (list) {
+                list.innerHTML = `
+                    <div class="text-center text-muted py-4 small" id="emptyNotifMsg">
+                        <i class="fa-regular fa-bell-slash fs-3 d-block mb-2 opacity-50"></i>
+                        Không có thông báo mới nào
+                    </div>
+                `;
+            }
+            if (badge) badge.classList.add('d-none');
+            if (countText) countText.textContent = '0 mới';
+        }
+
+        // Auto-dismiss server-rendered toasts
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('#toastNotificationContainer .custom-toast').forEach(function(t) {
+                const closeBtn = t.querySelector('.btn-close');
+                const dismiss = () => {
+                    t.classList.add('toast-hiding');
+                    setTimeout(() => t.remove(), 350);
+                };
+                if (closeBtn) closeBtn.onclick = dismiss;
+                setTimeout(dismiss, 5000);
+            });
+        });
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 
     @if (isAdmin || isWarehouse || isQc)
     {
         <!-- AI Chat Widget -->
         <div id="aiChatWidget" class="position-fixed" style="bottom: 20px; right: 20px; z-index: 1050;">
-            <div id="chatBox" class="card shadow d-none" style="width: 350px; height: 450px;">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0"><i class="fa-solid fa-robot"></i> Trợ lý AI Ollama</h6>
-                    <button type="button" class="btn-close btn-close-white btn-sm" id="closeChat"></button>
+            <div id="chatBox" class="card shadow d-none" style="width: 360px; height: 460px;">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+                    <h6 class="mb-0 fs-6"><i class="fa-solid fa-robot me-1"></i> Trợ lý AI WMS</h6>
+                    <div class="d-flex align-items-center">
+                        <button type="button" class="btn btn-sm btn-link text-white text-opacity-75 p-0 me-2" id="clearChatHistory" title="Xóa lịch sử chat" data-bs-toggle="tooltip"><i class="fa-solid fa-trash-can"></i></button>
+                        <button type="button" class="btn-close btn-close-white btn-sm" id="closeChat"></button>
+                    </div>
                 </div>
-                <div class="card-body overflow-auto" id="chatMessages" style="flex: 1; background: #f8f9fa;">
-                    <div class="text-muted text-center small mb-3">AI (qwen2.5-coder:7b) đã sẵn sàng</div>
+                <div class="card-body overflow-auto p-3" id="chatMessages" style="flex: 1; background: #f8f9fa;">
+                    <div class="text-muted text-center small mb-3" id="aiReadyNotice">
+                        <span class="badge bg-light text-secondary border"><i class="fa-solid fa-circle-check text-success me-1"></i>Trợ lý AI đã sẵn sàng</span>
+                    </div>
                 </div>
-                <div class="card-footer">
+                <div class="card-footer bg-white border-top p-2">
                     <form id="chatForm">
                         <div class="input-group">
                             <input type="text" id="chatInput" class="form-control form-control-sm" placeholder="Hỏi AI về kho hàng..." required autocomplete="off">
-                            <button class="btn btn-primary btn-sm" type="submit" id="sendChatBtn"><i class="fa-solid fa-paper-plane"></i></button>
+                            <button class="btn btn-primary btn-sm btn-icon-only" type="submit" id="sendChatBtn" data-tooltip="Gửi câu hỏi tới Trợ lý AI" data-tt-type="action"><i class="fa-solid fa-paper-plane"></i></button>
                         </div>
                     </form>
                 </div>
             </div>
-            <button id="openChatBtn" class="btn btn-primary btn-lg rounded-circle shadow" style="width: 60px; height: 60px; float: right;">
+            <button id="openChatBtn" class="btn btn-primary btn-lg rounded-circle shadow btn-icon-only" style="width: 58px; height: 58px; float: right;" data-tooltip="Trợ lý AI Ollama - Hỏi đáp và hỗ trợ tra cứu thông tin kho" data-tt-type="func">
                 <i class="fa-solid fa-message fs-4"></i>
             </button>
         </div>
         
         <script>
             document.addEventListener('DOMContentLoaded', function() {
-                // Wait for jQuery
                 let intv = setInterval(function() {
                     if (window.jQuery) {
                         clearInterval(intv);
@@ -320,24 +854,67 @@
                     }
                 }, 100);
 
-                                function initChat() {
+                function initChat() {
                     let currentUser = '@(User.Identity?.Name ?? "guest")';
                     let chatKey = 'chatHistory_' + currentUser;
+
+                    // Allowed routes whitelist to prevent Open Redirect & DOM XSS
+                    const ALLOWED_NAV_ROUTES = [
+                        '/inbound', '/inbound/create',
+                        '/outbound', '/outbound/create',
+                        '/stocktransfer', '/stocktransfer/create',
+                        '/inventoryaudit', '/inventoryaudit/create',
+                        '/replenishment',
+                        '/report', '/report/inventory', '/report/exportexcel',
+                        '/admin', '/admin/users', '/admin/backup', '/admin/exportdata', '/admin/settings', '/admin/logs',
+                        '/home', '/dashboard', '/aidashboard'
+                    ];
+
+                    function isSafeNavUrl(url) {
+                        if (!url || typeof url !== 'string') return false;
+                        let trimmed = url.trim();
+                        // Reject protocols, protocol-relative, backslashes
+                        if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.includes('\\')) return false;
+                        let path = trimmed.split('?')[0].split('#')[0].toLowerCase();
+                        return ALLOWED_NAV_ROUTES.indexOf(path) !== -1;
+                    }
 
                     function saveChat(role, content) {
                         let history = JSON.parse(localStorage.getItem(chatKey)) || [];
                         history.push({ role: role, content: content });
+                        // Keep last 20 messages in storage
+                        if (history.length > 20) history = history.slice(history.length - 20);
                         localStorage.setItem(chatKey, JSON.stringify(history));
+                    }
+
+                    function renderFormattedMessage(text) {
+                        if (!text) return '';
+                        let html = escapeHtml(text);
+                        // Markdown bold: **text**
+                        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                        // Inline code: `code`
+                        html = html.replace(/`([^`]+)`/g, '<code class="bg-light text-dark px-1 py-0.5 rounded border small">$1</code>');
+                        // Markdown link: [text](url)
+                        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(m, p1, p2) {
+                            let trimmed = p2.trim();
+                            if (trimmed.startsWith('/') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                                return '<a href="' + escapeHtml(trimmed) + '" class="text-primary fw-bold text-decoration-underline">' + p1 + ' <i class="fa-solid fa-arrow-up-right-from-square small"></i></a>';
+                            }
+                            return p1;
+                        });
+                        // Newlines
+                        html = html.replace(/\n/g, '<br>');
+                        return html;
                     }
 
                     function loadChat() {
                         let history = JSON.parse(localStorage.getItem(chatKey)) || [];
                         history.forEach(item => {
                             if (item.role === 'user') {
-                                $('#chatMessages').append('<div class="d-flex justify-content-end mb-2"><div class="bg-primary text-white p-2 rounded" style="max-width: 80%;">' + escapeHtml(item.content) + '</div></div>');
+                                $('#chatMessages').append('<div class="d-flex justify-content-end mb-2"><div class="bg-primary text-white p-2 rounded" style="max-width: 80%; font-size: 0.9em;">' + escapeHtml(item.content) + '</div></div>');
                             } else {
-                                let replyHtml = escapeHtml(item.content).replace(/\n/g, '<br>');
-                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-white border p-2 rounded shadow-sm" style="max-width: 85%; font-size: 0.95em;">' + replyHtml + '</div></div>');
+                                let replyHtml = renderFormattedMessage(item.content);
+                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-white border p-2 rounded shadow-sm" style="max-width: 85%; font-size: 0.9em;">' + replyHtml + '</div></div>');
                             }
                         });
                         scrollToBottom();
@@ -355,18 +932,33 @@
                         $('#openChatBtn').removeClass('d-none');
                     });
 
+                    $('#clearChatHistory').click(function() {
+                        if (confirm('Bạn có muốn xóa toàn bộ lịch sử cuộc trò chuyện này?')) {
+                            localStorage.removeItem(chatKey);
+                            $('#chatMessages').html('<div class="text-muted text-center small mb-3"><span class="badge bg-light text-secondary border"><i class="fa-solid fa-circle-check text-success me-1"></i>Trợ lý AI đã sẵn sàng</span></div>');
+                        }
+                    });
+
                     $('#chatForm').submit(function(e) {
                         e.preventDefault();
                         let prompt = $('#chatInput').val().trim();
                         if (!prompt) return;
 
-                                                $('#chatMessages').append('<div class="d-flex justify-content-end mb-2"><div class="bg-primary text-white p-2 rounded" style="max-width: 80%;">' + escapeHtml(prompt) + '</div></div>');
+                        // Display user message
+                        $('#chatMessages').append('<div class="d-flex justify-content-end mb-2"><div class="bg-primary text-white p-2 rounded" style="max-width: 80%; font-size: 0.9em;">' + escapeHtml(prompt) + '</div></div>');
+                        
+                        // Collect history for multi-turn context (last 6 messages before this one)
+                        let rawHistory = JSON.parse(localStorage.getItem(chatKey)) || [];
+                        let historyPayload = rawHistory.slice(-6).map(function(item) {
+                            return { role: item.role, content: item.content };
+                        });
+
                         saveChat('user', prompt);
                         $('#chatInput').val('');
                         scrollToBottom();
 
                         let loadingId = 'loading-' + Date.now();
-                        $('#chatMessages').append('<div id="' + loadingId + '" class="d-flex justify-content-start mb-2"><div class="bg-light border p-2 rounded text-muted">AI đang nghĩ <i class="fa-solid fa-circle-notch fa-spin"></i></div></div>');
+                        $('#chatMessages').append('<div id="' + loadingId + '" class="d-flex justify-content-start mb-2"><div class="bg-light border p-2 rounded text-muted small">AI đang suy nghĩ <i class="fa-solid fa-circle-notch fa-spin ms-1"></i></div></div>');
                         scrollToBottom();
                         $('#sendChatBtn').prop('disabled', true);
 
@@ -374,12 +966,12 @@
                             url: '/api/AiChat/chat',
                             method: 'POST',
                             contentType: 'application/json',
-                            data: JSON.stringify({ prompt: prompt }),
-                                                                                    success: function(res) {
+                            data: JSON.stringify({ prompt: prompt, history: historyPayload }),
+                            success: function(res) {
                                 $('#' + loadingId).remove();
-                                let replyText = res.reply;
+                                let replyText = res.reply || '';
                                 
-                                // Check for NAVIGATE command
+                                // Parse NAVIGATE command
                                 let navMatch = replyText.match(/\[NAVIGATE:\s*([^\]]+)\]/);
                                 let actionMatch = replyText.match(/\[ACTION:\s*([^\]]+)\]/);
                                 
@@ -390,37 +982,158 @@
                                 }
                                 
                                 let actionCmd = null;
+                                let actionData = null;
                                 if (actionMatch) {
-                                    actionCmd = actionMatch[1].trim();
+                                    let fullAction = actionMatch[1].trim();
                                     replyText = replyText.replace(actionMatch[0], '').trim();
+                                    
+                                    if (fullAction.startsWith('CREATE_DRAFT_INBOUND:')) {
+                                        actionCmd = 'CREATE_DRAFT_INBOUND';
+                                        let jsonStr = fullAction.substring('CREATE_DRAFT_INBOUND:'.length).trim();
+                                        try { actionData = JSON.parse(jsonStr); } catch(e) { console.warn('JSON parse error:', jsonStr); }
+                                    } else if (fullAction.startsWith('CREATE_DRAFT_OUTBOUND:')) {
+                                        actionCmd = 'CREATE_DRAFT_OUTBOUND';
+                                        let jsonStr = fullAction.substring('CREATE_DRAFT_OUTBOUND:'.length).trim();
+                                        try { actionData = JSON.parse(jsonStr); } catch(e) { console.warn('JSON parse error:', jsonStr); }
+                                    } else {
+                                        actionCmd = fullAction;
+                                    }
                                 }
                                 
-                                                                let replyHtml = escapeHtml(replyText).replace(/\n/g, '<br>');
                                 saveChat('ai', replyText);
-                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-white border p-2 rounded shadow-sm" style="max-width: 85%; font-size: 0.95em;">' + replyHtml + '</div></div>');
+                                let replyHtml = renderFormattedMessage(replyText);
+                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-white border p-2 rounded shadow-sm" style="max-width: 85%; font-size: 0.9em;">' + replyHtml + '</div></div>');
                                 scrollToBottom();
                                 $('#sendChatBtn').prop('disabled', false);
                                 $('#chatInput').focus();
                                 
                                 if (navUrl) {
-                                    setTimeout(function() {
-                                        window.location.href = navUrl;
-                                    }, 1500);
-                                } else if (actionCmd === 'TRIGGER_REPLENISHMENT') {
-                                    $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-warning border p-2 rounded small text-dark"><i class="fa fa-spinner fa-spin"></i> Hệ thống đang chạy thuật toán phân tích tồn kho...</div></div>');
-                                    scrollToBottom();
-                                    $.post('/api/AiChat/trigger-replenishment', function() {
-                                        setTimeout(function() {
-                                            $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-success text-white border p-2 rounded small"><i class="fa fa-check"></i> Đã hoàn tất phân tích! Đang chuyển hướng...</div></div>');
+                                    if (isSafeNavUrl(navUrl)) {
+                                        let currentFull = window.location.pathname + window.location.search;
+                                        let isSamePage = currentFull.toLowerCase() === navUrl.toLowerCase();
+                                        if (!isSamePage) {
+                                            $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-info bg-opacity-10 text-primary border border-info p-2 rounded small"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Đang chuyển hướng tới ' + escapeHtml(navUrl) + '...</div></div>');
                                             scrollToBottom();
-                                            setTimeout(function() { window.location.href = '/Replenishment'; }, 1500);
-                                        }, 1000);
+                                            setTimeout(function() {
+                                                window.location.href = navUrl;
+                                            }, 1800);
+                                        }
+                                    } else {
+                                        console.warn('Blocked untrusted navigation target:', navUrl);
+                                        $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-warning text-dark border p-2 rounded small"><i class="fa-solid fa-shield-halved me-1"></i> Đã chặn chuyển hướng không an toàn (' + escapeHtml(navUrl) + ').</div></div>');
+                                        scrollToBottom();
+                                    }
+                                }
+                                
+                                if (actionCmd === 'TRIGGER_REPLENISHMENT') {
+                                    $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-warning text-dark border p-2 rounded small"><i class="fa fa-spinner fa-spin me-1"></i> Hệ thống đang chạy quét phân tích AI trên toàn bộ kho...</div></div>');
+                                    scrollToBottom();
+                                    $.post('/api/AiChat/trigger-replenishment')
+                                        .done(function(res) {
+                                            setTimeout(function() {
+                                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-success text-white border p-2 rounded small"><i class="fa fa-check me-1"></i> ' + escapeHtml(res.message || 'Hoàn tất phân tích!') + ' Đang mở trang Đề xuất nhập...</div></div>');
+                                                scrollToBottom();
+                                                setTimeout(function() { window.location.href = '/Replenishment'; }, 1500);
+                                            }, 1000);
+                                        })
+                                        .fail(function(xhr) {
+                                            let err = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : xhr.responseText;
+                                            $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-danger text-white border p-2 rounded small"><i class="fa fa-triangle-exclamation me-1"></i> ' + escapeHtml(err || 'Lỗi khi kích hoạt phân tích.') + '</div></div>');
+                                            scrollToBottom();
+                                        });
+                                } else if (actionCmd === 'TRIGGER_BACKUP') {
+                                    $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-warning text-dark border p-2 rounded small"><i class="fa fa-spinner fa-spin me-1"></i> Hệ thống đang trích xuất snapshot và khởi tạo bản sao lưu dữ liệu...</div></div>');
+                                    scrollToBottom();
+                                    $.post('/api/AiChat/trigger-backup')
+                                        .done(function(res) {
+                                            setTimeout(function() {
+                                                let downloadUrl = '/Admin/DownloadBackup?name=' + encodeURIComponent(res.file);
+                                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-success text-white border p-2 rounded small"><i class="fa fa-check me-1"></i> ' + escapeHtml(res.message || 'Đã tạo bản sao lưu thành công!') + '<br><div class="mt-2"><a href="' + downloadUrl + '" class="btn btn-sm btn-light text-dark fw-bold me-2"><i class="fa-solid fa-download me-1"></i>Tải file sao lưu</a><a href="/Admin/Backup" class="btn btn-sm btn-outline-light"><i class="fa-solid fa-database me-1"></i>Xem trang Backup</a></div></div></div>');
+                                                scrollToBottom();
+                                            }, 800);
+                                        })
+                                        .fail(function(xhr) {
+                                            let err = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : xhr.responseText;
+                                            $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-danger text-white border p-2 rounded small"><i class="fa fa-triangle-exclamation me-1"></i> ' + escapeHtml(err || 'Lỗi khi tạo bản sao lưu. Vui lòng kiểm tra quyền Admin.') + ' <a href="/Admin/Backup" class="text-white text-decoration-underline ms-1">Mở trang Backup</a></div></div>');
+                                            scrollToBottom();
+                                        });
+                                } else if (actionCmd === 'CREATE_DRAFT_INBOUND' || actionCmd === 'CREATE_DRAFT_OUTBOUND') {
+                                    let isOut = actionCmd === 'CREATE_DRAFT_OUTBOUND';
+                                    let vType = isOut ? 'OUTBOUND' : 'INBOUND';
+                                    let vTitle = isOut ? 'Phiếu Xuất kho' : 'Phiếu Nhập kho';
+                                    let vPartner = (actionData && actionData.counterparty) ? actionData.counterparty : (isOut ? 'Khách hàng' : 'Nhà cung cấp');
+                                    let vSku = (actionData && actionData.sku) ? actionData.sku : 'SKU-001';
+                                    let vQty = (actionData && actionData.quantity) ? actionData.quantity : 10;
+                                    let cardId = 'actionCard-' + Date.now();
+
+                                    let cardHtml = `
+                                        <div id="${cardId}" class="d-flex justify-content-start mb-2">
+                                            <div class="card border-primary shadow-sm" style="max-width: 88%; font-size: 0.88em;">
+                                                <div class="card-header bg-primary bg-opacity-10 text-primary py-1 px-2 fw-bold">
+                                                    <i class="fa-solid fa-file-pen me-1"></i> Xác nhận tạo bản nháp ${vTitle}
+                                                </div>
+                                                <div class="card-body p-2">
+                                                    <div><b>Đối tác:</b> ${escapeHtml(vPartner)}</div>
+                                                    <div><b>Mặt hàng:</b> <code>${escapeHtml(vSku)}</code></div>
+                                                    <div><b>Số lượng:</b> <span class="badge bg-secondary">${vQty}</span></div>
+                                                    <div class="mt-2 pt-2 border-top d-flex gap-2">
+                                                        <button class="btn btn-primary btn-sm py-0 px-2 confirm-btn"><i class="fa-solid fa-check me-1"></i>Tạo phiếu</button>
+                                                        <button class="btn btn-outline-secondary btn-sm py-0 px-2 cancel-btn"><i class="fa-solid fa-xmark me-1"></i>Hủy</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                    $('#chatMessages').append(cardHtml);
+                                    scrollToBottom();
+
+                                    let $card = $('#' + cardId);
+                                    $card.find('.confirm-btn').click(function() {
+                                        let $btn = $(this);
+                                        $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Đang tạo...');
+                                        $card.find('.cancel-btn').remove();
+
+                                        $.ajax({
+                                            url: '/api/AiChat/create-draft-voucher',
+                                            method: 'POST',
+                                            contentType: 'application/json',
+                                            data: JSON.stringify({
+                                                type: vType,
+                                                counterparty: vPartner,
+                                                sku: vSku,
+                                                quantity: parseInt(vQty) || 10
+                                            }),
+                                            success: function(r) {
+                                                $card.find('.card-body').html(`
+                                                    <div class="text-success fw-bold mb-1"><i class="fa fa-circle-check me-1"></i>${escapeHtml(r.message)}</div>
+                                                    <div class="small text-muted mb-2">Số phiếu: <b>${escapeHtml(r.voucherNumber)}</b> (${escapeHtml(r.quantity)} đơn vị)</div>
+                                                    <div class="d-flex gap-2">
+                                                        <a href="${escapeHtml(r.directUrl || r.targetUrl)}" class="btn btn-primary btn-sm py-1 px-2"><i class="fa-solid fa-file-pen me-1"></i>Mở & Sửa phiếu ngay</a>
+                                                        <a href="${escapeHtml(r.targetUrl)}" class="btn btn-outline-secondary btn-sm py-1 px-2"><i class="fa-solid fa-eye me-1"></i>Xem danh sách</a>
+                                                    </div>
+                                                `);
+                                                scrollToBottom();
+                                            },
+                                            error: function(xhr) {
+                                                let errTxt = xhr.status === 403 
+                                                    ? 'Bạn không đủ quyền thực hiện (chỉ Quản lý kho / Giám đốc / Admin).' 
+                                                    : (xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : xhr.responseText || 'Lỗi khi tạo phiếu.');
+                                                $card.find('.card-body').html(`
+                                                    <div class="text-danger small"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(errTxt)}</div>
+                                                `);
+                                                scrollToBottom();
+                                            }
+                                        });
+                                    });
+
+                                    $card.find('.cancel-btn').click(function() {
+                                        $card.find('.card-body').html('<div class="text-muted small fst-italic"><i class="fa-solid fa-ban me-1"></i>Đã hủy yêu cầu tạo phiếu.</div>');
                                     });
                                 }
                             },
                             error: function(xhr) {
                                 $('#' + loadingId).remove();
-                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-danger text-white p-2 rounded small">Lỗi kết nối AI: ' + xhr.responseText + '</div></div>');
+                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-danger text-white p-2 rounded small">Lỗi kết nối AI: ' + escapeHtml(xhr.responseText || 'Không thể kết nối máy chủ.') + '</div></div>');
                                 scrollToBottom();
                                 $('#sendChatBtn').prop('disabled', false);
                                 $('#chatInput').focus();

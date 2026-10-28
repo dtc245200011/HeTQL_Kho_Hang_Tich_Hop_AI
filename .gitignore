@@ -1,3 +1,20 @@
+# Build output .NET
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Database & temporary local files
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+wwwroot/backups/*.json
+
 # Tệp môi trường chứa mật khẩu/chuỗi kết nối
 .env
 .env.*
@@ -19,5 +36,4 @@ env/
 .vscode/
 .idea/
 *.log
-# Thư mục tạm của Visual Studio / IDE
 .vs/

@@ -12,9 +12,13 @@ namespace DuAnCode.Web.Models.ViewModels
     public class ReportRow
     {
         public string SkuId { get; set; } = null!;
+        public string ProductName { get; set; } = string.Empty;
+        public string Unit { get; set; } = "Cái";
         public int Beginning { get; set; }
         public int TotalIn { get; set; }
         public int TotalOut { get; set; }
         public int Ending { get; set; }
+        public int EndingGood { get; set; }
+        public int EndingDamaged { get; set; }
     }
 }

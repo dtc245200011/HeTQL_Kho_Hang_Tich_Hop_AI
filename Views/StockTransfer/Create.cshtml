@@ -1,208 +1,556 @@
 @model DuAnCode.Web.Models.ViewModels.VoucherPageViewModel
 @{
-    ViewData["Title"] = "Phiếu Xuất kho ";
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model?.Form?.VoucherNumber) ? "Tạo Phiếu Chuyển kho" : $"Phiếu Chuyển kho {Model.Form.VoucherNumber}";
     var skus = Model?.Skus ?? new List<DuAnCode.Web.Models.ViewModels.SkuDto>();
     var warehouses = Model?.Warehouses ?? new List<DuAnCode.Web.Models.Warehouse>();
-    var recent = Model?.Recent ?? new List<DuAnCode.Web.Models.InventoryVoucher>();
+    var isLocked = Model?.Form?.Status == "APPROVED" || Model?.Form?.Status == "REJECTED";
 }
 
 <div class="container-fluid py-2 invoice-root">
-    <div class="card">
+    <div class="card shadow-sm border-0">
         <div class="card-body p-4 p-md-5">
-            <div class="d-flex justify-content-between align-items-start mb-3">
+            <!-- Header section -->
+            <div class="d-flex justify-content-between align-items-start mb-3 border-bottom pb-3">
                 <div>
-                    <div class="fw-bold">CÔNG TY NỘI THẤT VFS</div>
-                    <div class="small text-muted">Mẫu số: CK-01</div>
+                    <div class="fw-bold fs-6 text-secondary">CÔNG TY NỘI THẤT VFS</div>
+                    <div class="small text-muted">Mẫu số: CK-01 (Lệnh Điều chuyển Nội bộ)</div>
                 </div>
                 <div class="text-end">
-                    <div>Số phiếu: <span id="voucherNumber">Tự động tạo</span></div>
-                    <div>Ngày: @DateTime.UtcNow.ToString("dd/MM/yyyy")</div>
+                    <div>Số phiếu: <strong class="text-dark">@(string.IsNullOrWhiteSpace(Model?.Form?.VoucherNumber) ? "Tự động tạo" : Model.Form.VoucherNumber)</strong></div>
+                    <div class="small text-muted">Ngày: @(Model?.Form?.Date == default || Model?.Form?.Date == null ? DateTime.UtcNow.ToString("dd/MM/yyyy") : Model.Form.Date.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))</div>
+                    <div class="small mt-1">
+                        <span class="text-muted">Người lập:</span>
+                        @{
+                            var isAiVoucher = Model?.Form?.VoucherNumber?.Contains("-AI-") == true || Model?.Form?.CreatedBy?.Contains("AI") == true || Model?.Form?.Reason?.Contains("AI") == true;
+                            var creatorName = !string.IsNullOrWhiteSpace(Model?.Form?.CreatedBy) ? Model.Form.CreatedBy : (isAiVoucher ? "Trợ lý AI WMS" : (User?.Identity?.Name ?? "Chưa xác định"));
+                        }
+                        @if (isAiVoucher)
+                        {
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle fw-semibold" data-tooltip="Phiếu này do Trợ lý AI WMS khởi tạo tự động">
+                                <i class="fa-solid fa-robot me-1"></i>@creatorName
+                            </span>
+                        }
+                        else
+                        {
+                            <strong class="text-dark"><i class="fa-solid fa-user me-1 text-secondary small"></i>@creatorName</strong>
+                        }
+                    </div>
+                    <div class="mt-2">
+                        @if (Model?.Form?.Status == "APPROVED")
+                        {
+                            <span class="badge bg-success fs-6 px-3 py-1"><i class="fa-solid fa-check me-1"></i>ĐÃ DUYỆT (Đã chuyển tồn)</span>
+                        }
+                        else if (Model?.Form?.Status == "REJECTED")
+                        {
+                            <span class="badge bg-danger fs-6 px-3 py-1"><i class="fa-solid fa-ban me-1"></i>ĐÃ TỪ CHỐI DUYỆT</span>
+                        }
+                        else if (Model?.Form?.Status == "PENDING")
+                        {
+                            <span class="badge bg-warning text-dark fs-6 px-3 py-1"><i class="fa-solid fa-clock me-1"></i>CHỜ DUYỆT</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary fs-6 px-3 py-1"><i class="fa-solid fa-pen me-1"></i>BẢN NHÁP</span>
+                        }
+                    </div>
                 </div>
             </div>
 
-            <h4 class="text-center mb-4 text-primary fw-bold">PHIẾU CHUYỂN KHO</h5>
+            <h4 class="text-center mb-4 text-primary fw-bold text-uppercase">
+                <i class="fa-solid fa-exchange-alt me-2"></i>PHIẾU ĐIỀU CHUYỂN KHO NỘI BỘ
+            </h4>
 
-            <form method="post" asp-action="Create" asp-controller="StockTransfer">
-<datalist id="sku-options-list">
-@foreach(var s in skus){ <option value="@s.SkuId">@s.ProductName</option> }
-</datalist>
+            @{
+                var stTr = Model?.Form?.Status ?? "DRAFT";
+                var step1ClassTr = "completed";
+                var step2ClassTr = stTr == "DRAFT" ? "pending" : (stTr == "PENDING" ? "active" : (stTr == "REJECTED" ? "rejected" : "completed"));
+                var step3ClassTr = stTr == "APPROVED" ? "completed" : (stTr == "REJECTED" ? "rejected" : "pending");
+                var step3IconTr = stTr == "REJECTED" ? "fa-solid fa-ban" : "fa-solid fa-truck-moving";
+                var step3TitleTr = stTr == "REJECTED" ? "3. Bị từ chối" : (stTr == "APPROVED" ? "3. Đã duyệt chuyển kho" : "3. Hoàn tất chuyển kho");
+                var step3SubTr = stTr == "REJECTED" ? "Không chuyển tồn" : (stTr == "APPROVED" ? "Đã chuyển sang kho đích" : "Chờ phê duyệt");
+            }
+            <!-- Quy trình xử lý phiếu Chuyển kho (Workflow Stepper) -->
+            <div class="workflow-stepper">
+                <ul class="wms-steps">
+                    <li class="wms-step @(stTr == "DRAFT" ? "active" : "completed")">
+                        <div class="wms-step-icon"><i class="fa-solid fa-file-waveform"></i></div>
+                        <div class="wms-step-title">1. Khởi tạo lệnh</div>
+                        <div class="wms-step-desc">Đề xuất chuyển kho</div>
+                    </li>
+                    <li class="wms-step @step2ClassTr">
+                        <div class="wms-step-icon">
+                            @if (stTr == "PENDING") { <i class="fa-solid fa-hourglass-half"></i> }
+                            else if (stTr == "REJECTED") { <i class="fa-solid fa-circle-xmark"></i> }
+                            else { <i class="fa-solid fa-user-check"></i> }
+                        </div>
+                        <div class="wms-step-title">2. Phê duyệt điều chuyển</div>
+                        <div class="wms-step-desc">@(stTr == "PENDING" ? "Đang chờ quản lý duyệt" : (stTr == "REJECTED" ? "Quản lý từ chối" : "Quản lý đã duyệt"))</div>
+                    </li>
+                    <li class="wms-step @step3ClassTr">
+                        <div class="wms-step-icon"><i class="@step3IconTr"></i></div>
+                        <div class="wms-step-title">@step3TitleTr</div>
+                        <div class="wms-step-desc">@step3SubTr</div>
+                    </li>
+                </ul>
+            </div>
+
+            @if (Model?.Form?.Status == "REJECTED")
+            {
+                <div class="alert alert-danger border-2 border-danger shadow-sm p-3 mb-4 rounded-3">
+                    <div class="d-flex align-items-start">
+                        <i class="fa-solid fa-ban fs-2 text-danger me-3 mt-1"></i>
+                        <div class="flex-grow-1">
+                            <h6 class="alert-heading fw-bold mb-1 text-danger">PHIẾU CHUYỂN KHO ĐÃ BỊ TỪ CHỐI DUYỆT</h6>
+                            <div class="p-3 bg-white border border-danger-subtle rounded-2 mb-2">
+                                <div class="text-secondary small fw-bold text-uppercase mb-1"><i class="fa-solid fa-triangle-exclamation text-danger me-1"></i>Lý do từ chối:</div>
+                                <div class="fs-6 text-danger fw-semibold">@(string.IsNullOrWhiteSpace(Model?.Form?.RejectionReason) ? "Không có lý do cụ thể" : Model.Form.RejectionReason)</div>
+                            </div>
+                            <div class="small text-muted d-flex flex-wrap gap-4">
+                                <span><i class="fa-solid fa-user-xmark text-danger me-1"></i>Người từ chối: <strong class="text-dark">@(Model?.Form?.ApprovedBy ?? "Quản lý kho")</strong></span>
+                                <span><i class="fa-solid fa-clock text-danger me-1"></i>Thời gian: <strong class="text-dark">@(Model?.Form?.RejectedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? Model?.Form?.Date?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? DateTime.Now.ToString("dd/MM/yyyy HH:mm"))</strong></span>
+                                <span><i class="fa-solid fa-shield-halved text-secondary me-1"></i>Tác động: <strong>Không phát sinh chuyển kho</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <form method="post" asp-action="Create" asp-controller="StockTransfer" id="transferForm">
+                <datalist id="sku-options-list">
+                    @foreach(var s in skus){ <option value="@s.SkuId" data-name="@s.ProductName" data-unit="@s.Unit">@s.SkuId - @s.ProductName</option> }
+                </datalist>
+
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="VoucherId" value="@Model?.Form?.VoucherId" />
-                <input type="hidden" name="VoucherNumber" value="Tự động tạo" />
+                <input type="hidden" name="VoucherNumber" value="@(string.IsNullOrWhiteSpace(Model?.Form?.VoucherNumber) ? "Tự động tạo" : Model.Form.VoucherNumber)" />
+                <input type="hidden" name="Form.VoucherId" value="@Model?.Form?.VoucherId" />
+                <input type="hidden" name="Form.VoucherNumber" value="@Model?.Form?.VoucherNumber" />
+                <input type="hidden" name="Form.CreatedBy" value="@Model?.Form?.CreatedBy" />
+                <input type="hidden" name="Form.Date" value="@(Model?.Form?.Date?.ToString("yyyy-MM-ddTHH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss"))" />
                 <div asp-validation-summary="All" class="text-danger mb-3"></div>
-                <div class="row g-4 mb-4">
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold text-muted small text-uppercase">Người vận chuyển</label>
-                        <input asp-for="Form.Counterparty" class="form-control form-control-sm" />
+
+                <!-- Balanced Grid Layout: 2 items per row -->
+                <div class="p-3 bg-light rounded-3 border mb-4">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary small text-uppercase">
+                                Người / Đơn vị vận chuyển
+                                <i class="fa-solid fa-circle-question help-icon" data-tooltip="Tài xế hoặc đối tác vận tải phụ trách vận chuyển hàng hóa giữa 2 kho."></i>
+                            </label>
+                            <input asp-for="Form.Counterparty" class="form-control" placeholder="Đơn vị vận chuyển hoặc tài xế phụ trách..." readonly="@isLocked" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary small text-uppercase">
+                                Địa chỉ giao nhận
+                                <i class="fa-solid fa-circle-question help-icon" data-tooltip="Địa chỉ hoặc lộ trình tuyến đường giữa kho xuất và kho nhận."></i>
+                            </label>
+                            <input asp-for="Form.Address" class="form-control" placeholder="Địa chỉ giao / tuyến đường vận chuyển..." readonly="@isLocked" />
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold text-muted small text-uppercase">Địa chỉ</label>
-                        <input asp-for="Form.Address" class="form-control form-control-sm" />
+
+                    @{
+                        var defaultSourceWh = !string.IsNullOrWhiteSpace(Model?.Form?.WarehouseId) 
+                            ? Model.Form.WarehouseId 
+                            : (warehouses.FirstOrDefault(w => w.WarehouseType == "MAIN" && w.IsActive)?.WarehouseId 
+                               ?? warehouses.FirstOrDefault(w => w.WarehouseType != "DAMAGED" && w.IsActive)?.WarehouseId 
+                               ?? warehouses.FirstOrDefault()?.WarehouseId);
+
+                        var defaultDestWh = !string.IsNullOrWhiteSpace(Model?.Form?.ToWarehouseId)
+                            ? Model.Form.ToWarehouseId
+                            : (warehouses.FirstOrDefault(w => w.WarehouseId != defaultSourceWh && w.WarehouseType != "DAMAGED" && w.IsActive)?.WarehouseId
+                               ?? warehouses.FirstOrDefault(w => w.WarehouseId != defaultSourceWh && w.IsActive)?.WarehouseId);
+                    }
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary small text-uppercase">
+                                Kho Nguồn (Xuất hàng) <span class="text-danger">*</span>
+                                <i class="fa-solid fa-circle-question help-icon" data-tooltip="Kho đang chứa hàng thực tế, sẽ bị trừ số lượng tồn sau khi duyệt."></i>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white text-primary"><i class="fa-solid fa-warehouse"></i></span>
+                                <select asp-for="Form.WarehouseId" id="sourceWarehouseSelect" class="form-select fw-semibold" disabled="@isLocked" required>
+                                    @foreach(var w in warehouses) { <option value="@w.WarehouseId" selected="@(w.WarehouseId == defaultSourceWh)">@w.WarehouseName (@w.WarehouseId)</option> }
+                                </select>
+                            </div>
+                            @if (isLocked) { <input type="hidden" name="Form.WarehouseId" value="@Model?.Form?.WarehouseId" /> }
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary small text-uppercase">
+                                Kho Đích (Nhận hàng) <span class="text-danger">*</span>
+                                <i class="fa-solid fa-circle-question help-icon" data-tooltip="Kho tiếp nhận hàng đến, sẽ được cộng thêm số lượng tồn sau khi duyệt."></i>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white text-success"><i class="fa-solid fa-warehouse"></i></span>
+                                <select asp-for="Form.ToWarehouseId" id="destWarehouseSelect" class="form-select fw-semibold" disabled="@isLocked" required>
+                                    <option value="" disabled selected="@(string.IsNullOrWhiteSpace(defaultDestWh))">-- Chọn kho đích nhận hàng --</option>
+                                    @foreach(var w in warehouses) { <option value="@w.WarehouseId" selected="@(w.WarehouseId == defaultDestWh)">@w.WarehouseName (@w.WarehouseId)</option> }
+                                </select>
+                            </div>
+                            @if (isLocked) { <input type="hidden" name="Form.ToWarehouseId" value="@Model?.Form?.ToWarehouseId" /> }
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold text-muted small text-uppercase">Kho Nguồn (Xuất)</label>
-                        <select asp-for="Form.WarehouseId" class="form-select">
-                            @foreach(var w in warehouses) { <option value="@w.WarehouseId">@w.WarehouseName</option> }
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold text-muted small text-uppercase">Kho Đích (Nhập)</label>
-                        <select asp-for="Form.ToWarehouseId" class="form-select">
-                            @foreach(var w in warehouses) { <option value="@w.WarehouseId">@w.WarehouseName</option> }
-                        </select>
+
+
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary small text-uppercase">
+                                Chứng từ gốc (Lệnh chuyển kho / TO)
+                                <i class="fa-solid fa-circle-question help-icon" data-tooltip="Số lệnh điều động nội bộ (Transfer Order - TO) từ ban quản lý hoặc kế hoạch chuyển kho."></i>
+                            </label>
+                            <input asp-for="Form.ReferenceDocument" class="form-control" placeholder="Số chứng từ gốc, số lệnh điều chuyển..." readonly="@isLocked" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary small text-uppercase">
+                                Lý do điều chuyển
+                                <i class="fa-solid fa-circle-question help-icon" data-tooltip="Mục đích: Cân đối hàng tồn giữa các chi nhánh, dọn kho hoặc chuẩn bị sự kiện."></i>
+                            </label>
+                            <input asp-for="Form.Reason" class="form-control" placeholder="Điều chuyển cân đối tồn kho, chuyển chi nhánh..." readonly="@isLocked" />
+                        </div>
                     </div>
                 </div>
 
-                <div class="row g-4 mb-4">
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold text-muted small text-uppercase">Chứng từ gốc (Mã hóa đơn/PO)</label>
-                        <input asp-for="Form.ReferenceDocument" class="form-control form-control-sm" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold text-muted small text-uppercase">Lý do</label>
-                        <input asp-for="Form.Reason" class="form-control form-control-sm" />
-                    </div>
-                    <div class="col-md-4 text-end align-self-end">
-                        <button type="button" class="btn btn-outline-secondary fw-semibold me-2 no-print" onclick="window.print()">In phiếu</button>
-                        <button type="submit" class="btn btn-primary fw-semibold shadow-sm no-print">Lưu phiếu</button>
-                    </div>
-                </div>
+                <!-- Lines Table Styling -->
+                <style>
+                    #linesTable { font-size: 0.85rem; }
+                    #linesTable th, #linesTable td { padding: 0.45rem 0.35rem !important; vertical-align: middle; white-space: nowrap; }
+                    #linesTable input.form-control-sm { padding: 0.25rem 0.4rem; font-size: 0.85rem; border-radius: 4px; border: 1px solid #cbd5e1; width: 100%; min-width: 70px; }
+                    #linesTable input.form-control-sm:focus { border-color: #3b82f6; box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15); }
+                    #linesTable .product-name { min-width: 170px !important; }
+                    #linesTable .sku-select { min-width: 130px !important; }
+                    .stock-badge-box { font-size: 0.75rem; }
+                </style>
 
-                
-<style>
-    #linesTable { font-size: 0.85rem; }
-    #linesTable th, #linesTable td { padding: 0.4rem 0.3rem !important; vertical-align: middle; white-space: nowrap; }
-    #linesTable input.form-control-sm { padding: 0.25rem 0.4rem; font-size: 0.85rem; border-radius: 4px; border: 1px solid #e2e8f0; width: 100%; min-width: 70px; }
-    #linesTable input.form-control-sm:focus { border-color: #3b82f6; box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15); }
-    #linesTable .product-name { min-width: 150px !important; }
-    #linesTable .sku-select { min-width: 110px !important; }
-</style>
-<div class="table-responsive border rounded shadow-sm mb-3">
-                    <table class="table table-hover table-sm align-middle " id="linesTable">
+                <div class="table-responsive border rounded shadow-xs mb-3">
+                    <table class="table table-hover table-sm align-middle mb-0" id="linesTable">
                         <thead class="table-light">
-                            <tr><th style="width:40px">STT</th><th >Mã hàng</th><th >Tên hàng</th><th >ĐVT</th><th style="width:100px">Số lượng (Yêu cầu)</th><th style="width:100px">Số lượng (Thực xuất)</th><th >Mã lô</th><th >HSD</th><th >Đơn giá</th><th >Thành tiền</th><th style="width:80px">&nbsp;</th></tr>
-                        </thead>
-                        <tbody>
-                        @if(Model?.Form?.Lines != null && Model.Form.Lines.Any()){
-                            for(int i=0;i<Model.Form.Lines.Count;i++){
-                                var ln = Model.Form.Lines[i];
-                                <tr>
-                                    <td class="text-center">@(i+1)</td>
-                                    <td>
-                                        <select name="Form.Lines[@i].SkuId" class="form-select sku-select">
-                                            <option value="">-- Chọn SKU --</option>
-                                            @foreach(var s in skus){ <option value="@s.SkuId" selected="@(s.SkuId==ln.SkuId)">@s.SkuId</option> }
-                                        </select>
-                                    </td>
-                                    <td><input name="Form.Lines[@i].ProductName" class="form-control form-control-sm product-name" value="@ln.ProductName" /></td>
-                                    <td><input name="Form.Lines[@i].Unit" class="form-control form-control-sm unit" value="@ln.Unit" /></td>
-                                    <td><input name="Form.Lines[@i].DocumentQuantity" type="number" min="0" value="@ln.DocumentQuantity" class="form-control form-control-sm" /></td>
-                                    <td><input name="Form.Lines[@i].Quantity" type="number" min="0" value="@ln.Quantity" class="form-control form-control-sm qty" /></td>
-                                    <td><input name="Form.Lines[@i].BatchNumber" class="form-control form-control-sm" value="@ln.BatchNumber" /></td>
-                                    <td><input name="Form.Lines[@i].ExpiryDate" type="date" class="form-control form-control-sm" value="@(ln.ExpiryDate?.ToString("yyyy-MM-dd"))" /></td>
-                                    <td><input name="Form.Lines[@i].UnitPrice" type="number" step="0.01" value="@ln.UnitPrice" class="form-control form-control-sm price" /></td>
-                                    <td class="line-total">@(ln.UnitPrice * ln.Quantity)</td>
-                                    <td class="text-center"><button type="button" class="btn btn-sm btn-danger remove-line">-</button></td>
-                                    <input type="hidden" name="Form.Lines[@i].Id" value="@ln.Id" />
-                                </tr>
-                            }
-                        }
-                        </tbody>
-                        <tfoot>
                             <tr>
-                                <td colspan="9" class="text-end fw-bold text-uppercase text-muted">Tổng cộng</td>
-                                <td class="fw-bold" id="totalAmount">0</td>
-                                <td>&nbsp;</td>
+                                <th style="width: 40px" class="text-center">STT</th>
+                                <th>
+                                    Mã hàng <span class="text-danger">*</span>
+                                    <i class="fa-solid fa-circle-question help-icon" data-abbr="SKU"></i>
+                                </th>
+                                <th>Tên hàng hóa</th>
+                                <th style="width: 75px">
+                                    ĐVT
+                                    <i class="fa-solid fa-circle-question help-icon" data-abbr="ĐVT"></i>
+                                </th>
+                                <th style="width: 110px" class="text-end">
+                                    SL Yêu cầu
+                                    <i class="fa-solid fa-circle-question help-icon" data-tooltip="Số lượng dự kiến cần điều chuyển theo kế hoạch."></i>
+                                </th>
+                                <th style="width: 120px" class="text-end">
+                                    SL Chuyển <span class="text-danger">*</span>
+                                    <i class="fa-solid fa-circle-question help-icon" data-tooltip="Số lượng thực tế đóng gói và vận chuyển sang kho đích."></i>
+                                </th>
+                                <th style="min-width: 120px" class="text-center">
+                                    Tồn kho nguồn
+                                    <i class="fa-solid fa-circle-question help-icon" data-tooltip="Số lượng sản phẩm còn sẵn trong kho xuất để chuyển."></i>
+                                </th>
+                                <th>
+                                    Mã lô (Batch)
+                                    <i class="fa-solid fa-circle-question help-icon" data-abbr="Batch"></i>
+                                </th>
+                                <th>
+                                    HSD
+                                    <i class="fa-solid fa-circle-question help-icon" data-abbr="HSD"></i>
+                                </th>
+                                <th style="width: 120px" class="text-end">
+                                    Đơn giá
+                                    <i class="fa-solid fa-circle-question help-icon" data-tooltip="Đơn giá vốn hạch toán điều chuyển nội bộ giữa 2 kho."></i>
+                                </th>
+                                <th style="width: 130px" class="text-end">
+                                    Thành tiền
+                                    <i class="fa-solid fa-circle-question help-icon" data-tooltip="Tổng giá trị = Số lượng chuyển × Đơn giá."></i>
+                                </th>
+                                @if (!isLocked) { <th style="width: 50px" class="text-center no-print">&nbsp;</th> }
+                            </tr>
+                        </thead>
+                        <tbody id="linesTableBody">
+                            @if(Model?.Form?.Lines != null && Model.Form.Lines.Any())
+                            {
+                                for (int i = 0; i < Model.Form.Lines.Count; i++)
+                                {
+                                    var ln = Model.Form.Lines[i];
+                                    <tr class="transfer-row">
+                                        <td class="text-center idx">@(i+1)</td>
+                                        <td>
+                                            @if (isLocked)
+                                            {
+                                                <input name="Form.Lines[@i].SkuId" class="form-control form-control-sm sku-select bg-light" value="@ln.SkuId" readonly />
+                                            }
+                                            else
+                                            {
+                                                <input list="sku-options-list" name="Form.Lines[@i].SkuId" class="form-control form-control-sm sku-select" value="@ln.SkuId" placeholder="Chọn SKU..." required />
+                                            }
+                                        </td>
+                                        <td><input name="Form.Lines[@i].ProductName" class="form-control form-control-sm product-name bg-light" value="@ln.ProductName" readonly /></td>
+                                        <td><input name="Form.Lines[@i].Unit" class="form-control form-control-sm unit bg-light" value="@ln.Unit" readonly /></td>
+                                        <td><input name="Form.Lines[@i].DocumentQuantity" type="number" min="0" value="@ln.DocumentQuantity" class="form-control form-control-sm text-end" readonly="@isLocked" /></td>
+                                        <td><input name="Form.Lines[@i].Quantity" type="number" min="1" value="@ln.Quantity" class="form-control form-control-sm text-end qty fw-bold text-primary" readonly="@isLocked" required /></td>
+                                        <td class="text-center stock-badge-box">
+                                            <span class="badge bg-secondary-subtle text-secondary border stock-badge">Đang tra...</span>
+                                        </td>
+                                        <td><input name="Form.Lines[@i].BatchNumber" class="form-control form-control-sm" value="@ln.BatchNumber" placeholder="Lô..." readonly="@isLocked" /></td>
+                                        <td><input name="Form.Lines[@i].ExpiryDate" type="date" class="form-control form-control-sm" value="@(ln.ExpiryDate?.ToString("yyyy-MM-dd"))" readonly="@isLocked" /></td>
+                                        <td><input name="Form.Lines[@i].UnitPrice" type="number" step="0.01" value="@ln.UnitPrice" class="form-control form-control-sm text-end price" readonly="@isLocked" /></td>
+                                        <td class="text-end fw-semibold line-total">@((ln.UnitPrice * ln.Quantity).ToString("N0"))</td>
+                                        @if (!isLocked)
+                                        {
+                                            <td class="text-center no-print">
+                                                <button type="button" class="btn btn-sm btn-outline-danger remove-line btn-icon-only"><i class="fa-solid fa-trash-can"></i></button>
+                                            </td>
+                                        }
+                                        <input type="hidden" name="Form.Lines[@i].Id" value="@ln.Id" />
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="10" class="text-end fw-bold text-uppercase text-secondary">Tổng cộng tiền hàng điều chuyển</td>
+                                <td class="text-end fw-bold fs-6 text-primary" id="totalAmount">0</td>
+                                @if (!isLocked) { <td>&nbsp;</td> }
                             </tr>
                         </tfoot>
                     </table>
                 </div>
 
-                <div class="mb-3">
-                    <button type="button" class="btn btn-outline-primary no-print" id="addLine">+ Thêm hàng hóa</button>
+                @if (!isLocked)
+                {
+                    <div class="mb-4 no-print">
+                        <button type="button" class="btn btn-outline-primary" id="addLine">
+                            <i class="fa-solid fa-plus me-1"></i> Thêm hàng hóa
+                        </button>
+                    </div>
+                }
+
+                <!-- Action Button Footer: natural bottom flow -->
+                <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-4 no-print">
+                    <a asp-action="Index" class="btn btn-outline-secondary">
+                        <i class="fa-solid fa-arrow-left me-1"></i> Quay lại danh sách
+                    </a>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
+                            <i class="fa-solid fa-print me-1"></i> In phiếu
+                        </button>
+                        @if (!isLocked)
+                        {
+                            <button type="submit" id="btnSubmitTransfer" class="btn btn-primary px-4 fw-semibold shadow-sm">
+                                <i class="fa-solid fa-floppy-disk me-1"></i> Lưu Phiếu Chuyển Kho
+                            </button>
+                        }
+                    </div>
                 </div>
             </form>
-
-            <!-- Recent history removed to avoid duplication with Dashboard -->
         </div>
     </div>
 </div>
 
 <script>
     const skus = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(skus));
+    const isLockedMode = @(isLocked ? "true" : "false");
+    let currentStockMap = {};
+
+    function fetchWarehouseStock() {
+        const sourceWh = document.getElementById('sourceWarehouseSelect')?.value;
+        if (!sourceWh) return;
+
+        fetch(`/api/stock/available?warehouseId=${encodeURIComponent(sourceWh)}`)
+            .then(r => r.json())
+            .then(res => {
+                currentStockMap = res.stock || {};
+                updateAllStockBadges();
+            })
+            .catch(() => {});
+    }
+
+    let lastConflictWarned = false;
+    function checkWarehouseConflict() {
+        const source = document.getElementById('sourceWarehouseSelect')?.value;
+        const dest = document.getElementById('destWarehouseSelect')?.value;
+        const submitBtn = document.getElementById('btnSubmitTransfer');
+
+        if (source && dest && source === dest) {
+            if (!lastConflictWarned) {
+                if (window.showToast) {
+                    window.showToast('Kho Nguồn và Kho Đích không được trùng nhau! Vui lòng chọn kho đích khác.', 'error', 'Lỗi chọn kho');
+                }
+                lastConflictWarned = true;
+            }
+            if (submitBtn) submitBtn.disabled = true;
+        } else {
+            lastConflictWarned = false;
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    }
+
+    function updateStockBadgeForRow(row) {
+        const sku = row.querySelector('.sku-select')?.value?.trim();
+        const qtyInput = row.querySelector('.qty');
+        const badge = row.querySelector('.stock-badge');
+        if (!badge) return;
+
+        if (!sku) {
+            badge.className = 'badge bg-secondary-subtle text-secondary border stock-badge';
+            badge.textContent = 'Chưa chọn SKU';
+            return;
+        }
+
+        const avail = currentStockMap[sku] ?? 0;
+        const qty = parseFloat(qtyInput?.value) || 0;
+
+        if (avail <= 0) {
+            badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle stock-badge';
+            badge.innerHTML = `<i class="fa-solid fa-circle-exclamation me-1"></i>Hết hàng (0)`;
+        } else if (qty > avail) {
+            badge.className = 'badge bg-danger text-white stock-badge';
+            badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i>Vượt tồn (${avail})`;
+            qtyInput?.classList.add('is-invalid');
+        } else {
+            badge.className = 'badge bg-success-subtle text-success border border-success-subtle stock-badge';
+            badge.innerHTML = `<i class="fa-solid fa-check me-1"></i>Khả dụng: <strong>${avail}</strong>`;
+            qtyInput?.classList.remove('is-invalid');
+        }
+    }
+
+    function updateAllStockBadges() {
+        document.querySelectorAll('#linesTableBody tr').forEach(updateStockBadgeForRow);
+    }
 
     function createRow(idx) {
         const tr = document.createElement('tr');
+        tr.className = 'transfer-row';
         tr.innerHTML = `
-            <td class="text-center">${idx}</td>
+            <td class="text-center idx">${idx}</td>
             <td>
-                <input list="sku-options-list" name="Form.Lines[${idx-1}].SkuId" class="form-control form-control-sm sku-select" placeholder="Mã SKU (tự nhập...)" />
+                <input list="sku-options-list" name="Form.Lines[${idx-1}].SkuId" class="form-control form-control-sm sku-select" placeholder="Chọn SKU..." required />
             </td>
-            <td><input name="Form.Lines[${idx-1}].ProductName" class="form-control form-control-sm product-name" /></td>
-            <td><input name="Form.Lines[${idx-1}].Unit" class="form-control form-control-sm unit" value="Cái" /></td>
-            <td><input name="Form.Lines[${idx-1}].DocumentQuantity" type="number" min="0" value="1" class="form-control form-control-sm" /></td>
-            <td><input name="Form.Lines[${idx-1}].Quantity" type="number" min="0" value="1" class="form-control form-control-sm qty" /></td>
-            <td><input name="Form.Lines[${idx-1}].BatchNumber" class="form-control form-control-sm" /></td>
+            <td><input name="Form.Lines[${idx-1}].ProductName" class="form-control form-control-sm product-name bg-light" readonly /></td>
+            <td><input name="Form.Lines[${idx-1}].Unit" class="form-control form-control-sm unit bg-light" value="Cái" readonly /></td>
+            <td><input name="Form.Lines[${idx-1}].DocumentQuantity" type="number" min="0" value="1" class="form-control form-control-sm text-end" /></td>
+            <td><input name="Form.Lines[${idx-1}].Quantity" type="number" min="1" value="1" class="form-control form-control-sm text-end qty fw-bold text-primary" required /></td>
+            <td class="text-center stock-badge-box">
+                <span class="badge bg-secondary-subtle text-secondary border stock-badge">Đang tra...</span>
+            </td>
+            <td><input name="Form.Lines[${idx-1}].BatchNumber" class="form-control form-control-sm" placeholder="Lô..." /></td>
             <td><input name="Form.Lines[${idx-1}].ExpiryDate" type="date" class="form-control form-control-sm" /></td>
-            <td><input name="Form.Lines[${idx-1}].UnitPrice" type="number" step="0.01" value="0" class="form-control form-control-sm price" /></td>
-            <td class="line-total">0</td>
-            <td class="text-center"><button type="button" class="btn btn-sm btn-danger remove-line">-</button></td>
+            <td><input name="Form.Lines[${idx-1}].UnitPrice" type="number" step="0.01" value="0" class="form-control form-control-sm text-end price" /></td>
+            <td class="text-end fw-semibold line-total">0</td>
+            <td class="text-center no-print">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-line btn-icon-only"><i class="fa-solid fa-trash-can"></i></button>
+            </td>
         `;
+        bindRowEvents(tr);
         return tr;
     }
 
-    
+    function bindRowEvents(row) {
+        const skuInput = row.querySelector('.sku-select');
+        const qtyInput = row.querySelector('.qty');
+        const priceInput = row.querySelector('.price');
+        const removeBtn = row.querySelector('.remove-line');
+
+        skuInput?.addEventListener('change', function () {
+            const val = this.value.trim();
+            const s = skus.find(x => x.SkuId.toLowerCase() === val.toLowerCase());
+            if (s) {
+                this.value = s.SkuId;
+                row.querySelector('.product-name').value = s.ProductName || '';
+                row.querySelector('.unit').value = s.Unit || 'Cái';
+            }
+            updateStockBadgeForRow(row);
+            recalc();
+        });
+
+        qtyInput?.addEventListener('input', function () {
+            updateStockBadgeForRow(row);
+            recalc();
+        });
+
+        priceInput?.addEventListener('input', recalc);
+
+        removeBtn?.addEventListener('click', function () {
+            row.remove();
+            updateIndexes();
+            recalc();
+        });
+    }
+
     function updateIndexes() {
-        const rows = document.querySelectorAll('#linesTable tbody tr');
+        const rows = document.querySelectorAll('#linesTableBody tr');
         rows.forEach((r, i) => {
-            r.querySelector('td:first-child').innerText = i + 1; // STT
-            const inputs = r.querySelectorAll('input, select');
-            inputs.forEach(inp => {
+            const idxCell = r.querySelector('.idx');
+            if (idxCell) idxCell.innerText = i + 1;
+            r.querySelectorAll('input, select').forEach(inp => {
                 if (inp.name) {
-                    inp.name = inp.name = inp.name.replace(/(Form\.)?Lines\[\d+\]/, `Form.Lines[${i}]`);
+                    inp.name = inp.name.replace(/(Form\.)?Lines\[\d+\]/, `Form.Lines[${i}]`);
                 }
             });
         });
     }
 
     function recalc() {
-        const rows = document.querySelectorAll('#linesTable tbody tr');
         let total = 0;
-        rows.forEach((r,i)=>{
-            const qty = parseFloat(r.querySelector('.qty').value) || 0;
-            const price = parseFloat(r.querySelector('.price').value) || 0;
+        document.querySelectorAll('#linesTableBody tr').forEach(r => {
+            const qty = parseFloat(r.querySelector('.qty')?.value) || 0;
+            const price = parseFloat(r.querySelector('.price')?.value) || 0;
             const lt = qty * price;
-            r.querySelector('.line-total').innerText = lt.toLocaleString();
+            const ltCell = r.querySelector('.line-total');
+            if (ltCell) ltCell.innerText = lt.toLocaleString();
             total += lt;
         });
-        document.getElementById('totalAmount').innerText = total.toLocaleString();
+        const totalElem = document.getElementById('totalAmount');
+        if (totalElem) totalElem.innerText = total.toLocaleString();
     }
 
-    document.getElementById('addLine').addEventListener('click', ()=>{
-        const tbody = document.querySelector('#linesTable tbody');
-        const idx = tbody.children.length + 1;
-        const row = createRow(idx);
-        tbody.appendChild(row);
-        row.querySelector('.sku-select').addEventListener('change', function(){
-            const s = skus.find(x => x.SkuId === this.value);
-            if (s) {
-                const r = this.closest('tr');
-                r.querySelector('.product-name').value = s.ProductName || '';
-                r.querySelector('.unit').value = s.Unit || 'Cái';
+    document.addEventListener('DOMContentLoaded', function () {
+        const srcSelect = document.getElementById('sourceWarehouseSelect');
+        const dstSelect = document.getElementById('destWarehouseSelect');
+        if (srcSelect && dstSelect && !isLockedMode && srcSelect.value && dstSelect.value === srcSelect.value) {
+            for (let opt of dstSelect.options) {
+                if (opt.value && opt.value !== srcSelect.value) {
+                    dstSelect.value = opt.value;
+                    break;
+                }
             }
-        });
-        row.querySelector('.qty').addEventListener('input', recalc);
-        row.querySelector('.price').addEventListener('input', recalc);
-        row.querySelector('.remove-line').addEventListener('click', function(){ this.closest('tr').remove(); updateIndexes(); recalc(); });
-    });
+        }
 
-    // add one row by default
-    document.getElementById('addLine').click();
+        srcSelect?.addEventListener('change', function () {
+            checkWarehouseConflict();
+            fetchWarehouseStock();
+        });
+
+        dstSelect?.addEventListener('change', checkWarehouseConflict);
+
+        checkWarehouseConflict();
+        fetchWarehouseStock();
+
+        if (!isLockedMode) {
+            document.querySelectorAll('#linesTableBody tr').forEach(bindRowEvents);
+
+            document.getElementById('addLine')?.addEventListener('click', function () {
+                const tbody = document.getElementById('linesTableBody');
+                const idx = tbody.children.length + 1;
+                const row = createRow(idx);
+                tbody.appendChild(row);
+                updateStockBadgeForRow(row);
+                row.querySelector('.sku-select')?.focus();
+            });
+
+            if (document.querySelectorAll('#linesTableBody tr').length === 0) {
+                document.getElementById('addLine')?.click();
+            }
+        }
+
+        recalc();
+    });
 </script>
 
 <style>
     @@media print {
-        .sidebar, .no-print, .btn { display:none !important; }
-        .invoice-root { margin:0; }
+        .sidebar, .main-header, .no-print, .btn { display:none !important; }
+        .invoice-root { margin:0; padding:0; }
+        .card { box-shadow: none !important; border: none !important; }
     }
 </style>

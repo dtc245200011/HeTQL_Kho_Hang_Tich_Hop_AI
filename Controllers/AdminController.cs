@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Authentication;
 
 namespace DuAnCode.Web.Controllers
 {
-    [Authorize(Roles = "Admin,Director")]
+    [Authorize(Roles = "Admin,Director,Quản trị viên,Giám đốc")]
     public class AdminController : Controller
     {
         private readonly ApplicationDbContext _db;
@@ -95,7 +95,43 @@ namespace DuAnCode.Web.Controllers
             catch { }
         }
 
-        // Helper to import entities from a JsonElement (used for rollback re-import)
+        // Helper to extract full database snapshot for backup
+        public static async Task<Dictionary<string, object?>> BuildExportDataAsync(ApplicationDbContext db)
+        {
+            var export = new Dictionary<string, object?>();
+            export["Users"] = await db.Users.AsNoTracking().ToListAsync();
+            export["Roles"] = await db.Roles.AsNoTracking().ToListAsync();
+            export["UserRoles"] = await db.Set<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>().AsNoTracking().ToListAsync();
+            export["Warehouses"] = await db.Warehouses.AsNoTracking().ToListAsync();
+            export["Suppliers"] = await db.Suppliers.AsNoTracking().ToListAsync();
+            export["ProductModels"] = await db.ProductModels.AsNoTracking().ToListAsync();
+            export["SkuVariants"] = await db.SkuVariants.AsNoTracking().ToListAsync();
+            export["StockLedgers"] = await db.StockLedgers.AsNoTracking().ToListAsync();
+            export["StockMovements"] = await db.StockMovements.AsNoTracking().ToListAsync();
+            export["InventoryVouchers"] = await db.InventoryVouchers.AsNoTracking().ToListAsync();
+            export["VoucherLines"] = await db.VoucherLines.AsNoTracking().ToListAsync();
+            export["AuditLogs"] = await db.AuditLogs.AsNoTracking().ToListAsync();
+            export["ComboProducts"] = await db.ComboProducts.AsNoTracking().ToListAsync();
+            export["BomComponents"] = await db.BomComponents.AsNoTracking().ToListAsync();
+            export["StockTransfers"] = await db.StockTransfers.AsNoTracking().ToListAsync();
+            export["StockTransferLines"] = await db.StockTransferLines.AsNoTracking().ToListAsync();
+            export["StockAdjustments"] = await db.StockAdjustments.AsNoTracking().ToListAsync();
+            export["DamagedRecords"] = await db.DamagedRecords.AsNoTracking().ToListAsync();
+            export["ApprovalSteps"] = await db.ApprovalSteps.AsNoTracking().ToListAsync();
+            export["AiSuggestions"] = await db.AiSuggestions.AsNoTracking().ToListAsync();
+            export["PurchaseOrders"] = await db.PurchaseOrders.AsNoTracking().ToListAsync();
+            export["PurchaseOrderLines"] = await db.PurchaseOrderLines.AsNoTracking().ToListAsync();
+            export["SalesOrders"] = await db.SalesOrders.AsNoTracking().ToListAsync();
+            export["SalesOrderLines"] = await db.SalesOrderLines.AsNoTracking().ToListAsync();
+            export["InventoryAudits"] = await db.InventoryAudits.AsNoTracking().ToListAsync();
+            export["InventoryAuditLines"] = await db.InventoryAuditLines.AsNoTracking().ToListAsync();
+            export["SystemConfigs"] = await db.SystemConfigs.AsNoTracking().ToListAsync();
+            return export;
+        }
+
+        private async Task<Dictionary<string, object?>> BuildExportDataAsync() => await BuildExportDataAsync(_db);
+
+        // Helper to import entities from a JsonElement (used for restore & rollback)
         private async Task ImportEntitiesFromDocumentAsync(System.Text.Json.JsonElement root)
         {
             // Roles
@@ -115,7 +151,23 @@ namespace DuAnCode.Web.Controllers
                 try
                 {
                     var users = System.Text.Json.JsonSerializer.Deserialize<List<User>>(usersEl.GetRawText());
-                    if (users != null && users.Any()) { await _db.Users.AddRangeAsync(users); await _db.SaveChangesAsync(); }
+                    if (users != null && users.Any())
+                    {
+                        var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<User>();
+                        foreach (var u in users)
+                        {
+                            if (string.IsNullOrEmpty(u.PasswordHash))
+                            {
+                                u.PasswordHash = hasher.HashPassword(u, "ChangeMe123!");
+                            }
+                            if (string.IsNullOrEmpty(u.SecurityStamp))
+                            {
+                                u.SecurityStamp = Guid.NewGuid().ToString();
+                            }
+                        }
+                        await _db.Users.AddRangeAsync(users);
+                        await _db.SaveChangesAsync();
+                    }
                 }
                 catch { }
             }
@@ -135,6 +187,12 @@ namespace DuAnCode.Web.Controllers
             if (root.TryGetProperty("Warehouses", out var whsEl))
             {
                 try { var whs = System.Text.Json.JsonSerializer.Deserialize<List<Warehouse>>(whsEl.GetRawText()); if (whs != null && whs.Any()) { await _db.Warehouses.AddRangeAsync(whs); await _db.SaveChangesAsync(); } } catch { }
+            }
+
+            // Suppliers
+            if (root.TryGetProperty("Suppliers", out var supEl))
+            {
+                try { var sups = System.Text.Json.JsonSerializer.Deserialize<List<Supplier>>(supEl.GetRawText()); if (sups != null && sups.Any()) { await _db.Suppliers.AddRangeAsync(sups); await _db.SaveChangesAsync(); } } catch { }
             }
 
             // ProductModels
@@ -158,7 +216,14 @@ namespace DuAnCode.Web.Controllers
             // StockMovements
             if (root.TryGetProperty("StockMovements", out var smEl))
             {
-                try { var sms = System.Text.Json.JsonSerializer.Deserialize<List<StockMovement>>(smEl.GetRawText()); if (sms != null && sms.Any()) { await _db.StockMovements.AddRangeAsync(sms); await _db.SaveChangesAsync(); } } catch { }
+                try {
+                    var sms = System.Text.Json.JsonSerializer.Deserialize<List<StockMovement>>(smEl.GetRawText());
+                    if (sms != null && sms.Any()) {
+                        foreach (var m in sms) m.MovementId = 0;
+                        await _db.StockMovements.AddRangeAsync(sms);
+                        await _db.SaveChangesAsync();
+                    }
+                } catch { }
             }
 
             // InventoryVouchers
@@ -170,20 +235,101 @@ namespace DuAnCode.Web.Controllers
             // VoucherLines
             if (root.TryGetProperty("VoucherLines", out var vlEl))
             {
-                try { var vls = System.Text.Json.JsonSerializer.Deserialize<List<VoucherLine>>(vlEl.GetRawText()); if (vls != null && vls.Any()) { await _db.VoucherLines.AddRangeAsync(vls); await _db.SaveChangesAsync(); } } catch { }
+                try {
+                    var vls = System.Text.Json.JsonSerializer.Deserialize<List<VoucherLine>>(vlEl.GetRawText());
+                    if (vls != null && vls.Any()) {
+                        foreach (var l in vls) l.Id = 0;
+                        await _db.VoucherLines.AddRangeAsync(vls);
+                        await _db.SaveChangesAsync();
+                    }
+                } catch { }
             }
 
-            // AiSuggestions
-            if (root.TryGetProperty("AiSuggestions", out var aiEl))
-            {
-                try { var ais = System.Text.Json.JsonSerializer.Deserialize<List<AiSuggestion>>(aiEl.GetRawText()); if (ais != null && ais.Any()) { await _db.AiSuggestions.AddRangeAsync(ais); await _db.SaveChangesAsync(); } } catch { }
+            // PurchaseOrders & Lines
+            if (root.TryGetProperty("PurchaseOrders", out var poEl)) { try { var pos = System.Text.Json.JsonSerializer.Deserialize<List<PurchaseOrder>>(poEl.GetRawText()); if (pos != null && pos.Any()) { await _db.PurchaseOrders.AddRangeAsync(pos); await _db.SaveChangesAsync(); } } catch { } }
+            if (root.TryGetProperty("PurchaseOrderLines", out var polEl)) {
+                try {
+                    var pols = System.Text.Json.JsonSerializer.Deserialize<List<PurchaseOrderLine>>(polEl.GetRawText());
+                    if (pols != null && pols.Any()) {
+                        foreach (var l in pols) l.Id = 0;
+                        await _db.PurchaseOrderLines.AddRangeAsync(pols);
+                        await _db.SaveChangesAsync();
+                    }
+                } catch { }
             }
 
-            // AuditLogs
-            if (root.TryGetProperty("AuditLogs", out var alEl))
-            {
-                try { var als = System.Text.Json.JsonSerializer.Deserialize<List<AuditLog>>(alEl.GetRawText()); if (als != null && als.Any()) { await _db.AuditLogs.AddRangeAsync(als); await _db.SaveChangesAsync(); } } catch { }
+            // SalesOrders & Lines
+            if (root.TryGetProperty("SalesOrders", out var soEl)) { try { var sos = System.Text.Json.JsonSerializer.Deserialize<List<SalesOrder>>(soEl.GetRawText()); if (sos != null && sos.Any()) { await _db.SalesOrders.AddRangeAsync(sos); await _db.SaveChangesAsync(); } } catch { } }
+            if (root.TryGetProperty("SalesOrderLines", out var solEl)) {
+                try {
+                    var sols = System.Text.Json.JsonSerializer.Deserialize<List<SalesOrderLine>>(solEl.GetRawText());
+                    if (sols != null && sols.Any()) {
+                        foreach (var l in sols) l.LineId = 0;
+                        await _db.SalesOrderLines.AddRangeAsync(sols);
+                        await _db.SaveChangesAsync();
+                    }
+                } catch { }
             }
+
+            // ComboProducts & BomComponents
+            if (root.TryGetProperty("ComboProducts", out var cpEl)) { try { var cps = System.Text.Json.JsonSerializer.Deserialize<List<ComboProduct>>(cpEl.GetRawText()); if (cps != null && cps.Any()) { await _db.ComboProducts.AddRangeAsync(cps); await _db.SaveChangesAsync(); } } catch { } }
+            if (root.TryGetProperty("BomComponents", out var bcEl)) {
+                try {
+                    var bcs = System.Text.Json.JsonSerializer.Deserialize<List<BomComponent>>(bcEl.GetRawText());
+                    if (bcs != null && bcs.Any()) {
+                        foreach (var l in bcs) l.Id = 0;
+                        await _db.BomComponents.AddRangeAsync(bcs);
+                        await _db.SaveChangesAsync();
+                    }
+                } catch { }
+            }
+
+            // StockTransfers & Lines
+            if (root.TryGetProperty("StockTransfers", out var stEl)) { try { var sts = System.Text.Json.JsonSerializer.Deserialize<List<StockTransfer>>(stEl.GetRawText()); if (sts != null && sts.Any()) { await _db.StockTransfers.AddRangeAsync(sts); await _db.SaveChangesAsync(); } } catch { } }
+            if (root.TryGetProperty("StockTransferLines", out var stlEl)) {
+                try {
+                    var stls = System.Text.Json.JsonSerializer.Deserialize<List<StockTransferLine>>(stlEl.GetRawText());
+                    if (stls != null && stls.Any()) {
+                        foreach (var l in stls) l.Id = 0;
+                        await _db.StockTransferLines.AddRangeAsync(stls);
+                        await _db.SaveChangesAsync();
+                    }
+                } catch { }
+            }
+
+            // StockAdjustments & DamagedRecords & ApprovalSteps
+            if (root.TryGetProperty("StockAdjustments", out var saEl)) { try { var sas = System.Text.Json.JsonSerializer.Deserialize<List<StockAdjustment>>(saEl.GetRawText()); if (sas != null && sas.Any()) { await _db.StockAdjustments.AddRangeAsync(sas); await _db.SaveChangesAsync(); } } catch { } }
+            if (root.TryGetProperty("DamagedRecords", out var drEl)) { try { var drs = System.Text.Json.JsonSerializer.Deserialize<List<DamagedRecord>>(drEl.GetRawText()); if (drs != null && drs.Any()) { await _db.DamagedRecords.AddRangeAsync(drs); await _db.SaveChangesAsync(); } } catch { } }
+            if (root.TryGetProperty("ApprovalSteps", out var apEl)) { try { var aps = System.Text.Json.JsonSerializer.Deserialize<List<ApprovalStep>>(apEl.GetRawText()); if (aps != null && aps.Any()) { await _db.ApprovalSteps.AddRangeAsync(aps); await _db.SaveChangesAsync(); } } catch { } }
+
+            // InventoryAudits & InventoryAuditLines
+            if (root.TryGetProperty("InventoryAudits", out var iaEl)) { try { var ias = System.Text.Json.JsonSerializer.Deserialize<List<InventoryAudit>>(iaEl.GetRawText()); if (ias != null && ias.Any()) { await _db.InventoryAudits.AddRangeAsync(ias); await _db.SaveChangesAsync(); } } catch { } }
+            if (root.TryGetProperty("InventoryAuditLines", out var ialEl)) {
+                try {
+                    var ials = System.Text.Json.JsonSerializer.Deserialize<List<InventoryAuditLine>>(ialEl.GetRawText());
+                    if (ials != null && ials.Any()) {
+                        foreach (var l in ials) l.Id = 0;
+                        await _db.InventoryAuditLines.AddRangeAsync(ials);
+                        await _db.SaveChangesAsync();
+                    }
+                } catch { }
+            }
+
+            // SystemConfigs
+            if (root.TryGetProperty("SystemConfigs", out var scEl)) {
+                try {
+                    var scs = System.Text.Json.JsonSerializer.Deserialize<List<SystemConfig>>(scEl.GetRawText());
+                    if (scs != null && scs.Any()) {
+                        foreach (var s in scs) s.Id = 0;
+                        await _db.SystemConfigs.AddRangeAsync(scs);
+                        await _db.SaveChangesAsync();
+                    }
+                } catch { }
+            }
+
+            // AiSuggestions & AuditLogs
+            if (root.TryGetProperty("AiSuggestions", out var aiEl)) { try { var ais = System.Text.Json.JsonSerializer.Deserialize<List<AiSuggestion>>(aiEl.GetRawText()); if (ais != null && ais.Any()) { await _db.AiSuggestions.AddRangeAsync(ais); await _db.SaveChangesAsync(); } } catch { } }
+            if (root.TryGetProperty("AuditLogs", out var alEl)) { try { var als = System.Text.Json.JsonSerializer.Deserialize<List<AuditLog>>(alEl.GetRawText()); if (als != null && als.Any()) { await _db.AuditLogs.AddRangeAsync(als); await _db.SaveChangesAsync(); } } catch { } }
         }
 
         public async Task<IActionResult> Index()
@@ -235,12 +381,12 @@ namespace DuAnCode.Web.Controllers
                     Email = u.Email ?? string.Empty,
                     FullName = u.FullName ?? string.Empty,
                     PhoneNumber = u.PhoneNumber ?? string.Empty,
-                    Roles = string.Join(", ", roles),
+                    Roles = DuAnCode.Web.Services.RoleHelper.ToVietnameseList(string.Join(", ", roles)),
                     IsLockedOut = u.LockoutEnd != null && u.LockoutEnd > DateTimeOffset.UtcNow
                 });
             }
-            // also supply available roles
-            ViewBag.AvailableRoles = await _roleManager.Roles.Select(r => r.Name).ToListAsync();
+            // supply available roles in Vietnamese
+            ViewBag.AvailableRoles = DuAnCode.Web.Services.RoleHelper.AllVietnameseRoles;
             ViewBag.TotalUsers = await _db.Users.CountAsync();
             ViewBag.CurrentUserId = _userManager.GetUserId(User);
             // find current admin id if any
@@ -259,7 +405,8 @@ namespace DuAnCode.Web.Controllers
             }
 
             // enforce single admin rule
-            if (!string.IsNullOrWhiteSpace(role) && role == "Admin")
+            bool isNewAdmin = !string.IsNullOrWhiteSpace(role) && (role == "Admin" || role == DuAnCode.Web.Services.RoleHelper.Admin);
+            if (isNewAdmin)
             {
                 var existingAdmins = await _userManager.GetUsersInRoleAsync("Admin");
                 var existing = existingAdmins.FirstOrDefault();
@@ -279,11 +426,14 @@ namespace DuAnCode.Web.Controllers
                 return Json(new { success = false, message = string.Join("; ", res.Errors.Select(e => e.Description)) });
             }
 
-            if (!string.IsNullOrWhiteSpace(role) && await _roleManager.RoleExistsAsync(role))
+            if (!string.IsNullOrWhiteSpace(role))
             {
-                await _userManager.AddToRoleAsync(user, role);
+                var vnRole = DuAnCode.Web.Services.RoleHelper.ToVietnamese(role);
+                var enRole = DuAnCode.Web.Services.RoleHelper.ToEnglish(role);
+                if (await _roleManager.RoleExistsAsync(vnRole)) await _userManager.AddToRoleAsync(user, vnRole);
+                if (await _roleManager.RoleExistsAsync(enRole) && enRole != vnRole) await _userManager.AddToRoleAsync(user, enRole);
 
-                if (role == "Admin")
+                if (isNewAdmin)
                 {
                     // if there was an old admin and confirm=true, delete old admin
                     var existingAdmins = await _userManager.GetUsersInRoleAsync("Admin");
@@ -316,16 +466,17 @@ namespace DuAnCode.Web.Controllers
             if (totalUsers <= 1)
             {
                 // ensure sole user is Admin
-                if (!await _userManager.IsInRoleAsync(user, "Admin"))
+                if (!await _userManager.IsInRoleAsync(user, "Admin") && !await _userManager.IsInRoleAsync(user, DuAnCode.Web.Services.RoleHelper.Admin))
                 {
-                    var resAdd = await _userManager.AddToRoleAsync(user, "Admin");
-                    if (!resAdd.Succeeded) return Json(new { success = false, message = "Cannot promote sole user to Admin" });
+                    await _userManager.AddToRoleAsync(user, "Admin");
+                    await _userManager.AddToRoleAsync(user, DuAnCode.Web.Services.RoleHelper.Admin);
                 }
                 return Json(new { success = false, message = "Operation blocked: only one user exists; role must be Admin" });
             }
 
             // if promoting to Admin, and existing admin exists
-            if (!string.IsNullOrWhiteSpace(role) && role == "Admin")
+            bool isTargetAdmin = !string.IsNullOrWhiteSpace(role) && (role == "Admin" || role == DuAnCode.Web.Services.RoleHelper.Admin);
+            if (isTargetAdmin)
             {
                 var existingAdmins = await _userManager.GetUsersInRoleAsync("Admin");
                 var existing = existingAdmins.FirstOrDefault();
@@ -333,16 +484,17 @@ namespace DuAnCode.Web.Controllers
                 {
                     if (!confirm)
                     {
-                        return Json(new { success = false, requiresConfirmation = true, message = "System already has an Admin. Confirm to replace and delete old Admin.", oldAdminId = existing.Id, oldAdminUser = existing.UserName });
+                        return Json(new { success = false, requiresConfirmation = true, message = "Hệ thống đã có Quản trị viên (Admin). Xác nhận để thay thế và xóa Admin cũ.", oldAdminId = existing.Id, oldAdminUser = existing.UserName });
                     }
 
                     // confirmed: delete old admin
                     var delRes = await _userManager.DeleteAsync(existing);
-                    if (!delRes.Succeeded) return Json(new { success = false, message = "Failed to remove old admin" });
+                    if (!delRes.Succeeded) return Json(new { success = false, message = "Không thể xóa Admin cũ" });
                     if (_userManager.GetUserId(User) == existing.Id)
                     {
                         // current user deleted -> force logout
                         await _userManager.AddToRoleAsync(user, "Admin");
+                        await _userManager.AddToRoleAsync(user, DuAnCode.Web.Services.RoleHelper.Admin);
                         return Json(new { success = true, logout = true, redirect = Url.Action("Logout", "Account") });
                     }
                 }
@@ -351,9 +503,12 @@ namespace DuAnCode.Web.Controllers
             // remove existing roles and add new one
             var current = await _userManager.GetRolesAsync(user);
             await _userManager.RemoveFromRolesAsync(user, current);
-            if (!string.IsNullOrWhiteSpace(role) && await _roleManager.RoleExistsAsync(role))
+            if (!string.IsNullOrWhiteSpace(role))
             {
-                await _userManager.AddToRoleAsync(user, role);
+                var vnRole = DuAnCode.Web.Services.RoleHelper.ToVietnamese(role);
+                var enRole = DuAnCode.Web.Services.RoleHelper.ToEnglish(role);
+                if (await _roleManager.RoleExistsAsync(vnRole)) await _userManager.AddToRoleAsync(user, vnRole);
+                if (await _roleManager.RoleExistsAsync(enRole) && enRole != vnRole) await _userManager.AddToRoleAsync(user, enRole);
             }
             return Json(new { success = true });
         }
@@ -375,7 +530,7 @@ namespace DuAnCode.Web.Controllers
                 return Json(new { success = false, message = "Cannot delete your own account." });
             }
             // New rule: Never allow deleting an account that currently has Admin role
-            if (await _userManager.IsInRoleAsync(user, "Admin"))
+            if (await _userManager.IsInRoleAsync(user, "Admin") || await _userManager.IsInRoleAsync(user, DuAnCode.Web.Services.RoleHelper.Admin))
             {
                 // record a friendly message for full-page flows and also return JSON for AJAX
                 TempData["Error"] = "Không thể xóa tài khoản Quản trị viên (Admin) để đảm bảo an toàn hệ thống!";
@@ -560,7 +715,16 @@ namespace DuAnCode.Web.Controllers
                             OllamaModel NVARCHAR(100) NOT NULL DEFAULT 'llama3',
                             AiScanIntervalMinutes INT NOT NULL DEFAULT 30,
                             DefaultLanguage NVARCHAR(50) NOT NULL DEFAULT 'vi-VN',
-                            CurrencyFormat NVARCHAR(50) NOT NULL DEFAULT 'VND'
+                            CurrencyFormat NVARCHAR(50) NOT NULL DEFAULT 'VND',
+                            EnableMultiLevelApproval BIT NOT NULL DEFAULT 1,
+                            OutboundDirectorApprovalThreshold DECIMAL(18,2) NOT NULL DEFAULT 100000000,
+                            InboundRequireApproval BIT NOT NULL DEFAULT 1,
+                            TransferRequireApproval BIT NOT NULL DEFAULT 1,
+                            ApprovalRoleLevel1 NVARCHAR(50) NOT NULL DEFAULT 'Accountant',
+                            ApprovalRoleLevel2 NVARCHAR(50) NOT NULL DEFAULT 'WarehouseManager',
+                            ApprovalRoleLevel3 NVARCHAR(50) NOT NULL DEFAULT 'Director',
+                            AutoApproveLowValueOutbound BIT NOT NULL DEFAULT 0,
+                            AutoApproveThreshold DECIMAL(18,2) NOT NULL DEFAULT 0
                         );
                     END
                     ELSE
@@ -597,6 +761,19 @@ namespace DuAnCode.Web.Controllers
                             ALTER TABLE SystemConfigs ADD 
                                 AiScanIntervalMinutes INT NOT NULL DEFAULT 30;
                         END
+                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE Name = N'EnableMultiLevelApproval' AND Object_ID = Object_ID(N'SystemConfigs'))
+                        BEGIN
+                            ALTER TABLE SystemConfigs ADD 
+                                EnableMultiLevelApproval BIT NOT NULL DEFAULT 1,
+                                OutboundDirectorApprovalThreshold DECIMAL(18,2) NOT NULL DEFAULT 100000000,
+                                InboundRequireApproval BIT NOT NULL DEFAULT 1,
+                                TransferRequireApproval BIT NOT NULL DEFAULT 1,
+                                ApprovalRoleLevel1 NVARCHAR(50) NOT NULL DEFAULT 'Accountant',
+                                ApprovalRoleLevel2 NVARCHAR(50) NOT NULL DEFAULT 'WarehouseManager',
+                                ApprovalRoleLevel3 NVARCHAR(50) NOT NULL DEFAULT 'Director',
+                                AutoApproveLowValueOutbound BIT NOT NULL DEFAULT 0,
+                                AutoApproveThreshold DECIMAL(18,2) NOT NULL DEFAULT 0;
+                        END
                     END
                 ");
             }
@@ -615,6 +792,10 @@ namespace DuAnCode.Web.Controllers
                 if (existing == null)
                 {
                     if (model.AiScanIntervalMinutes <= 0) model.AiScanIntervalMinutes = 30;
+                    if (model.OutboundDirectorApprovalThreshold <= 0) model.OutboundDirectorApprovalThreshold = 100000000M;
+                    if (string.IsNullOrWhiteSpace(model.ApprovalRoleLevel1)) model.ApprovalRoleLevel1 = "Accountant";
+                    if (string.IsNullOrWhiteSpace(model.ApprovalRoleLevel2)) model.ApprovalRoleLevel2 = "WarehouseManager";
+                    if (string.IsNullOrWhiteSpace(model.ApprovalRoleLevel3)) model.ApprovalRoleLevel3 = "Director";
                     _db.SystemConfigs.Add(model);
                 }
                 else
@@ -647,6 +828,17 @@ namespace DuAnCode.Web.Controllers
                     existing.AiScanIntervalMinutes = model.AiScanIntervalMinutes > 0 ? model.AiScanIntervalMinutes : 30;
                     existing.DefaultLanguage = model.DefaultLanguage ?? "vi-VN";
                     existing.CurrencyFormat = model.CurrencyFormat ?? "VND";
+
+                    // Approval Workflow Fields
+                    existing.EnableMultiLevelApproval = model.EnableMultiLevelApproval;
+                    existing.OutboundDirectorApprovalThreshold = model.OutboundDirectorApprovalThreshold > 0 ? model.OutboundDirectorApprovalThreshold : 100000000M;
+                    existing.InboundRequireApproval = model.InboundRequireApproval;
+                    existing.TransferRequireApproval = model.TransferRequireApproval;
+                    existing.ApprovalRoleLevel1 = string.IsNullOrWhiteSpace(model.ApprovalRoleLevel1) ? "Accountant" : model.ApprovalRoleLevel1;
+                    existing.ApprovalRoleLevel2 = string.IsNullOrWhiteSpace(model.ApprovalRoleLevel2) ? "WarehouseManager" : model.ApprovalRoleLevel2;
+                    existing.ApprovalRoleLevel3 = string.IsNullOrWhiteSpace(model.ApprovalRoleLevel3) ? "Director" : model.ApprovalRoleLevel3;
+                    existing.AutoApproveLowValueOutbound = model.AutoApproveLowValueOutbound;
+                    existing.AutoApproveThreshold = model.AutoApproveThreshold;
                 }
 
                 await _db.SaveChangesAsync();
@@ -734,6 +926,12 @@ namespace DuAnCode.Web.Controllers
         }
 
         [HttpGet]
+        public IActionResult ExportData()
+        {
+            return RedirectToAction("Backup");
+        }
+
+        [HttpGet]
         public IActionResult Backup()
         {
             var backups = new List<dynamic>();
@@ -759,36 +957,12 @@ namespace DuAnCode.Web.Controllers
                 var fileName = $"backup_{DateTime.UtcNow:yyyyMMddHHmmss}.json";
                 var path = Path.Combine(dir, fileName);
 
-                var export = new Dictionary<string, object?>();
-                export["Users"] = await _db.Users.AsNoTracking().ToListAsync();
-                export["Roles"] = await _db.Roles.AsNoTracking().ToListAsync();
-                export["UserRoles"] = await _db.Set<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>().AsNoTracking().ToListAsync();
-                export["Warehouses"] = await _db.Warehouses.AsNoTracking().ToListAsync();
-                export["ProductModels"] = await _db.ProductModels.AsNoTracking().ToListAsync();
-                export["SkuVariants"] = await _db.SkuVariants.AsNoTracking().ToListAsync();
-                export["StockLedgers"] = await _db.StockLedgers.AsNoTracking().ToListAsync();
-                export["StockMovements"] = await _db.StockMovements.AsNoTracking().ToListAsync();
-                export["InventoryVouchers"] = await _db.InventoryVouchers.AsNoTracking().ToListAsync();
-                export["VoucherLines"] = await _db.VoucherLines.AsNoTracking().ToListAsync();
-                export["AuditLogs"] = await _db.AuditLogs.AsNoTracking().ToListAsync();
-                export["ComboProducts"] = await _db.ComboProducts.AsNoTracking().ToListAsync();
-                export["BomComponents"] = await _db.BomComponents.AsNoTracking().ToListAsync();
-                export["StockTransfers"] = await _db.StockTransfers.AsNoTracking().ToListAsync();
-                export["StockTransferLines"] = await _db.StockTransferLines.AsNoTracking().ToListAsync();
-                export["StockAdjustments"] = await _db.StockAdjustments.AsNoTracking().ToListAsync();
-                export["DamagedRecords"] = await _db.DamagedRecords.AsNoTracking().ToListAsync();
-                export["ApprovalSteps"] = await _db.ApprovalSteps.AsNoTracking().ToListAsync();
-                export["AiSuggestions"] = await _db.AiSuggestions.AsNoTracking().ToListAsync();
-                export["PurchaseOrders"] = await _db.PurchaseOrders.AsNoTracking().ToListAsync();
-                export["PurchaseOrderLines"] = await _db.PurchaseOrderLines.AsNoTracking().ToListAsync();
-                export["SalesOrders"] = await _db.SalesOrders.AsNoTracking().ToListAsync();
-                export["SalesOrderLines"] = await _db.SalesOrderLines.AsNoTracking().ToListAsync();
-
+                var export = await BuildExportDataAsync();
                 var jsonOptions = new System.Text.Json.JsonSerializerOptions { WriteIndented = true, ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles };
                 var json = System.Text.Json.JsonSerializer.Serialize(export, jsonOptions);
                 await System.IO.File.WriteAllTextAsync(path, json);
 
-                TempData["Message"] = "Backup completed.";
+                TempData["Message"] = "Đã sao lưu dữ liệu toàn hệ thống thành công.";
                 return RedirectToAction("Backup");
             }
             catch (Exception ex)
@@ -809,31 +983,7 @@ namespace DuAnCode.Web.Controllers
                 var fileName = $"backup_{DateTime.UtcNow:yyyyMMddHHmmss}.json";
                 var path = Path.Combine(dir, fileName);
 
-                var export = new Dictionary<string, object?>();
-                export["Users"] = await _db.Users.AsNoTracking().ToListAsync();
-                export["Roles"] = await _db.Roles.AsNoTracking().ToListAsync();
-                export["UserRoles"] = await _db.Set<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>().AsNoTracking().ToListAsync();
-                export["Warehouses"] = await _db.Warehouses.AsNoTracking().ToListAsync();
-                export["ProductModels"] = await _db.ProductModels.AsNoTracking().ToListAsync();
-                export["SkuVariants"] = await _db.SkuVariants.AsNoTracking().ToListAsync();
-                export["StockLedgers"] = await _db.StockLedgers.AsNoTracking().ToListAsync();
-                export["StockMovements"] = await _db.StockMovements.AsNoTracking().ToListAsync();
-                export["InventoryVouchers"] = await _db.InventoryVouchers.AsNoTracking().ToListAsync();
-                export["VoucherLines"] = await _db.VoucherLines.AsNoTracking().ToListAsync();
-                export["AuditLogs"] = await _db.AuditLogs.AsNoTracking().ToListAsync();
-                export["ComboProducts"] = await _db.ComboProducts.AsNoTracking().ToListAsync();
-                export["BomComponents"] = await _db.BomComponents.AsNoTracking().ToListAsync();
-                export["StockTransfers"] = await _db.StockTransfers.AsNoTracking().ToListAsync();
-                export["StockTransferLines"] = await _db.StockTransferLines.AsNoTracking().ToListAsync();
-                export["StockAdjustments"] = await _db.StockAdjustments.AsNoTracking().ToListAsync();
-                export["DamagedRecords"] = await _db.DamagedRecords.AsNoTracking().ToListAsync();
-                export["ApprovalSteps"] = await _db.ApprovalSteps.AsNoTracking().ToListAsync();
-                export["AiSuggestions"] = await _db.AiSuggestions.AsNoTracking().ToListAsync();
-                export["PurchaseOrders"] = await _db.PurchaseOrders.AsNoTracking().ToListAsync();
-                export["PurchaseOrderLines"] = await _db.PurchaseOrderLines.AsNoTracking().ToListAsync();
-                export["SalesOrders"] = await _db.SalesOrders.AsNoTracking().ToListAsync();
-                export["SalesOrderLines"] = await _db.SalesOrderLines.AsNoTracking().ToListAsync();
-
+                var export = await BuildExportDataAsync();
                 var jsonOptions = new System.Text.Json.JsonSerializerOptions { WriteIndented = true, ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles };
                 var json = System.Text.Json.JsonSerializer.Serialize(export, jsonOptions);
                 await System.IO.File.WriteAllTextAsync(path, json);
@@ -958,18 +1108,7 @@ namespace DuAnCode.Web.Controllers
             var tempBackupPath = Path.Combine(backupsDir, "temp_snap.json");
             try
             {
-                var snapshot = new Dictionary<string, object?>();
-                snapshot["Users"] = await _db.Users.AsNoTracking().ToListAsync();
-                snapshot["Roles"] = await _db.Roles.AsNoTracking().ToListAsync();
-                snapshot["UserRoles"] = await _db.Set<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>().AsNoTracking().ToListAsync();
-                snapshot["Warehouses"] = await _db.Warehouses.AsNoTracking().ToListAsync();
-                snapshot["ProductModels"] = await _db.ProductModels.AsNoTracking().ToListAsync();
-                snapshot["SkuVariants"] = await _db.SkuVariants.AsNoTracking().ToListAsync();
-                snapshot["StockLedgers"] = await _db.StockLedgers.AsNoTracking().ToListAsync();
-                snapshot["StockMovements"] = await _db.StockMovements.AsNoTracking().ToListAsync();
-                snapshot["InventoryVouchers"] = await _db.InventoryVouchers.AsNoTracking().ToListAsync();
-                snapshot["VoucherLines"] = await _db.VoucherLines.AsNoTracking().ToListAsync();
-                snapshot["AuditLogs"] = await _db.AuditLogs.AsNoTracking().ToListAsync();
+                var snapshot = await BuildExportDataAsync();
                 var opts = new System.Text.Json.JsonSerializerOptions { WriteIndented = true, ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles };
                 var snapJson = System.Text.Json.JsonSerializer.Serialize(snapshot, opts);
                 await System.IO.File.WriteAllTextAsync(tempBackupPath, snapJson);
@@ -1027,12 +1166,12 @@ namespace DuAnCode.Web.Controllers
                 using var transaction = await _db.Database.BeginTransactionAsync();
                 try
                 {
-                    // Delete child tables first to respect FKs
+                    // Delete child tables first to respect foreign keys
                     var deleteOrder = new[] {
+                        "InventoryAuditLines",
+                        "InventoryAudits",
                         "VoucherLines",
                         "InventoryVouchers",
-                        "VoucherLines",
-                        "VoucherLines",
                         "AuditLogs",
                         "StockMovements",
                         "StockLedgers",
@@ -1042,7 +1181,6 @@ namespace DuAnCode.Web.Controllers
                         "PurchaseOrders",
                         "SalesOrderLines",
                         "SalesOrders",
-                        "VoucherLines",
                         "StockAdjustments",
                         "DamagedRecords",
                         "ApprovalSteps",
@@ -1053,6 +1191,7 @@ namespace DuAnCode.Web.Controllers
                         "ProductModels",
                         "Suppliers",
                         "Warehouses",
+                        "SystemConfigs"
                     };
                     foreach (var t in deleteOrder)
                     {
@@ -1070,117 +1209,8 @@ namespace DuAnCode.Web.Controllers
 
                     await _db.SaveChangesAsync();
 
-                    // Import entities from JSON if present
-                    // Roles
-                    if (doc.RootElement.TryGetProperty("Roles", out var rolesEl))
-                    {
-                        try
-                        {
-                            var roles = System.Text.Json.JsonSerializer.Deserialize<List<Role>>(rolesEl.GetRawText());
-                            if (roles != null && roles.Any()) { await _db.Roles.AddRangeAsync(roles); await _db.SaveChangesAsync(); }
-                        }
-                        catch { }
-                    }
-
-                    // Users
-                    if (doc.RootElement.TryGetProperty("Users", out var usersEl))
-                    {
-                        try
-                        {
-                            var users = System.Text.Json.JsonSerializer.Deserialize<List<User>>(usersEl.GetRawText());
-                            if (users != null && users.Any()) 
-                            { 
-                                var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<User>();
-                                foreach(var u in users)
-                                {
-                                    if (string.IsNullOrEmpty(u.PasswordHash))
-                                    {
-                                        u.PasswordHash = hasher.HashPassword(u, "ChangeMe123!");
-                                    }
-                                    if (string.IsNullOrEmpty(u.SecurityStamp))
-                                    {
-                                        u.SecurityStamp = Guid.NewGuid().ToString();
-                                    }
-                                }
-                                await _db.Users.AddRangeAsync(users); 
-                                await _db.SaveChangesAsync(); 
-                            }
-                        }
-                        catch { }
-                    }
-
-                    // UserRoles
-                    if (doc.RootElement.TryGetProperty("UserRoles", out var urEl))
-                    {
-                        try
-                        {
-                            var urs = System.Text.Json.JsonSerializer.Deserialize<List<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>>(urEl.GetRawText());
-                            if (urs != null && urs.Any()) { await _db.Set<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>().AddRangeAsync(urs); await _db.SaveChangesAsync(); }
-                        }
-                        catch { }
-                    }
-
-                    // Warehouses
-                    if (doc.RootElement.TryGetProperty("Warehouses", out var whsEl))
-                    {
-                        try { var whs = System.Text.Json.JsonSerializer.Deserialize<List<Warehouse>>(whsEl.GetRawText()); if (whs != null && whs.Any()) { await _db.Warehouses.AddRangeAsync(whs); await _db.SaveChangesAsync(); } } catch { }
-                    }
-
-                    // ProductModels
-                    if (doc.RootElement.TryGetProperty("ProductModels", out var pmEl))
-                    {
-                        try { var pms = System.Text.Json.JsonSerializer.Deserialize<List<ProductModel>>(pmEl.GetRawText()); if (pms != null && pms.Any()) { await _db.ProductModels.AddRangeAsync(pms); await _db.SaveChangesAsync(); } } catch { }
-                    }
-
-                    // SkuVariants
-                    if (doc.RootElement.TryGetProperty("SkuVariants", out var skEl))
-                    {
-                        try { var sks = System.Text.Json.JsonSerializer.Deserialize<List<SkuVariant>>(skEl.GetRawText()); if (sks != null && sks.Any()) { await _db.SkuVariants.AddRangeAsync(sks); await _db.SaveChangesAsync(); } } catch { }
-                    }
-
-                    // StockLedgers
-                    if (doc.RootElement.TryGetProperty("StockLedgers", out var slEl))
-                    {
-                        try { var sls = System.Text.Json.JsonSerializer.Deserialize<List<StockLedger>>(slEl.GetRawText()); if (sls != null && sls.Any()) { await _db.StockLedgers.AddRangeAsync(sls); await _db.SaveChangesAsync(); } } catch { }
-                    }
-
-                    // StockMovements
-                    if (doc.RootElement.TryGetProperty("StockMovements", out var smEl))
-                    {
-                        try { var sms = System.Text.Json.JsonSerializer.Deserialize<List<StockMovement>>(smEl.GetRawText()); if (sms != null && sms.Any()) { await _db.StockMovements.AddRangeAsync(sms); await _db.SaveChangesAsync(); } } catch { }
-                    }
-
-                    // InventoryVouchers
-                    if (doc.RootElement.TryGetProperty("InventoryVouchers", out var ivEl))
-                    {
-                        try { var ivs = System.Text.Json.JsonSerializer.Deserialize<List<InventoryVoucher>>(ivEl.GetRawText()); if (ivs != null && ivs.Any()) { await _db.InventoryVouchers.AddRangeAsync(ivs); await _db.SaveChangesAsync(); } } catch { }
-                    }
-
-                    // VoucherLines
-                    if (doc.RootElement.TryGetProperty("VoucherLines", out var vlEl))
-                    {
-                        try { var vls = System.Text.Json.JsonSerializer.Deserialize<List<VoucherLine>>(vlEl.GetRawText()); if (vls != null && vls.Any()) { await _db.VoucherLines.AddRangeAsync(vls); await _db.SaveChangesAsync(); } } catch { }
-                    }
-
-                    // Other optional entities: PurchaseOrders, SalesOrders, Transfers, etc.
-                    if (doc.RootElement.TryGetProperty("PurchaseOrders", out var poEl)) { try { var pos = System.Text.Json.JsonSerializer.Deserialize<List<PurchaseOrder>>(poEl.GetRawText()); if (pos != null && pos.Any()) { await _db.PurchaseOrders.AddRangeAsync(pos); await _db.SaveChangesAsync(); } } catch { } }
-                    if (doc.RootElement.TryGetProperty("PurchaseOrderLines", out var polEl)) { try { var pols = System.Text.Json.JsonSerializer.Deserialize<List<PurchaseOrderLine>>(polEl.GetRawText()); if (pols != null && pols.Any()) { await _db.PurchaseOrderLines.AddRangeAsync(pols); await _db.SaveChangesAsync(); } } catch { } }
-                    if (doc.RootElement.TryGetProperty("SalesOrders", out var soEl)) { try { var sos = System.Text.Json.JsonSerializer.Deserialize<List<SalesOrder>>(soEl.GetRawText()); if (sos != null && sos.Any()) { await _db.SalesOrders.AddRangeAsync(sos); await _db.SaveChangesAsync(); } } catch { } }
-                    if (doc.RootElement.TryGetProperty("SalesOrderLines", out var solEl)) { try { var sols = System.Text.Json.JsonSerializer.Deserialize<List<SalesOrderLine>>(solEl.GetRawText()); if (sols != null && sols.Any()) { await _db.SalesOrderLines.AddRangeAsync(sols); await _db.SaveChangesAsync(); } } catch { } }
-
-                    if (doc.RootElement.TryGetProperty("ComboProducts", out var cpEl)) { try { var cps = System.Text.Json.JsonSerializer.Deserialize<List<ComboProduct>>(cpEl.GetRawText()); if (cps != null && cps.Any()) { await _db.ComboProducts.AddRangeAsync(cps); await _db.SaveChangesAsync(); } } catch { } }
-                    if (doc.RootElement.TryGetProperty("BomComponents", out var bcEl)) { try { var bcs = System.Text.Json.JsonSerializer.Deserialize<List<BomComponent>>(bcEl.GetRawText()); if (bcs != null && bcs.Any()) { await _db.BomComponents.AddRangeAsync(bcs); await _db.SaveChangesAsync(); } } catch { } }
-
-                    if (doc.RootElement.TryGetProperty("StockTransfers", out var stEl)) { try { var sts = System.Text.Json.JsonSerializer.Deserialize<List<StockTransfer>>(stEl.GetRawText()); if (sts != null && sts.Any()) { await _db.StockTransfers.AddRangeAsync(sts); await _db.SaveChangesAsync(); } } catch { } }
-                    if (doc.RootElement.TryGetProperty("StockTransferLines", out var stlEl)) { try { var stls = System.Text.Json.JsonSerializer.Deserialize<List<StockTransferLine>>(stlEl.GetRawText()); if (stls != null && stls.Any()) { await _db.StockTransferLines.AddRangeAsync(stls); await _db.SaveChangesAsync(); } } catch { } }
-
-                    if (doc.RootElement.TryGetProperty("StockAdjustments", out var saEl)) { try { var sas = System.Text.Json.JsonSerializer.Deserialize<List<StockAdjustment>>(saEl.GetRawText()); if (sas != null && sas.Any()) { await _db.StockAdjustments.AddRangeAsync(sas); await _db.SaveChangesAsync(); } } catch { } }
-                    if (doc.RootElement.TryGetProperty("DamagedRecords", out var drEl)) { try { var drs = System.Text.Json.JsonSerializer.Deserialize<List<DamagedRecord>>(drEl.GetRawText()); if (drs != null && drs.Any()) { await _db.DamagedRecords.AddRangeAsync(drs); await _db.SaveChangesAsync(); } } catch { } }
-
-                    if (doc.RootElement.TryGetProperty("ApprovalSteps", out var apEl)) { try { var aps = System.Text.Json.JsonSerializer.Deserialize<List<ApprovalStep>>(apEl.GetRawText()); if (aps != null && aps.Any()) { await _db.ApprovalSteps.AddRangeAsync(aps); await _db.SaveChangesAsync(); } } catch { } }
-                    if (doc.RootElement.TryGetProperty("AiSuggestions", out var aiEl)) { try { var ais = System.Text.Json.JsonSerializer.Deserialize<List<AiSuggestion>>(aiEl.GetRawText()); if (ais != null && ais.Any()) { await _db.AiSuggestions.AddRangeAsync(ais); await _db.SaveChangesAsync(); } } catch { } }
-
-                    if (doc.RootElement.TryGetProperty("AuditLogs", out var alEl)) { try { var als = System.Text.Json.JsonSerializer.Deserialize<List<AuditLog>>(alEl.GetRawText()); if (als != null && als.Any()) { await _db.AuditLogs.AddRangeAsync(als); await _db.SaveChangesAsync(); } } catch { } }
+                    // Import all entities using unified helper
+                    await ImportEntitiesFromDocumentAsync(doc.RootElement);
 
                     // After imports, ensure roles and admin user integrity
                     var rolesExist = await _db.Roles.AnyAsync();
@@ -1280,7 +1310,9 @@ namespace DuAnCode.Web.Controllers
                             try
                             {
                                 // wipe whatever partially changed (best effort)
-                                var tables = new[] { "VoucherLines","InventoryVouchers","AuditLogs","StockMovements","StockLedgers","SkuVariants","ProductModels","Warehouses","AspNetUserRoles","AspNetUserTokens","AspNetUserLogins","AspNetUserClaims","AspNetRoleClaims","AspNetRoles","AspNetUsers" };
+                                var tables = new[] {
+                                    "InventoryAuditLines","InventoryAudits","VoucherLines","InventoryVouchers","AuditLogs","StockMovements","StockLedgers","StockTransferLines","StockTransfers","PurchaseOrderLines","PurchaseOrders","SalesOrderLines","SalesOrders","StockAdjustments","DamagedRecords","ApprovalSteps","AiSuggestions","ComboProducts","BomComponents","SkuVariants","ProductModels","Suppliers","Warehouses","SystemConfigs","AspNetUserRoles","AspNetUserTokens","AspNetUserLogins","AspNetUserClaims","AspNetRoleClaims","AspNetRoles","AspNetUsers"
+                                };
                                 foreach (var t in tables) { try { await _db.Database.ExecuteSqlRawAsync("DELETE FROM [" + t + "]"); } catch { } }
                                 // call a local import helper implemented below
                                 await ImportEntitiesFromDocumentAsync(tempDoc.RootElement);

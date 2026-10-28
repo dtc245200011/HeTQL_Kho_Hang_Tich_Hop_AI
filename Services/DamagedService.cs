@@ -21,9 +21,19 @@ namespace DuAnCode.Web.Services
             await using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
-                var ledgers = await _db.StockLedgers
-                    .FromSqlRaw("SELECT * FROM StockLedgers WITH (UPDLOCK, ROWLOCK) WHERE SkuId = {0} AND WarehouseId = {1} AND Status IN ('GOOD', 'DAMAGED')", skuId, warehouseId)
-                    .ToListAsync();
+                List<StockLedger> ledgers;
+                if (_db.Database.IsSqlServer())
+                {
+                    ledgers = await _db.StockLedgers
+                        .FromSqlRaw("SELECT * FROM StockLedgers WITH (UPDLOCK, ROWLOCK) WHERE SkuId = {0} AND WarehouseId = {1} AND Status IN ('GOOD', 'DAMAGED')", skuId, warehouseId)
+                        .ToListAsync();
+                }
+                else
+                {
+                    ledgers = await _db.StockLedgers
+                        .Where(l => l.SkuId == skuId && l.WarehouseId == warehouseId && (l.Status == "GOOD" || l.Status == "DAMAGED"))
+                        .ToListAsync();
+                }
 
                 var good = ledgers.FirstOrDefault(l => l.Status == "GOOD");
                 if (good == null || good.Quantity < qty) 
@@ -61,9 +71,19 @@ namespace DuAnCode.Web.Services
             await using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
-                var ledgers = await _db.StockLedgers
-                    .FromSqlRaw("SELECT * FROM StockLedgers WITH (UPDLOCK, ROWLOCK) WHERE SkuId = {0} AND WarehouseId = {1} AND Status IN ('GOOD', 'DAMAGED')", skuId, warehouseId)
-                    .ToListAsync();
+                List<StockLedger> ledgers;
+                if (_db.Database.IsSqlServer())
+                {
+                    ledgers = await _db.StockLedgers
+                        .FromSqlRaw("SELECT * FROM StockLedgers WITH (UPDLOCK, ROWLOCK) WHERE SkuId = {0} AND WarehouseId = {1} AND Status IN ('GOOD', 'DAMAGED')", skuId, warehouseId)
+                        .ToListAsync();
+                }
+                else
+                {
+                    ledgers = await _db.StockLedgers
+                        .Where(l => l.SkuId == skuId && l.WarehouseId == warehouseId && (l.Status == "GOOD" || l.Status == "DAMAGED"))
+                        .ToListAsync();
+                }
 
                 var damaged = ledgers.FirstOrDefault(l => l.Status == "DAMAGED");
                 if (damaged == null || damaged.Quantity < qty) 
