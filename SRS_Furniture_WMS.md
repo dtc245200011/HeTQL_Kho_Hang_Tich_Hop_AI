@@ -1,884 +1,916 @@
-# FILE: SRS_Furniture_WMS.md
-
-# ĐẶC TẢ YÊU CẦU PHẦN MỀM (SOFTWARE REQUIREMENTS SPECIFICATION)
-## HỆ THỐNG QUẢN LÝ KHO NỘI THẤT CÓ TÍCH HỢP AI
-
-| Thông tin | Giá trị |
-|---|---|
-| Mã tài liệu | SRS-WMS-AI-FURNITURE-001 |
-| Phiên bản | 1.0 |
-| Nguồn đầu vào | URD-WMS-AI-002 (v2.0) – Kho Nội thất tích hợp AI |
-| Đối tượng đọc | Development Team, QA/Test, DevOps, Product Owner |
-| Trạng thái | Baseline cho thiết kế chi tiết (Detailed Design) và phát triển |
-
-### Quy ước ký hiệu
-| Ký hiệu | Ý nghĩa |
-|---|---|
-| SRS-F | Software Functional Requirement |
-| SRS-NF | Software Non-Functional Requirement |
-| SRS-AI | AI/ML Requirement |
-| SRS-DATA | Data Requirement |
-| API | Application Programming Interface (REST) |
-| CBM | Cubic Meter (m³) |
-| BOM | Bill of Materials |
-| SKU | Stock Keeping Unit |
-| RBAC | Role-Based Access Control |
-| PL | Pessimistic Locking |
+# ĐẶC TẢ YÊU CẦU PHẦN MỀM (SOFTWARE REQUIREMENTS SPECIFICATION - SRS)
+## HỆ THỐNG QUẢN LÝ KHO HÀNG NỘI THẤT TÍCH HỢP AI (FURNITURE WMS WITH INTEGRATED AI)
+### Tiêu chuẩn áp dụng: IEEE Std 830-1998 / ISO/IEC/IEEE 29148:2018
+#### Phiên bản: 1.0 (Baseline Hoàn thiện Thực tế theo Kiến trúc & Mã nguồn .NET 9)
 
 ---
 
-## MỤC LỤC
-1. Tổng quan hệ thống
-2. Actor, Vai trò và Ma trận phân quyền
-3. Kiến trúc tổng thể & Nguyên tắc thiết kế
-4. Yêu cầu chức năng (Functional Requirements)
-5. Luồng nghiệp vụ chi tiết (Business Process Specification)
-6. Yêu cầu AI (AI Requirements)
-7. Mô hình dữ liệu & Biểu đồ (ERD, Sequence, Flowchart)
-8. Yêu cầu phi chức năng (Non-Functional Requirements)
-9. Đặc tả API tổng quát
-10. Ma trận truy vết yêu cầu (Traceability Matrix)
-11. Tiêu chí nghiệm thu (Acceptance Criteria)
-12. Phụ lục: Danh sách mã lỗi & Thông báo hệ thống
+> **Học phần:** Ứng dụng Trí tuệ Nhân tạo trong Phát triển Phần mềm (GenAI Software Development)  
+> **Khoa:** Công nghệ Thông tin – Trường Đại học Công nghệ Thông tin & Truyền thông (ICTU) – Đại học Thái Nguyên  
+> **Nhóm thực hiện:** Nhóm 7  
+> **Thành viên thực hiện đề tài:**  
+> - **Nguyễn Đức Hiếu** (Trưởng nhóm – Kiến trúc phần mềm, Backend Core, AI Integration & Automated Testing)  
+> - **Trần Minh Hiếu** (Thành viên – Database Design, Master Data, UI/UX & QA Testing)  
+> **Thời gian thực hiện:** Năm học 2025 – 2026  
+> **Trạng thái tài liệu:** Đã nghiệm thu thực tế • Build Success (.NET 9) • 36/36 Automated xUnit Tests Passed  
 
 ---
 
-## 1. Tổng quan hệ thống
-
-### 1.1. Mục tiêu
-Xây dựng hệ thống Quản lý Kho Nội thất (Warehouse Management System – WMS) tích hợp AI nhằm:
-- Số hóa toàn bộ quy trình nhập – xuất – tồn – kiểm kê – chuyển kho, thay thế thao tác Excel thủ công.
-- Quản lý chính xác đặc thù ngành nội thất: kích thước/thể tích (CBM), hàng Combo/BOM, biến thể SKU (màu sắc, chất liệu), và hàng lỗi (Damaged).
-- Đảm bảo tính toàn vẹn dữ liệu tồn kho thông qua cơ chế giao dịch có khóa (Pessimistic Locking), tránh xuất vượt tồn khi nhiều người thao tác đồng thời.
-- Tự động hóa báo cáo Nhập – Xuất – Tồn (N-X-T) và cung cấp năng lực AI: dự báo nhu cầu nhập hàng, phát hiện biến động bất thường, cảnh báo nghẽn cổ chai cấu kiện Combo — với cơ chế con người xác nhận (Human-in-the-loop) trước khi áp dụng vào nghiệp vụ.
-- Cung cấp workflow phê duyệt phiếu đa cấp (2–3 cấp) và audit log đầy đủ phục vụ kiểm toán, lưu tối thiểu 5 năm.
-
-### 1.2. Phạm vi hệ thống
-Hệ thống bao gồm các phân hệ (module):
-1. **Master Data**: Hàng hóa (Product Model), Biến thể SKU, Combo/BOM, Nhà cung cấp, Kho/Kho chi nhánh.
-2. **Inbound**: Phiếu nhập kho, phân loại chất lượng (QC – Tốt/Damaged).
-3. **Outbound**: Phiếu xuất kho (SKU đơn lẻ và Combo).
-4. **Inventory Control**: Tồn kho theo trạng thái (GOOD/DAMAGED), khóa bản ghi giao dịch, kiểm kê định kỳ, điều chỉnh tồn.
-5. **Transfer**: Chuyển kho nội bộ.
-6. **Approval Workflow**: Phê duyệt phiếu đa cấp theo giá trị và loại giao dịch.
-7. **Reporting**: Báo cáo N-X-T, báo cáo CBM, báo cáo hàng Damaged, xuất Excel/PDF.
-8. **AI Insight**: Dự báo nhập hàng, phát hiện biến động, cảnh báo bottleneck Combo, sinh nhận xét báo cáo.
-9. **Audit & Security**: Audit log, RBAC, quản lý người dùng.
-
-### 1.3. Ngoài phạm vi
-- Phân hệ kế toán tổng hợp (General Ledger), tích hợp hóa đơn điện tử.
-- Quản lý vận tải (TMS) và tối ưu tuyến đường giao hàng.
-- Chính sách giá/khuyến mãi bán hàng (Pricing Engine) — chỉ lưu đơn giá tham chiếu phục vụ tính thành tiền trên phiếu.
+| Thông tin tài liệu | Giá trị đặc tả |
+| :--- | :--- |
+| **Mã tài liệu** | `SRS-WMS-AI-FURNITURE-001` |
+| **Tên tài liệu** | Đặc tả Yêu cầu Phần mềm Hệ thống Quản lý Kho Hàng Nội thất Tích hợp AI |
+| **Phiên bản** | v1.0 (Bản chuẩn hóa theo mã nguồn thực tế) |
+| **Tài liệu nguồn đầu vào** | `URD-WMS-AI-FURNITURE-002` (URD v2.0 – Nhóm 7) |
+| **Đối tượng độc giả** | Kiến trúc sư hệ thống, Kỹ sư phần mềm (Backend/Frontend), Kỹ sư AI/Prompt Engineer, Kỹ sư QA/QC Test, Ban Giám đốc |
+| **Môi trường công nghệ** | .NET 9.0 ASP.NET Core MVC (C# 13), EF Core 9, SQL Server 2022 (32 bảng), Local LLM Ollama (`qwen2.5-coder:7b`) |
 
 ---
 
-## 2. Actor, Vai trò và Ma trận phân quyền
+## 📌 MỤC LỤC CHI TIẾT
 
-### 2.1. Danh sách Actor
-
-| Actor | Mô tả |
-|---|---|
-| Nhân viên (Staff) | Lập chứng từ nháp (phiếu nhập/xuất dự thảo) |
-| Thủ kho (Warehouse Keeper) | Thao tác nhập/xuất/chuyển kho/kiểm kê; gắn cờ hàng Damaged |
-| Nhân viên QC | Kiểm tra chất lượng hàng khi nhập, phân loại Tốt/Damaged |
-| Kế toán (Accountant) | Duyệt sơ bộ (cấp 1), đối chiếu chứng từ, xem báo cáo |
-| Quản lý kho (Warehouse Manager) | Duyệt cấp 2 (duyệt cuối), duyệt gợi ý AI, duyệt xử lý hàng Damaged, hủy phiếu |
-| Giám đốc (Director) | Duyệt cấp 3 — chỉ áp dụng cho phiếu xuất có giá trị > 100.000.000 VNĐ |
-| Quản trị hệ thống (System Admin) | Cấu hình hệ thống, quản lý người dùng/phân quyền, cấu hình lock timeout |
-| Hệ thống AI (AI Engine) | Actor kỹ thuật: sinh nhận xét, gợi ý, cảnh báo (không có quyền ghi dữ liệu nghiệp vụ) |
-
-### 2.2. Ma trận phân quyền RBAC (CRUD + Approve)
-
-| Chức năng | Nhân viên | Thủ kho | QC | Kế toán | Quản lý kho | Giám đốc | Admin |
-|---|---|---|---|---|---|---|---|
-| Tạo phiếu nhập (nháp) | C | C | - | - | - | - | - |
-| Lập/sửa phiếu nhập (chưa duyệt) | - | CRU | - | - | - | - | - |
-| QC phân loại Tốt/Damaged | - | - | CRU | - | - | - | - |
-| Duyệt phiếu nhập (cấp 1) | - | - | - | Approve | - | - | - |
-| Duyệt phiếu nhập (cấp 2) | - | - | - | - | Approve | - | - |
-| Lập/sửa phiếu xuất (chưa duyệt) | - | CRU | - | - | - | - | - |
-| Duyệt phiếu xuất ≤ 100 triệu (cấp 1 → 2) | - | - | - | Approve | Approve | - | - |
-| Duyệt phiếu xuất > 100 triệu (cấp 3) | - | - | - | - | - | Approve | - |
-| Hủy phiếu đã duyệt | - | - | - | - | R+Request | Approve | - |
-| Chuyển kho nội bộ | - | CRU | - | - | Approve | - | - |
-| Lập phiếu kiểm kê | - | CRU | - | - | - | - | - |
-| Duyệt phiếu điều chỉnh tồn (>5%) | - | - | - | R | Approve | - | - |
-| Gắn cờ hàng Damaged | - | CRU | CRU | - | - | - | - |
-| Duyệt phương án xử lý Damaged | - | - | - | - | Approve | - | - |
-| Xem báo cáo N-X-T/CBM/Damaged | - | R | - | R | R | R | R |
-| Xuất Excel/PDF | - | R | - | CR | CR | R | - |
-| Xem gợi ý AI | - | - | - | R | R | R | - |
-| Duyệt gợi ý AI (Human-in-the-loop) | - | - | - | - | Approve | - | - |
-| Quản lý danh mục hàng hóa/CBM/Combo/BOM/Biến thể | - | CRU | - | - | CRUD | - | - |
-| Quản lý người dùng & phân quyền | - | - | - | - | - | - | CRUD |
-| Cấu hình lock timeout, retry | - | - | - | - | - | - | CRUD |
-
-Ghi chú: `C` = Create, `R` = Read, `U` = Update, `D` = Delete, `Approve` = có quyền phê duyệt bước tương ứng.
-
-### 2.3. Quy tắc workflow phê duyệt (Approval Workflow Rules)
-
-| Loại phiếu | Cấp 1 | Cấp 2 | Cấp 3 (điều kiện) |
-|---|---|---|---|
-| Phiếu nhập kho | Kế toán duyệt sơ bộ (đối chiếu chứng từ NCC) | Quản lý kho duyệt cuối | Không áp dụng |
-| Phiếu xuất kho ≤ 100.000.000 VNĐ | Kế toán duyệt sơ bộ | Quản lý kho duyệt cuối | Không áp dụng |
-| Phiếu xuất kho > 100.000.000 VNĐ | Kế toán duyệt sơ bộ | Quản lý kho duyệt | **Giám đốc duyệt bắt buộc** |
-| Phiếu điều chỉnh tồn (lệch kiểm kê > 5%) | Thủ kho lập | Quản lý kho duyệt | Không áp dụng |
-| Phiếu chuyển kho nội bộ | Thủ kho lập | Quản lý kho duyệt | Không áp dụng |
-| Đổi trạng thái GOOD ↔ DAMAGED | Thủ kho/QC ghi nhận | Quản lý kho duyệt | Không áp dụng |
-| Gợi ý AI (nhập hàng, xử lý biến động) | AI Engine sinh gợi ý | Quản lý kho duyệt ("Duyệt gợi ý AI") | Không áp dụng |
-
-**SRS-F-000 (Business Rule tổng quát):** Một phiếu chỉ chuyển sang trạng thái "Đã duyệt" và ảnh hưởng đến tồn kho sau khi đã đi qua **đủ và đúng thứ tự** các cấp duyệt quy định ở trên. Hệ thống không cho phép bỏ qua cấp hoặc duyệt sai thứ tự (VD: Quản lý kho không thể duyệt trước khi Kế toán duyệt).
+1. [Giới thiệu tổng quan hệ thống phần mềm](#1-giới-thiệu-tổng-quan-hệ-thống-phần-mềm)  
+   1.1. [Mục đích tài liệu](#11-mục-đích-tài-liệu)  
+   1.2. [Phạm vi sản phẩm phần mềm](#12-phạm-vi-sản-phẩm-phần-mềm)  
+   1.3. [Định nghĩa, từ viết tắt và ký hiệu quy ước](#13-định-nghĩa-từ-viết-tắt-và-ký-hiệu-quy-ước)  
+   1.4. [Tài liệu tham chiếu](#14-tài-liệu-tham-chiếu)  
+   1.5. [Cấu trúc tổng quan tài liệu](#15-cấu-trúc-tổng-quan-tài-liệu)  
+2. [Mô tả tổng thể hệ thống (Overall Description)](#2-mô-tả-tổng-thể-hệ-thống-overall-description)  
+   2.1. [Bối cảnh sản phẩm & Kiến trúc Clean Layered Architecture](#21-bối-cảnh-sản-phẩm--kiến-trúc-clean-layered-architecture)  
+   2.2. [Giao diện người dùng & Giao diện phần mềm](#22-giao-diện-người-dùng--giao-diện-phần-mềm)  
+   2.3. [Phân tích 6 Actor & Ma trận phân quyền RBAC chi tiết](#23-phân-tích-6-actor--ma-trận-phân-quyền-rbac-chi-tiết)  
+   2.4. [Môi trường vận hành & Công nghệ triển khai](#24-môi-trường-vận-hành--công-nghệ-triển-khai)  
+   2.5. [Ràng buộc thiết kế & Nguyên tắc triển khai cốt lõi](#25-ràng-buộc-thiết-kế--nguyên-tắc-triển-khai-cốt-lõi)  
+3. [Đặc tả yêu cầu chức năng phần mềm chi tiết (Functional Requirements)](#3-đặc-tả-yêu-cầu-chức-năng-phần-mềm-chi-tiết-functional-requirements)  
+   3.1. [Phân hệ Dữ liệu gốc (Master Data Management: SRS-F-01 $\rightarrow$ SRS-F-05)](#31-phân-hệ-dữ-liệu-gốc-master-data-management-srs-f-01-rightarrow-srs-f-05)  
+   3.2. [Phân hệ Nhập kho & Kiểm định chất lượng (Inbound & QC: SRS-F-06 $\rightarrow$ SRS-F-08)](#32-phân-hệ-nhập-kho--kiểm-định-chất-lượng-inbound--qc-srs-f-06-rightarrow-srs-f-08)  
+   3.3. [Phân hệ Xuất kho & Khóa bi quan (Outbound & Concurrency Control: SRS-F-09 $\rightarrow$ SRS-F-12)](#33-phân-hệ-xuất-kho--khóa-bi-quan-outbound--concurrency-control-srs-f-09-rightarrow-srs-f-12)  
+   3.4. [Phân hệ Điều chuyển kho nội bộ (Stock Transfer: SRS-F-13)](#34-phân-hệ-điều-chuyển-kho-nội-bộ-stock-transfer-srs-f-13)  
+   3.5. [Phân hệ Kiểm kê & Cân chỉnh tồn (Inventory Audit & Adjustment: SRS-F-14 $\rightarrow$ SRS-F-15)](#35-phân-hệ-kiểm-kê--cân-chỉnh-tồn-inventory-audit--adjustment-srs-f-14-rightarrow-srs-f-15)  
+   3.6. [Phân hệ Quản lý Hàng lỗi (Damaged Stock Management: SRS-F-16)](#36-phân-hệ-quản-lý-hàng-lỗi-damaged-stock-management-srs-f-16)  
+   3.7. [Phân hệ Phê duyệt chứng từ đa cấp (Approval Workflow: SRS-F-17)](#37-phân-hệ-phê-duyệt-chứng-từ-đa-cấp-approval-workflow-srs-f-17)  
+   3.8. [Phân hệ Báo cáo & Thống kê (Reporting & Analytics: SRS-F-18 $\rightarrow$ SRS-F-20)](#38-phân-hệ-báo-cáo--thống-kê-reporting--analytics-srs-f-18-rightarrow-srs-f-20)  
+   3.9. [Phân hệ Quản trị hệ thống, Nhật ký & Sao lưu (Admin, Audit & Backup: SRS-F-21 $\rightarrow$ SRS-F-23)](#39-phân-hệ-quản-trị-hệ-thống-nhật-ký--sao-lưu-admin-audit--backup-srs-f-21-rightarrow-srs-f-23)  
+   3.10. [Phân hệ Tra cứu thông tin nhanh (Quick Search: SRS-F-24)](#310-phân-hệ-tra-cứu-thông-tin-nhanh-quick-search-srs-f-24)  
+4. [Đặc tả yêu cầu Trí tuệ nhân tạo (AI Requirements: SRS-AI-01 $\rightarrow$ SRS-AI-06)](#4-đặc-tả-yêu-cầu-trí-tuệ-nhân-tạo-ai-requirements-srs-ai-01-rightarrow-srs-ai-06)  
+   4.1. [SRS-AI-01: Thuật toán Dự báo Bổ sung hàng tồn kho (Replenishment Engine)](#41-srs-ai-01-thuật-toán-dự-báo-bổ-sung-hàng-tồn-kho-replenishment-engine)  
+   4.2. [SRS-AI-02: Thuật toán Phát hiện Biến động nhu cầu bất thường (Anomaly Detection $\ge 20\%$)](#42-srs-ai-02-thuật-toán-phát-hiện-biến-động-nhu-cầu-bất-thường-anomaly-detection-ge-20)  
+   4.3. [SRS-AI-03: Thuật toán Phát hiện Điểm nghẽn Cấu kiện Combo (Combo Bottleneck Detection)](#43-srs-ai-03-thuật-toán-phát-hiện-điểm-nghẽn-cấu-kiện-combo-combo-bottleneck-detection)  
+   4.4. [SRS-AI-04: Cảnh báo Giới hạn Dung tích Khối kho hàng (Capacity Exceeded CBM)](#44-srs-ai-04-cảnh-báo-giới-hạn-dung-tích-khối-kho-hàng-capacity-exceeded-cbm)  
+   4.5. [SRS-AI-05: Trợ lý AI Copilot & Kỹ thuật RAG Context Grounding](#45-srs-ai-05-trợ-lý-ai-copilot--kỹ-thuật-rag-context-grounding)  
+   4.6. [SRS-AI-06: Tiến hóa Prompt & Rào chắn an toàn (Regex Guardrails, Action Calling, Human-in-the-loop)](#46-srs-ai-06-tiến-hóa-prompt--rào-chắn-an-toàn-regex-guardrails-action-calling-human-in-the-loop)  
+5. [Thiết kế Cơ sở Dữ liệu & Biểu đồ kỹ thuật (Database & Technical Diagrams)](#5-thiết-kế-cơ-sở-dữ-liệu--biểu-đồ-kỹ-thuật-database--technical-diagrams)  
+   5.1. [Sơ đồ Thực thể Liên kết (Entity Relationship Diagram - ERD 32 bảng CSDL)](#51-sơ-đồ-thực-thể-liên-kết-entity-relationship-diagram---erd-32-bảng-csdl)  
+   5.2. [Sequence Diagram: Quy trình Xuất kho & Khóa bi quan T-SQL UPDLOCK, ROWLOCK](#52-sequence-diagram-quy-trình-xuất-kho--khóa-bi-quan-t-sql-updlock-rowlock)  
+   5.3. [Sequence Diagram: Quy trình Nhập kho & Phân luồng QC GOOD / DAMAGED](#53-sequence-diagram-quy-trình-nhập-kho--phân-luồng-qc-good--damaged)  
+   5.4. [Sequence Diagram: AI Copilot RAG Grounding, Guardrails & Action sinh phiếu DRAFT](#54-sequence-diagram-ai-copilot-rag-grounding-guardrails--action-sinh-phiếu-draft)  
+   5.5. [State Diagram: Vòng đời Phê duyệt chứng từ tài chính 3 cấp độ](#55-state-diagram-vòng-đời-phê-duyệt-chứng-từ-tài-chính-3-cấp-độ)  
+   5.6. [State Diagram: Vòng đời Trạng thái Tồn kho hàng hóa (GOOD / DAMAGED)](#56-state-diagram-vòng-đời-trạng-thái-tồn-kho-hàng-hóa-good--damaged)  
+6. [Yêu cầu phi chức năng (Non-Functional Requirements: SRS-NF-01 $\rightarrow$ SRS-NF-22)](#6-yêu-cầu-phi-chức-năng-non-functional-requirements-srs-nf-01-rightarrow-srs-nf-22)  
+   6.1. [Yêu cầu Bảo mật, Danh tính & Phân quyền (Security & RBAC)](#61-yêu-cầu-bảo-mật-danh-tính--phân-quyền-security--rbac)  
+   6.2. [Yêu cầu Khóa bi quan & Toàn vẹn giao dịch đồng thời (Pessimistic Locking)](#62-yêu-cầu-khóa-bi-quan--toàn-vẹn-giao-dịch-đồng-thời-pessimistic-locking)  
+   6.3. [Yêu cầu Sao lưu, Phục hồi & Phòng chống thảm họa (Backup & Disaster Recovery)](#63-yêu-cầu-sao-lưu-phục-hồi--phòng-chống-thảm-họa-backup--disaster-recovery)  
+   6.4. [Yêu cầu Hiệu năng & Khả năng chịu tải (Performance & Scalability)](#64-yêu-cầu-hiệu-năng--khả-năng-chịu-tải-performance--scalability)  
+   6.5. [Yêu cầu Khả năng bảo trì & Độ tin cậy (Maintainability & Reliability)](#65-yêu-cầu-khả-năng-bảo-trì--độ-tin-cậy-maintainability--reliability)  
+7. [Đặc tả Giao diện Lập trình Ứng dụng (API Specifications)](#7-đặc-tả-giao-diện-lập-trình-ứng-dụng-api-specifications)  
+8. [Ma trận truy vết yêu cầu phần mềm (Traceability Matrix)](#8-ma-trận-truy-vết-yêu-cầu-phần-mềm-traceability-matrix)  
+9. [Bộ Tiêu chí Nghiệm thu & Kết quả Kiểm thử (36/36 xUnit Tests Passed)](#9-bộ-tiêu-chí-nghiệm-thu--kết-quả-kiểm-thử-3636-xunit-tests-passed)  
+10. [Phụ lục: Danh mục Mã lỗi chuẩn hóa hệ thống](#10-phụ-lục-danh-mục-mã-lỗi-chuẩn-hóa-hệ-thống)  
 
 ---
 
-## 3. Kiến trúc tổng thể & Nguyên tắc thiết kế
+## 1. Giới thiệu tổng quan hệ thống phần mềm
 
-### 3.1. Kiến trúc logic (Layered Architecture)
+### 1.1. Mục đích tài liệu
+Tài liệu **Đặc tả Yêu cầu Phần mềm (Software Requirements Specification - SRS)** này mô tả toàn diện, chi tiết và có cấu trúc các yêu cầu chức năng, yêu cầu phi chức năng, yêu cầu AI, kiến trúc dữ liệu và giao thức kỹ thuật của **Hệ thống Quản lý Kho Hàng Nội Thất Tích Hợp AI (Furniture WMS with Integrated AI)**.  
+Tài liệu được biên soạn tuân thủ nghiêm ngặt theo tiêu chuẩn quốc tế **IEEE Std 830-1998** và **ISO/IEC/IEEE 29148:2018**, đóng vai trò là chuẩn mực kỹ thuật pháp lý (*Technical Baseline*) để:
+- Hướng dẫn đội ngũ kỹ sư hiện thực hóa mã nguồn Clean Architecture C# trên .NET 9.
+- Định nghĩa các giao thức CSDL, cơ chế Khóa bi quan T-SQL và rào chắn an toàn AI (Guardrails).
+- Làm căn cứ thiết kế và thẩm định bộ 36 ca kiểm thử tự động xUnit (*Automated Testing Suite*).
+- Phục vụ nghiệm thu học phần *Ứng dụng Trí tuệ Nhân tạo trong Phát triển Phần mềm*.
 
-```
-┌─────────────────────────────────────────────┐
-│  Presentation Layer (Web UI / Mobile App)    │
-├─────────────────────────────────────────────┤
-│  API Gateway (REST, xác thực JWT, rate limit)│
-├─────────────────────────────────────────────┤
-│  Application/Service Layer                   │
-│   - Inbound Service    - Outbound Service    │
-│   - Inventory Service  - Approval Service    │
-│   - Transfer Service   - Reporting Service   │
-│   - AI Orchestration Service                 │
-├─────────────────────────────────────────────┤
-│  Domain Layer (Business Rules, BOM Engine,   │
-│   CBM Calculator, Locking Manager)           │
-├─────────────────────────────────────────────┤
-│  Data Access Layer (ORM / Repository)        │
-├─────────────────────────────────────────────┤
-│  CSDL quan hệ (PostgreSQL/SQL Server)        │
-│  + Cache (Redis) cho khóa phân tán (nếu scale│
-│    nhiều instance)                           │
-├─────────────────────────────────────────────┤
-│  AI/ML Service (tách rời, gọi qua API nội bộ)│
-│   - Forecasting Engine                       │
-│   - Anomaly Detection Engine                 │
-│   - LLM Narrative Generator (nhận xét báo cáo)│
-└─────────────────────────────────────────────┘
-```
+### 1.2. Phạm vi sản phẩm phần mềm
+Sản phẩm là ứng dụng Web quản trị doanh nghiệp chuyên sâu (**Enterprise Web Application**) phục vụ vận hành kho hàng nội thất với các năng lực:
+- **Quản lý Master Data đặc thù nội thất:** Quản lý mã hàng gốc, biến thể SKU (Màu sắc, Chất liệu), tự động tính toán thể tích khối $CBM = (Dài \times Rộng \times Cao) / 10^9$ ($m^3$), thiết lập định mức linh kiện sản phẩm lắp ráp theo bộ ($Combo/BOM$).
+- **Vận hành giao dịch kho chuẩn mực:** Nhập kho có tích hợp khâu kiểm định chất lượng QC phân loại rạch ròi hàng Đạt (`GOOD`) và hàng Lỗi (`DAMAGED`), Xuất kho bóc tách BOM tự động, Chuyển kho nội bộ nguyên tử, Kiểm kê cân chỉnh kho và Quản lý hàng hư hỏng.
+- **Kiểm soát đồng thời tuyệt đối (Concurrency Control):** Triển khai cơ chế Khóa bi quan ở tầng CSDL với T-SQL `WITH (UPDLOCK, ROWLOCK)` trong DbTransaction, loại trừ 100% tình trạng xuất âm kho.
+- **Phê duyệt phân tầng rủi ro tài chính:** Phân luồng 3 cấp độ (Kế toán $\rightarrow$ Quản lý kho $\rightarrow$ Giám đốc cho các đơn $> 100$ triệu VNĐ).
+- **Trợ lý AI Copilot On-Premise:** Tích hợp Local LLM Ollama (`qwen2.5-coder:7b`) được RAG Grounding dữ liệu kho thời gian thực; tự động quét biến động nhu cầu 7 ngày vs 60 ngày để phát hiện đột biến $\ge 20\%$ và tự sinh phiếu nhập hàng nháp có con người giám sát (*Human-in-the-loop*).
 
-### 3.2. Nguyên tắc thiết kế cốt lõi
-- **Nguyên tắc 1 – Single Source of Truth cho tồn kho:** Bảng `stock_ledger` là nguồn duy nhất xác định tồn; mọi module khác (báo cáo, AI) chỉ đọc, không được ghi trực tiếp.
-- **Nguyên tắc 2 – Transaction toàn vẹn (ACID):** Mọi thao tác thay đổi tồn phải nằm trong 1 transaction CSDL duy nhất, có khóa (xem mục 8.2).
-- **Nguyên tắc 3 – Tồn Combo là dữ liệu suy diễn (derived, không lưu cứng):** Tính tại thời điểm truy vấn/xuất từ tồn cấu kiện theo BOM.
-- **Nguyên tắc 4 – Tách bạch trạng thái tồn:** Mọi bản ghi tồn có thuộc tính `status ∈ {GOOD, DAMAGED}`; tồn khả dụng (available) luôn loại trừ DAMAGED và phần đang bị khóa.
-- **Nguyên tắc 5 – AI không có quyền ghi (read-only + propose):** AI Engine chỉ tạo bản ghi "đề xuất" (proposal), việc ghi vào nghiệp vụ chính thức chỉ xảy ra sau khi Quản lý kho bấm "Duyệt gợi ý AI".
-- **Nguyên tắc 6 – Audit-first:** Mọi hành động CUD (Create/Update/Delete) trên các bảng nghiệp vụ cốt lõi đều phải sinh 1 bản ghi `audit_log` tương ứng trong cùng transaction.
+### 1.3. Định nghĩa, từ viết tắt và ký hiệu quy ước
 
----
+| Thuật ngữ | Tên đầy đủ | Định nghĩa kỹ thuật trong hệ thống |
+| :--- | :--- | :--- |
+| **SRS** | Software Requirements Specification | Tài liệu đặc tả yêu cầu phần mềm chuẩn IEEE 830. |
+| **URD** | User Requirements Document | Tài liệu yêu cầu người dùng v2.0 (nguồn đầu vào của SRS). |
+| **CBM** | Cubic Meter ($m^3$) | Thể tích hình học: $CBM = (Length_{mm} \times Width_{mm} \times Height_{mm}) / 10^9$. |
+| **SKU** | Stock Keeping Unit | Mã biến thể hàng hóa độc lập quản lý tồn kho, định dạng `{ModelId}-{Color}-{Material}`. |
+| **BOM** | Bill of Materials | Bảng định mức cấu kiện kỹ thuật cấu thành nên bộ Combo. |
+| **PL** | Pessimistic Locking | Cơ chế khóa bi quan cấp độ dòng dữ liệu T-SQL `WITH (UPDLOCK, ROWLOCK)`. |
+| **RBAC** | Role-Based Access Control | Kiểm soát quyền truy cập dựa trên 6 vai trò người dùng trong hệ thống Identity. |
+| **QC** | Quality Control | Khâu kiểm định phân tách hàng đạt chuẩn (`GOOD`) và hàng lỗi (`DAMAGED`). |
+| **RAG** | Retrieval-Augmented Generation | Kỹ thuật trích xuất ngữ cảnh snapshot CSDL nạp vào System Prompt trước khi gọi LLM. |
+| **HITL** | Human-in-the-loop | Nguyên tắc thiết kế: AI chỉ tạo bản nháp/đề xuất, bắt buộc con người phê duyệt. |
+| **3NF** | Third Normal Form | Dạng chuẩn hóa bậc 3 của cấu trúc CSDL quan hệ loại bỏ dư thừa dữ liệu. |
 
-## 4. Yêu cầu chức năng (Functional Requirements)
+### 1.4. Tài liệu tham chiếu
+1. **IEEE Std 830-1998:** IEEE Recommended Practice for Software Requirements Specifications.
+2. **URD-WMS-AI-FURNITURE-002 (v2.0):** Tài liệu Đặc tả Yêu cầu Người dùng cho Hệ thống Quản lý Kho Hàng Nội Thất Tích Hợp AI, Nhóm 7, ICTU.
+3. **Mã nguồn Dự án:** Nền tảng .NET 9 ASP.NET Core MVC tại thư mục `HeTQL_Kho_Hang_Tich_Hop_AI/`.
+4. **Tài liệu Kỹ thuật Prompt & An toàn:** [`docs/PROMPT_ENGINEERING_AND_SAFETY.md`](file:///d:/Dai_hoc/nam%203/Ung_Dung_AI/Du%20An/DuAnCode/HeTQL_Kho_Hang_Tich_Hop_AI/docs/PROMPT_ENGINEERING_AND_SAFETY.md).
+5. **Đặc tả 5 Agent AI SDLC:** Thư mục [`agents/`](file:///d:/Dai_hoc/nam%203/Ung_Dung_AI/Du%20An/DuAnCode/HeTQL_Kho_Hang_Tich_Hop_AI/agents/) gồm Requirement, Design, Coding, Testing, Critic Agents.
 
-### 4.1. Nhóm Master Data
-
-**SRS-F-01 – Quản lý Hàng hóa (Product Model)**
-- Hệ thống cho phép Thủ kho/Quản lý kho tạo/sửa/xem mã hàng gốc gồm: mã hàng, tên hàng, danh mục (category), đơn vị tính, tồn tối thiểu (min_stock), mô tả, hình ảnh đại diện.
-- Validate: mã hàng duy nhất trong toàn hệ thống; tồn tối thiểu ≥ 0.
-- Không cho xóa cứng (hard delete) mã hàng đã có phát sinh giao dịch; chỉ cho phép "Ngừng kinh doanh" (soft delete/deactivate).
-
-**SRS-F-02 – Quản lý kích thước & tính CBM tự động**
-- Trên mỗi SKU (biến thể), cho phép nhập Dài (mm), Rộng (mm), Cao (mm).
-- Hệ thống **tự động tính** CBM ngay khi lưu, theo công thức:
-```
-CBM (m³) = (Dài_mm × Rộng_mm × Cao_mm) ÷ 1.000.000.000
-```
-- Validate: cả 3 chiều bắt buộc nhập, giá trị > 0 (số nguyên dương, đơn vị mm); nếu thiếu 1 trong 3 chiều, hệ thống chặn lưu và hiển thị lỗi `ERR-CBM-001`.
-- Mỗi lần cập nhật kích thước, hệ thống tính lại CBM và ghi `audit_log` với hành động `UPDATE_DIMENSION`.
-- Cung cấp API/báo cáo tổng CBM tồn kho: `Tổng CBM (SKU) = CBM đơn vị × Số lượng tồn GOOD`.
-
-**SRS-F-03 – Quản lý biến thể SKU (Variant Management)**
-- Cho phép khai báo các thuộc tính biến thể tại cấp Product Model: `color` (màu sắc), `material` (chất liệu), có thể mở rộng thêm thuộc tính tùy chỉnh (extensible attribute).
-- Khi khai báo tổ hợp biến thể mới, hệ thống tự sinh mã SKU theo quy tắc: `{product_model_id}-{color_code}-{material_code}`.
-- Mỗi SKU quản lý độc lập: tồn (GOOD/DAMAGED), CBM, giá bán tham chiếu, lịch sử giao dịch.
-- Validate chống trùng: không cho tạo 2 SKU có cùng `product_model_id + color + material`; nếu trùng, trả lỗi `ERR-SKU-DUPLICATE`.
-
-**SRS-F-04 – Quản lý Combo/BOM**
-- Cho phép tạo "Combo Product" gồm: mã Combo, tên Combo, danh sách cấu kiện (SKU) kèm định mức số lượng/bộ (`quantity_per_set`).
-- Validate: mỗi cấu kiện phải là SKU đã tồn tại và active; `quantity_per_set` > 0; một Combo phải có tối thiểu 1 cấu kiện.
-- CBM của Combo: mặc định = tổng (CBM cấu kiện × định mức); có thể override thủ công nếu đóng gói chung khác biệt (`cbm_override`).
-- Tồn Combo **không lưu trực tiếp**, được tính động (xem SRS-F-10).
-
-**SRS-F-05 – Quản lý Nhà cung cấp**
-- Trường dữ liệu: mã số thuế (bắt buộc, unique), tên NCC, địa chỉ, email, số điện thoại, người liên hệ.
-- Hệ thống hiển thị lịch sử giao dịch (danh sách phiếu nhập) theo từng NCC.
-
-### 4.2. Nhóm Inbound (Nhập kho)
-
-**SRS-F-06 – Lập phiếu nhập kho**
-- Trường dữ liệu bắt buộc: số phiếu (tự sinh, unique), ngày nhập, NCC, kho nhận, danh sách dòng hàng (SKU, số lượng chứng từ, số lượng thực nhận, đơn giá), người lập.
-- Cho phép ghi nhận **sai lệch** giữa số lượng chứng từ và số lượng thực tế kiểm đếm (trường `qty_document` vs `qty_actual`); nếu lệch, bắt buộc nhập lý do.
-- Phiếu nhập ở trạng thái `DRAFT` cho đến khi đủ 2 cấp duyệt.
-
-**SRS-F-07 – Phân loại chất lượng khi nhập (QC GOOD/DAMAGED)**
-- Nhân viên QC kiểm tra từng dòng hàng, ghi nhận: `qty_actual_good`, `qty_actual_damaged`, và bắt buộc nhập `reason` nếu có Damaged.
-- Ràng buộc: `qty_actual_good + qty_actual_damaged = qty_actual` (tổng phải khớp số lượng thực nhận).
-- Sau khi phiếu được duyệt đủ cấp, hệ thống tăng tồn tương ứng: `stock_ledger.GOOD += qty_actual_good`, `stock_ledger.DAMAGED += qty_actual_damaged`, trong cùng 1 transaction có khóa (xem mục 8.2).
-
-**SRS-F-08 – Kiểm tra dữ liệu phiếu nhập trước xử lý**
-- Kiểm tra: mã SKU tồn tại và active, kho nhận hợp lệ, số lượng > 0, đơn giá ≥ 0.
-- Nếu có bất kỳ dòng nào không hợp lệ, toàn bộ phiếu bị từ chối xử lý (không cho lưu một phần).
-
-### 4.3. Nhóm Outbound (Xuất kho)
-
-**SRS-F-09 – Lập phiếu xuất kho**
-- Trường dữ liệu: số phiếu, ngày xuất, kho xuất, đơn vị/khách hàng nhận, danh sách dòng hàng (SKU hoặc Combo, số lượng, đơn giá), người lập.
-- Hệ thống tự tính `total_amount` để xác định có cần duyệt cấp 3 (Giám đốc) hay không theo ngưỡng 100.000.000 VNĐ.
-
-**SRS-F-10 – Tính tồn khả dụng và tồn Combo suy diễn**
-- Công thức tồn khả dụng cho SKU đơn lẻ:
-```
-Tồn khả dụng (SKU) = Tồn GOOD − Số lượng đang bị khóa bởi giao dịch khác chưa commit
-```
-- Công thức tồn khả dụng cho Combo:
-```
-Tồn khả dụng (Combo) = MIN( floor( Tồn khả dụng(cấu kiện[i]) ÷ Định mức[i] ) ), với mọi cấu kiện i thuộc BOM
-```
-- Ví dụ minh họa: Combo "Bộ bàn ăn 6 ghế" gồm Mặt bàn (định mức 1, tồn khả dụng 10), Chân bàn bộ (định mức 1, tồn khả dụng 8), Ghế (định mức 6, tồn khả dụng 50) → Tồn khả dụng Combo = MIN(10, 8, floor(50/6)=8) = **8 bộ**.
-
-**SRS-F-11 – Chặn xuất vượt tồn (bao gồm Combo)**
-- Với SKU đơn lẻ: nếu `qty_xuất > Tồn khả dụng`, hệ thống từ chối toàn bộ giao dịch, trả lỗi `ERR-STOCK-001 (Không đủ tồn khả dụng)`.
-- Với Combo: nếu bất kỳ 1 cấu kiện nào không đủ theo định mức × số lượng xuất, hệ thống từ chối **toàn bộ** giao dịch (không xuất một phần), trả lỗi `ERR-STOCK-002 (Thiếu cấu kiện: {sku_id})`.
-- Toàn bộ kiểm tra và trừ tồn thực hiện trong 1 transaction có Pessimistic Locking (xem mục 8.2, sequence diagram mục 7.2).
-
-### 4.4. Nhóm Inventory Control (Kiểm soát tồn kho)
-
-**SRS-F-12 – Quản lý trạng thái tồn GOOD/DAMAGED**
-- Thủ kho/QC có thể gắn cờ chuyển 1 số lượng cụ thể của SKU từ GOOD sang DAMAGED (phát hiện lỗi trong lưu kho/kiểm kê), kèm lý do bắt buộc và ảnh minh chứng (tùy chọn).
-- Mọi thay đổi trạng thái phải qua bước duyệt của Quản lý kho trước khi chính thức ảnh hưởng đến tồn khả dụng.
-- Sau khi duyệt: `stock_ledger.GOOD -= qty`, `stock_ledger.DAMAGED += qty` (hoặc ngược lại khi chuyển Damaged → Good sau sửa chữa).
-
-**SRS-F-13 – Xử lý hàng Damaged**
-- Quản lý kho chọn 1 trong 3 phương án cho lô hàng Damaged: (a) Chuyển về GOOD (đã sửa chữa xong), (b) Thanh lý (tạo phiếu xuất với lý do "Thanh lý"), (c) Trả lại NCC (tạo phiếu trả hàng liên kết `po_id` gốc).
-- Mỗi phương án tạo 1 bản ghi điều chỉnh tồn (`stock_adjustment`) và `audit_log` tương ứng.
-
-**SRS-F-14 – Kiểm kê định kỳ (hàng quý)**
-- Hệ thống hỗ trợ tạo "Phiếu kiểm kê" theo kho/khu vực, liệt kê toàn bộ SKU cần đếm, tách riêng cột đếm GOOD và DAMAGED.
-- Sau khi nhập số liệu đếm thực tế, hệ thống tự tính chênh lệch: `variance % = |Số đếm thực tế − Tồn hệ thống| ÷ Tồn hệ thống × 100%`.
-- **Quy tắc bắt buộc:** Nếu `variance % > 5%` cho bất kỳ SKU nào, hệ thống **bắt buộc** phải lập "Phiếu điều chỉnh tồn" (Stock Adjustment) cho SKU đó và phiếu này phải được Quản lý kho duyệt trước khi tồn hệ thống được cập nhật theo số đếm thực tế.
-- Nếu `variance % ≤ 5%`: cho phép tự động cập nhật tồn theo số đếm mà không cần phiếu điều chỉnh riêng (tùy cấu hình `auto_adjust_threshold`, mặc định 5%).
-
-**SRS-F-15 – Chuyển kho nội bộ**
-- Cho phép lập phiếu chuyển kho giữa kho chính và kho chi nhánh, gồm: SKU, số lượng, kho nguồn, kho đích.
-- Giao dịch phải đảm bảo tính nguyên tử (atomic): giảm tồn kho nguồn và tăng tồn kho đích trong **cùng 1 transaction**, có khóa cả 2 bản ghi tồn liên quan (khóa theo thứ tự `warehouse_id` tăng dần để tránh deadlock).
-- Chỉ chuyển được tồn ở trạng thái GOOD; không chuyển tồn Damaged (trừ khi có phê duyệt đặc biệt — TBC, xem URD mục 18.6).
-
-**SRS-F-16 – Điều chỉnh tồn sau sửa/hủy phiếu đã duyệt**
-- Khi Quản lý kho hủy 1 phiếu nhập/xuất đã duyệt (đã ảnh hưởng đến tồn), hệ thống **không xóa** bản ghi gốc mà tự động sinh 1 "Phiếu điều chỉnh tồn" ngược dấu để đảo ngược tác động, giữ nguyên vẹn dấu vết giao dịch gốc (immutable ledger).
-
-### 4.5. Nhóm Approval Workflow
-
-**SRS-F-17 – Workflow phê duyệt đa cấp**
-- Mỗi loại phiếu có state machine riêng (xem mục 7.4 – State Diagram). Trạng thái tối thiểu: `DRAFT → PENDING_L1 → PENDING_L2 → (PENDING_L3) → APPROVED → (CANCELLED)`.
-- Hệ thống tự động xác định phiếu xuất có cần cấp duyệt thứ 3 (Giám đốc) dựa trên `total_amount > 100,000,000 VNĐ`.
-- Người duyệt sai cấp/sai vai trò bị hệ thống từ chối thao tác (`ERR-APPROVAL-001`).
-
-**SRS-F-18 – Duyệt gợi ý AI (Human-in-the-loop)**
-- Mọi output của AI Engine (gợi ý nhập hàng, cảnh báo biến động, cảnh báo bottleneck) được lưu ở bảng `ai_suggestion` với trạng thái mặc định `PENDING_REVIEW`.
-- Quản lý kho xem chi tiết căn cứ tính toán (dữ liệu đầu vào, công thức áp dụng) kèm nút **"Duyệt gợi ý AI"** hoặc **"Từ chối/Điều chỉnh"**.
-- Chỉ khi trạng thái chuyển thành `APPROVED`, hệ thống mới cho phép tạo Phiếu đề xuất nhập hàng chính thức (Purchase Requisition) từ gợi ý đó.
-
-### 4.6. Nhóm Reporting
-
-**SRS-F-19 – Báo cáo Nhập – Xuất – Tồn (N-X-T)**
-- Công thức: `Tồn cuối = Tồn đầu + Tổng nhập − Tổng xuất`, tính riêng cho từng trạng thái (GOOD/DAMAGED).
-- Bộ lọc: theo kỳ (tuần/tháng), NCC, mặt hàng/biến thể, kho, trạng thái tồn.
-- Hỗ trợ xuất Excel (.xlsx) và PDF.
-
-**SRS-F-20 – Báo cáo CBM/diện tích kho**
-- Tổng hợp CBM tồn kho theo kho, theo khu vực (zone) nếu có, hỗ trợ cảnh báo khi tổng CBM > sức chứa cấu hình của kho (`warehouse.max_capacity_cbm`).
-
-**SRS-F-21 – Báo cáo hàng Damaged**
-- Liệt kê số lượng, giá trị ước tính, lý do lỗi, phương án xử lý theo kỳ báo cáo.
-
-### 4.7. Nhóm Audit & Security
-
-**SRS-F-22 – Audit Log**
-- Mọi hành động Create/Update/Delete/Approve/Cancel trên các entity nghiệp vụ (phiếu nhập, phiếu xuất, tồn kho, trạng thái Damaged, phiếu điều chỉnh, phiếu chuyển kho, master data) phải sinh 1 bản ghi trong bảng `audit_log` gồm: người thực hiện, vai trò, thời điểm (timestamp UTC), hành động, entity_type, entity_id, dữ liệu trước/sau (before/after JSON snapshot), lý do (nếu có).
-- **Thời hạn lưu trữ: tối thiểu 5 năm**, không cho phép xóa audit log thủ công qua giao diện ứng dụng (chỉ xóa được qua chính sách data retention tự động ở tầng hạ tầng, do Admin cấu hình).
+### 1.5. Cấu trúc tổng quan tài liệu
+Tài liệu được chia thành 10 mục chính theo cấu trúc chuẩn IEEE 830, dẫn dắt từ bối cảnh kiến trúc tổng thể, chi tiết từng phân hệ chức năng, đặc tả thuật toán AI và rào chắn an toàn, mô hình ERD 32 bảng CSDL, yêu cầu phi chức năng, đặc tả API, ma trận truy vết và tiêu chí nghiệm thu qua 36 ca kiểm thử tự động.
 
 ---
 
-## 5. Luồng nghiệp vụ chi tiết (Business Process Specification)
+## 2. Mô tả tổng thể hệ thống (Overall Description)
 
-### 5.1. Luồng Nhập kho (chi tiết bước, gắn Requirement ID)
+### 2.1. Bối cảnh sản phẩm & Kiến trúc Clean Layered Architecture
+Hệ thống được thiết kế theo mô hình kiến trúc phân lớp sạch (**Clean Layered Architecture**), phân tách rõ ràng trách nhiệm giữa các thành phần phần mềm nhằm đảm bảo tính độc lập, dễ kiểm thử tự động và không suy thoái mã nguồn (*Zero Regression*):
 
-| Bước | Actor | Hành động | Requirement liên quan |
-|---|---|---|---|
-| 1 | Thủ kho | Nhận hàng, đối chiếu chứng từ NCC | SRS-F-06 |
-| 2 | QC | Kiểm đếm, phân loại GOOD/DAMAGED từng dòng hàng | SRS-F-07 |
-| 3 | Thủ kho | Lập phiếu nhập (trạng thái DRAFT) | SRS-F-06, SRS-F-08 |
-| 4 | Kế toán | Duyệt cấp 1 (đối chiếu chứng từ, đơn giá) | SRS-F-17 |
-| 5 | Quản lý kho | Duyệt cấp 2 (duyệt cuối) | SRS-F-17 |
-| 6 | Hệ thống | Khóa bản ghi tồn SKU liên quan (PL) | SRS-NF (mục 8.2) |
-| 7 | Hệ thống | Tăng tồn GOOD/DAMAGED theo số lượng đã QC | SRS-F-07 |
-| 8 | Hệ thống | Ghi Audit Log, mở khóa, commit | SRS-F-22 |
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        PRESENTATION LAYER (UI)                         │
+│       ASP.NET Core MVC (Razor Views, Tag Helpers, ViewModels)          │
+│       HTML5, Vanilla CSS / Bootstrap 5 Custom, JavaScript ES6          │
+├────────────────────────────────────────────────────────────────────────┤
+│                       CONTROLLER / API LAYER                           │
+│  InboundController, OutboundController, StockTransferController,       │
+│  InventoryAuditController, QualityController, ReplenishmentController, │
+│  AiChatController (RAG & Guardrails), AdminController, ReportController│
+├────────────────────────────────────────────────────────────────────────┤
+│                       BUSINESS SERVICE LAYER                           │
+│  InventoryServiceAdvanced (Pessimistic Locking & Combo Deduction),     │
+│  ApprovalWorkflowService (3-Tier Approval Engine), DamagedService,     │
+│  AiService (Replenishment, Anomaly 20%, Bottleneck), AiChatGrounding   │
+├────────────────────────────────────────────────────────────────────────┤
+│                       DATA ACCESS LAYER (DAL)                          │
+│  Generic Repository Pattern, IInventoryRepository (T-SQL Locking),    │
+│  ApplicationDbContext (Entity Framework Core 9 Code-First)            │
+├────────────────────────────────────────────────────────────────────────┤
+│                       DATABASE & RUNTIME INFRA                         │
+│  Microsoft SQL Server 2022 (32 bảng chuẩn 3NF, Indexes, Foreign Keys)  │
+│  Local LLM Runtime: Ollama (qwen2.5-coder:7b via HTTP REST API)        │
+│  Background Workers: AiMonitoringService, DatabaseBackupService        │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
-### 5.2. Luồng Xuất kho (chi tiết bước)
+- **Tầng Giao diện (Presentation Layer):** Xây dựng trên nền Razor View Engine, hỗ trợ 100% tiếng Việt với hệ thống tooltip giải thích trực quan, bảng điều khiển Responsive và thanh hội thoại AI Copilot nhúng cố định.
+- **Tầng Điều khiển (Controllers):** Tiếp nhận yêu cầu HTTP, kiểm tra xác thực người dùng, bảo vệ chống giả mạo yêu cầu qua thuộc tính `[ValidateAntiForgeryToken]`, ánh xạ dữ liệu và điều hướng luồng nghiệp vụ.
+- **Tầng Nghiệp vụ (Services):** Nơi hiện thực hóa toàn bộ logic tính toán cốt lõi: tính $CBM$, bóc tách BOM, khóa bi quan, tính toán biến động nhu cầu 7 ngày vs 60 ngày, phân luồng phê duyệt 3 cấp và rào chắn an toàn Regex.
+- **Tầng Truy xuất Dữ liệu (Repositories):** Trừu tượng hóa truy cập CSDL; thực thi các câu lệnh T-SQL tối ưu hóa có gài khóa `WITH (UPDLOCK, ROWLOCK)` và sắp xếp khóa theo `SkuId ASC`.
+- **Tầng Cơ sở Dữ liệu & AI:** SQL Server 2022 lưu trữ 32 bảng quan hệ; Ollama chạy Local trên cổng 11434 đảm bảo cách ly dữ liệu nội bộ.
 
-| Bước | Actor | Hành động | Requirement liên quan |
-|---|---|---|---|
-| 1 | Thủ kho | Chọn SKU/Combo, số lượng cần xuất | SRS-F-09 |
-| 2 | Hệ thống | Khóa bản ghi tồn liên quan (PL) | Mục 8.2 |
-| 3 | Hệ thống | Tính tồn khả dụng (loại trừ Damaged, loại trừ phần đang khóa) | SRS-F-10 |
-| 4 | Hệ thống | Nếu Combo: kiểm tra đủ tồn mọi cấu kiện theo BOM | SRS-F-10, SRS-F-11 |
-| 5 | Hệ thống | Nếu thiếu tồn: từ chối toàn bộ, rollback, mở khóa | SRS-F-11 |
-| 6 | Thủ kho | Lập phiếu xuất (trạng thái DRAFT) | SRS-F-09 |
-| 7 | Kế toán → Quản lý kho → (Giám đốc nếu >100tr) | Duyệt theo cấp | SRS-F-17 |
-| 8 | Hệ thống | Trừ tồn (SKU đơn lẻ hoặc từng cấu kiện Combo) | SRS-F-11 |
-| 9 | Hệ thống | Ghi Audit Log, mở khóa, commit | SRS-F-22 |
+### 2.2. Giao diện người dùng & Giao diện phần mềm
+1. **Giao diện Web tương tác (GUI):**
+   - Màn hình Tổng quan Kho (`/Dashboard`, `/AiDashboard`): Hiển thị KPI tồn kho, biểu đồ thể tích $CBM$, cảnh báo tồn thấp và biến động nhu cầu.
+   - Màn hình Danh mục (`/Admin/Products`, `/Admin/Skus`, `/Admin/Combos`): Quản trị thông tin sản phẩm, nhập kích thước 3 chiều và định mức BOM.
+   - Màn hình Giao dịch kho (`/Inbound`, `/Outbound`, `/StockTransfer`, `/InventoryAudit`): Quản lý vòng đời chứng từ từ Bản nháp $\rightarrow$ Phê duyệt $\rightarrow$ Hoàn tất trừ tồn.
+   - Màn hình Kiểm định QC (`/Quality`): Giao diện chuyên biệt cho nhân viên QC ghi nhận số lượng `GOOD`/`DAMAGED`.
+   - Màn hình AI Replenishment (`/Replenishment`): Bảng điều khiển duyệt gợi ý nhập hàng và phân tích nguyên nhân bất thường.
+   - Hộp chat Trợ lý AI Copilot: Modal tương tác tự nhiên hỗ trợ phím tắt và trả lời tức thời.
+2. **Giao diện Phần mềm Ngoại vi:**
+   - Kết nối Local REST API với Ollama qua endpoint `POST http://localhost:11434/api/chat`.
+   - Tích hợp dịch vụ gửi thư điện tử qua `IEmailSender` phục vụ thông báo cảnh báo tồn thấp.
 
-### 5.3. Luồng Kiểm kê & Điều chỉnh tồn
+### 2.3. Phân tích 6 Actor & Ma trận phân quyền RBAC chi tiết
 
-| Bước | Actor | Hành động | Requirement liên quan |
-|---|---|---|---|
-| 1 | Thủ kho | Tạo phiếu kiểm kê theo kho/kỳ (quý) | SRS-F-14 |
-| 2 | Thủ kho | Đếm thực tế, nhập số liệu GOOD/DAMAGED | SRS-F-14 |
-| 3 | Hệ thống | Tính % chênh lệch so với tồn hệ thống | SRS-F-14 |
-| 4 | Hệ thống | Nếu >5%: bắt buộc sinh Phiếu điều chỉnh tồn | SRS-F-14 |
-| 5 | Quản lý kho | Duyệt phiếu điều chỉnh | SRS-F-17 |
-| 6 | Hệ thống | Cập nhật tồn theo số đã duyệt, ghi Audit Log | SRS-F-22 |
+Hệ thống triển khai 6 vai trò người dùng chuẩn hóa qua ASP.NET Core Identity:
 
-### 5.4. Luồng Chuyển kho nội bộ
+| Chức năng nghiệp vụ | Thủ kho / NV (`Staff`) | Kiểm định (`QC`) | Kế toán (`Accountant`) | Quản lý kho (`WarehouseManager`) | Giám đốc (`Director`) | Quản trị (`Admin`) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Quản lý Master Data (Thêm/Sửa SKU, BOM)** | Xem | Xem | Xem | **Thực hiện** | Xem | **Toàn quyền** |
+| **Lập Phiếu Nhập / Xuất nháp (DRAFT)** | **Tạo / Sửa** | - | Xem | Xem | Xem | **Toàn quyền** |
+| **Thực hiện Kiểm định QC (GOOD/DAMAGED)** | - | **Thực hiện** | Xem | Xem | Xem | **Toàn quyền** |
+| **Phê duyệt Cấp 1 (Phiếu Nhập & Xuất)** | - | - | **Duyệt C1** | - | - | **Toàn quyền** |
+| **Phê duyệt Cấp 2 (Phiếu Nhập & Xuất)** | - | - | - | **Duyệt C2** | - | **Toàn quyền** |
+| **Phê duyệt Cấp 3 (Phiếu Xuất $> 100$ triệu)** | - | - | - | - | **Duyệt C3** | **Toàn quyền** |
+| **Lập Phiếu Điều chuyển & Kiểm kê** | **Thực hiện** | - | Xem | **Duyệt** | Xem | **Toàn quyền** |
+| **Xử lý Hàng lỗi (Sửa/Thanh lý/Trả NCC)** | Đề xuất | Ghi nhận | Xem | **Duyệt** | Xem | **Toàn quyền** |
+| **Duyệt Đề xuất Nhập hàng AI** | Xem | - | Xem | **Duyệt** | Xem | **Toàn quyền** |
+| **Xem & Kết xuất Báo cáo N-X-T, CBM** | Xem | Xem | **Xuất file** | **Xuất file** | Xem | **Toàn quyền** |
+| **Quản trị Người dùng & Phân quyền RBAC** | - | - | - | - | - | **Toàn quyền** |
+| **Sao lưu (Backup) & Phục hồi CSDL** | - | - | - | - | - | **Toàn quyền** |
 
-| Bước | Actor | Hành động | Requirement liên quan |
-|---|---|---|---|
-| 1 | Thủ kho | Lập phiếu chuyển kho (SKU, số lượng, kho nguồn/đích) | SRS-F-15 |
-| 2 | Quản lý kho | Duyệt phiếu chuyển kho | SRS-F-17 |
-| 3 | Hệ thống | Khóa đồng thời bản ghi tồn kho nguồn & đích (thứ tự tăng dần theo warehouse_id) | Mục 8.2 |
-| 4 | Hệ thống | Giảm tồn kho nguồn, tăng tồn kho đích trong 1 transaction | SRS-F-15 |
-| 5 | Hệ thống | Ghi Audit Log, mở khóa, commit | SRS-F-22 |
+### 2.4. Môi trường vận hành & Công nghệ triển khai
+- **Hệ điều hành:** Microsoft Windows 10/11 Professional/Enterprise hoặc Linux (Ubuntu 22.04 LTS trở lên).
+- **Runtime:** .NET 9.0 SDK & ASP.NET Core Runtime 9.0.
+- **Hệ quản trị CSDL:** Microsoft SQL Server 2019/2022 (Standard/Enterprise) hoặc SQL Server Express.
+- **Mô hình AI:** Local LLM Ollama (`qwen2.5-coder:7b`) yêu cầu tối thiểu 8GB RAM (khuyến nghị 16GB RAM hoặc GPU NVIDIA $\ge 6$GB VRAM).
+- **Trình duyệt Client:** Google Chrome, Microsoft Edge, Mozilla Firefox phiên bản mới nhất hỗ trợ HTML5, CSS Grid và Fetch API.
+
+### 2.5. Ràng buộc thiết kế & Nguyên tắc triển khai cốt lõi
+1. **Nguyên tắc 1 – Single Source of Truth cho số dư tồn kho:** Bảng `StockLedgers` là nơi duy nhất lưu trữ số dư tồn kho theo trạng thái (`GOOD`/`DAMAGED`). Mọi phân hệ khác (Báo cáo, AI) chỉ đọc số liệu từ bảng này, không được ghi đè tùy tiện.
+2. **Nguyên tắc 2 – Tính giao dịch toàn vẹn (ACID Transaction):** Mọi thao tác làm thay đổi số dư tồn kho bắt buộc phải nằm trong một `DbTransaction` duy nhất và có khóa bi quan bảo vệ.
+3. **Nguyên tắc 3 – Tồn Combo là dữ liệu suy diễn động (Derived Stock):** Không lưu trữ số dư cứng cho mã Combo trong CSDL. Số lượng Combo sẵn có được tính toán động tại thời điểm truy vấn từ tồn khả dụng của các linh kiện cấu thành theo BOM.
+4. **Nguyên tắc 4 – Phân tách tuyệt đối trạng thái hàng hóa:** Hàng hóa lưu kho luôn có thuộc tính trạng thái $Status \in \{GOOD, DAMAGED\}$. Hàng `DAMAGED` tuyệt đối không được tính vào tồn khả dụng xuất bán thương mại.
+5. **Nguyên tắc 5 – AI chỉ đề xuất, con người quyết định (Human-in-the-loop):** AI Engine không có quyền ghi đè số dư tồn kho hoặc phê duyệt chứng từ. AI chỉ tạo bản nháp (`DRAFT`) hoặc đề xuất (`PENDING_REVIEW`).
+6. **Nguyên tắc 6 – Bảo toàn nhật ký kiểm toán (Audit-first):** Mọi hành động Thêm/Sửa/Xóa/Duyệt trên các bảng nghiệp vụ cốt lõi đều phải sinh một bản ghi tương ứng trong `AuditLogs` trong cùng transaction, lưu trữ tối thiểu 5 năm.
 
 ---
 
-## 6. Yêu cầu AI (AI Requirements)
+## 3. Đặc tả yêu cầu chức năng phần mềm chi tiết (Functional Requirements)
 
-### 6.1. SRS-AI-01 — Dự báo số lượng cần nhập (Demand Forecasting)
+### 3.1. Phân hệ Dữ liệu gốc (Master Data Management: SRS-F-01 $\rightarrow$ SRS-F-05)
 
-**Input:**
-- Nhu cầu xuất bán trung bình 60 ngày gần nhất theo SKU (`avg_demand_60d`).
-- Hệ số mùa vụ (`seasonal_factor`): **1,2** cho tháng cao điểm, **0,8** cho tháng thấp điểm (danh sách tháng cao/thấp điểm do Quản lý kho cấu hình theo ngành hàng).
-- Biến động gần nhất (`recent_variance`): chênh lệch nhu cầu 7 ngày gần nhất so với trung bình 60 ngày.
-- Tồn hiện tại khả dụng (`current_available_stock`).
+#### SRS-F-01: Quản lý Danh mục Hàng hóa gốc (Product Model)
+- **Mô tả:** Hệ thống cho phép Quản lý kho và Admin quản lý cây sản phẩm gốc (dòng sản phẩm nội thất).
+- **Trường dữ liệu:** `ProductModelId` (Khóa chính, chuỗi ký tự duy nhất), `ProductName` (Tên sản phẩm, bắt buộc, tối đa 200 ký tự), `Category` (Danh mục: Bàn, Ghế, Giường, Tủ, Sofa), `Unit` (Đơn vị tính: Cái, Chiếc, Bộ), `MinStock` (Định mức tồn tối thiểu an toàn, số nguyên $\ge 0$), `Description`, `ImageUrl`, `IsActive` (Cờ trạng thái hoạt động).
+- **Ràng buộc:** Mã sản phẩm gốc là duy nhất; không cho phép xóa cứng (*Hard Delete*) mã hàng đã có phát sinh giao dịch trong kho, chỉ cho phép vô hiệu hóa (*Soft Delete / Deactivate*).
 
-**Công thức chính thức (đã chốt tại URD):**
-```
-Số lượng đề xuất nhập = (Nhu cầu TB 60 ngày × Hệ số mùa vụ) + Biến động gần nhất − Tồn hiện tại khả dụng
-```
+#### SRS-F-02: Quản lý Kích thước 3 chiều & Tự động tính CBM
+- **Mô tả:** Trên từng biến thể SKU, hệ thống cung cấp các trường nhập kích thước vật lý phục vụ tính toán thể tích lưu kho và vận tải.
+- **Trường dữ liệu:** `LengthMm` (Chiều Dài, mm), `WidthMm` (Chiều Rộng, mm), `HeightMm` (Chiều Cao, mm), `Cbm` (Thể tích mét khối, $m^3$).
+- **Quy tắc tính toán tự động:** Ngay khi người dùng nhập hoặc chỉnh sửa kích thước, hệ thống tự động tính toán thể tích theo công thức:
+  $$CBM = \frac{LengthMm \times WidthMm \times HeightMm}{1.000.000.000}$$
+  Giá trị được lưu vào CSDL với kiểu dữ liệu `decimal(18, 6)`.
+- **Ràng buộc kiểm tra:** Cả 3 chiều kích thước bắt buộc phải là số nguyên dương $> 0$. Nếu người dùng nhập thiếu hoặc nhập số $\le 0$, hệ thống chặn lưu và hiển thị thông báo lỗi `ERR-CBM-001: Vui lòng nhập đầy đủ Dài, Rộng, Cao (> 0) để tính thể tích CBM`.
 
-**Output:** Danh sách SKU/biến thể cần nhập, số lượng đề xuất, mức độ ưu tiên (High/Medium/Low dựa trên tỷ lệ `current_available_stock / min_stock`), kèm dữ liệu căn cứ hiển thị minh bạch (explainability).
+#### SRS-F-03: Quản lý Biến thể SKU (Variant Management)
+- **Mô tả:** Quản lý các biến thể thương mại của sản phẩm nội thất dựa trên tổ hợp thuộc tính Màu sắc (`Color`) và Chất liệu (`Material`).
+- **Quy tắc sinh mã SKU:** Mã SKU được định danh duy nhất theo cấu trúc: `{ProductModelId}-{ColorCode}-{MaterialCode}` (Ví dụ: `BAN-AN-GO-SOI-TN`, `GHE-CAFE-DA-DEN`).
+- **Trường dữ liệu quản lý độc lập:** Mỗi SKU quản lý độc lập về kích thước ($Length, Width, Height, CBM$), Đơn giá bán tham chiếu (`UnitPrice`), Hình ảnh đại diện và Lịch sử số dư tồn kho.
+- **Ràng buộc chống trùng:** Hệ thống kiểm tra ràng buộc duy nhất trên tổ hợp `(ProductModelId, Color, Material)`. Nếu phát hiện trùng lặp, trả lỗi `ERR-SKU-DUPLICATE`.
 
-**Ràng buộc:**
-- Nếu kết quả công thức ≤ 0, không tạo đề xuất (không đề xuất nhập âm).
-- Đề xuất chỉ ở trạng thái `PENDING_REVIEW`, không tự động tạo đơn đặt hàng.
+#### SRS-F-04: Quản lý Hàng Combo & Bảng định mức linh kiện (Combo / BOM Engine)
+- **Mô tả:** Cho phép định nghĩa các gói sản phẩm nội thất lắp ráp hoàn chỉnh được bán theo set từ nhiều cấu kiện rời.
+- **Cấu trúc thực thể:**
+  - `ComboProduct`: `ComboId` (Khóa chính), `ComboName`, `MinStock` (Mức tồn an toàn của Combo), `CbmOverride` (Thể tích tùy chỉnh nếu đóng gói chung khác biệt), `IsActive`.
+  - `BomComponent`: `Id` (Khóa chính), `ComboId` (Khóa ngoại), `SkuId` (Khóa ngoại trỏ đến biến thể linh kiện), `QuantityPerSet` (Định mức số lượng linh kiện trong 1 bộ, số nguyên $\ge 1$).
+- **Ràng buộc:** Một Combo phải có tối thiểu 1 linh kiện cấu thành; mỗi linh kiện phải là SKU đang hoạt động (`IsActive = true`).
 
-### 6.2. SRS-AI-02 — Phát hiện biến động bất thường (Anomaly Detection)
-
-**Ngưỡng đã chốt:** Cảnh báo bất thường khi nhu cầu xuất bán tăng/giảm **≥ 20%** trong **7 ngày liên tiếp** so với trung bình 60 ngày trước đó.
-
-**Công thức:**
-```
-% Biến động = (Nhu cầu TB 7 ngày gần nhất − Nhu cầu TB 60 ngày) ÷ Nhu cầu TB 60 ngày × 100%
-Nếu |% Biến động| ≥ 20% → Tạo cảnh báo "Biến động bất thường"
-```
-
-**Output:** Cảnh báo gồm: SKU, hướng biến động (tăng/giảm), % biến động, gợi ý kiểm tra nguyên nhân (VD: khuyến mãi, thời vụ, lỗi dữ liệu).
-
-**Dữ liệu đầu vào:** chỉ tính trên số lượng xuất của hàng trạng thái GOOD (loại trừ giao dịch thanh lý hàng Damaged để tránh nhiễu tín hiệu).
-
-### 6.3. SRS-AI-03 — Cảnh báo cấu kiện nghẽn cổ chai (Combo Bottleneck Detection)
-
-**Input:** Tồn khả dụng từng cấu kiện, định mức BOM, tốc độ bán Combo liên quan.
-
-**Logic:**
-```
-Với mỗi Combo C có cấu kiện {i}:
-  Tồn khả dụng Combo = MIN( floor(Tồn khả dụng[i] / Định mức[i]) )
-  Cấu kiện bottleneck = argmin( floor(Tồn khả dụng[i] / Định mức[i]) )
-Nếu Tồn khả dụng Combo < Ngưỡng an toàn (cấu hình, mặc định = min_stock của Combo):
-  → Cảnh báo, chỉ rõ cấu kiện bottleneck, đề xuất ưu tiên nhập cấu kiện đó
-```
-
-### 6.4. SRS-AI-04 — Sinh nhận xét báo cáo (Report Narrative Generation)
-
-- Input: dữ liệu báo cáo N-X-T theo kỳ (tồn đầu, nhập, xuất, tồn cuối, theo GOOD/DAMAGED).
-- Output: đoạn nhận xét ngôn ngữ tự nhiên tóm tắt xu hướng, các SKU đáng chú ý, liên kết chéo với cảnh báo AI-02/AI-03 nếu có trong kỳ.
-- Yêu cầu: nhận xét phải trích dẫn số liệu cụ thể lấy từ báo cáo (không được bịa số liệu ngoài phạm vi dữ liệu cung cấp).
-
-### 6.5. Cơ chế Human-in-the-loop
-
-- Tất cả output AI-01, AI-02, AI-03 lưu vào bảng `ai_suggestion` (trạng thái `PENDING_REVIEW`).
-- Giao diện hiển thị nút **"Duyệt gợi ý AI"** / **"Từ chối"** / **"Chỉnh sửa & Duyệt"** cho Quản lý kho.
-- Chỉ sau khi `status = APPROVED`, hệ thống mới cho phép:
-  - Tạo Phiếu đề xuất nhập hàng chính thức (từ AI-01).
-  - Gắn cờ theo dõi đặc biệt (watch flag) cho SKU biến động (từ AI-02).
-  - Tạo đề xuất ưu tiên nhập cấu kiện (từ AI-03).
-- Mọi hành động duyệt/từ chối AI đều ghi `audit_log` với `entity_type = AI_SUGGESTION`.
-- AI Engine **không có quyền ghi trực tiếp** vào `stock_ledger`, `purchase_order`, hay bất kỳ bảng nghiệp vụ chính thức nào.
+#### SRS-F-05: Quản lý Đối tác Nhà cung cấp & Danh mục Kho bãi
+- **Nhà cung cấp (`Supplier`):** `SupplierId` (PK), `TaxCode` (Mã số thuế, duy nhất), `Name`, `Address`, `Email`, `Phone`. Cho phép tra cứu lịch sử các đợt giao hàng.
+- **Kho bãi (`Warehouse`):** `WarehouseId` (PK), `WarehouseName`, `WarehouseType` (Kho Tổng, Kho Bán lẻ, Kho Hàng lỗi), `Address`, `MaxCapacityCbm` (Sức chứa thể tích tối đa của kho, $m^3$).
 
 ---
 
-## 7. Mô hình dữ liệu & Biểu đồ (Mermaid.js)
+### 3.2. Phân hệ Nhập kho & Kiểm định chất lượng (Inbound & QC: SRS-F-06 $\rightarrow$ SRS-F-08)
 
-### 7.1. ERD (Entity Relationship Diagram)
+#### SRS-F-06: Khởi tạo Phiếu Nhập kho (Inbound Voucher Creation)
+- **Mô tả:** Thủ kho hoặc Nhân viên lập phiếu ghi nhận hàng nhập từ Nhà cung cấp.
+- **Trường dữ liệu:** `VoucherId` (GUID PK), `VoucherNumber` (Tự động sinh theo tiền tố `PN-yyyyMMddHHmmss`), `Date`, `Type = 'INBOUND'`, `Counterparty` (Tên NCC), `WarehouseId` (Kho nhận), `Status` (Khởi tạo mặc định là `DRAFT`), `TotalAmount`, `CreatedBy`.
+- **Danh sách dòng hàng (`VoucherLine`):** `SkuId`, `ProductName`, `Unit`, `Quantity` (Số lượng thực nhận), `DocumentQuantity` (Số lượng ghi trên hóa đơn NCC), `UnitPrice`, `LineTotal`, `BatchNumber`.
+
+#### SRS-F-07: Phân luồng Kiểm định Chất lượng (QC GOOD / DAMAGED)
+- **Mô tả:** Nhân viên QC tiến hành kiểm tra thực tế hàng hóa tại khu vực tiếp nhận và phân tách số lượng đạt chuẩn và số lượng lỗi.
+- **Trường dữ liệu QC:**
+  - `qty_actual_good`: Số lượng hàng đạt chuẩn ngoại quan và kết cấu kỹ thuật.
+  - `qty_actual_damaged`: Số lượng hàng bị trầy xước, nứt vỡ, móp méo trong quá trình vận chuyển.
+  - `variance_reason`: Bắt buộc nhập lý do chi tiết nếu phát sinh hàng hỏng hoặc sai lệch so với chứng từ.
+- **Ràng buộc toán học bắt buộc:**
+  $$qty\_actual\_good + qty\_actual\_damaged = Quantity (Số\_lượng\_thực\_nhận)$$
+- **Tác động tồn kho sau phê duyệt:** Hệ thống tự động cập nhật số dư kho trong cùng 1 Transaction:
+  - Tồn kho đạt chuẩn: `StockLedgers(Status='GOOD') += qty_actual_good`.
+  - Tồn kho hàng hỏng: `StockLedgers(Status='DAMAGED') += qty_actual_damaged`.
+  - Tự động sinh bản ghi `DamagedRecords` ghi nhận số lượng lỗi và nguyên nhân để theo dõi xử lý.
+
+#### SRS-F-08: Phê duyệt Phiếu Nhập kho 2 cấp
+- **Quy trình:**
+  1. Sau khi QC hoàn tất, phiếu chuyển sang trạng thái chờ Kế toán duyệt Cấp 1 (`PENDING_L1`).
+  2. Kế toán đối chiếu hóa đơn, đơn giá, số lượng; bấm duyệt $\rightarrow$ chuyển trạng thái `PENDING_L2`.
+  3. Quản lý kho kiểm tra điều kiện kho bãi; bấm duyệt Cấp 2 $\rightarrow$ Hệ thống kích hoạt cập nhật tồn kho chính thức và chuyển trạng thái phiếu sang `APPROVED`.
+
+---
+
+### 3.3. Phân hệ Xuất kho & Khóa bi quan (Outbound & Concurrency Control: SRS-F-09 $\rightarrow$ SRS-F-12)
+
+#### SRS-F-09: Khởi tạo Phiếu Xuất kho (Outbound Voucher Creation)
+- **Mô tả:** Thủ kho hoặc Nhân viên lập phiếu xuất bán hàng thương mại hoặc xuất công trình dự án nội thất.
+- **Trường dữ liệu:** `VoucherNumber` (Tiền tố `PX-yyyyMMddHHmmss`), `Date`, `Type = 'OUTBOUND'`, `Counterparty` (Tên khách hàng/đơn vị nhận), `WarehouseId` (Kho xuất), `TotalAmount`, `Status = 'DRAFT'`.
+- **Hỗ trợ xuất linh hoạt:** Cho phép chọn xuất các mặt hàng SKU đơn lẻ hoặc xuất theo bộ Combo.
+
+#### SRS-F-10: Tính Tồn khả dụng & Bóc tách Linh kiện Combo BOM
+- **Tồn khả dụng SKU đơn lẻ:**
+  $$AvailableStock(SKU) = \sum StockLedgers(WarehouseId, SKU, Status='GOOD')$$
+  *(Loại trừ hoàn toàn các bản ghi có trạng thái DAMAGED).*
+- **Tồn khả dụng Combo suy diễn (Derived Stock):**
+  $$AvailableCombo(Combo) = \min_{c \in Components} \left\lfloor \frac{AvailableStock(c.SkuId)}{c.QuantityPerSet} \right\rfloor$$
+- **Bóc tách BOM khi xuất Combo:** Khi người dùng yêu cầu xuất $N$ bộ Combo, hệ thống tự động bóc tách thành danh sách các linh kiện cần trừ:
+  $$DeductionQty(Component_i) = N \times QuantityPerSet_i$$
+
+#### SRS-F-11: Chặn xuất vượt tồn & Cơ chế Khóa bi quan (Pessimistic Locking Engine)
+- **Hiện thực hóa kỹ thuật (`InventoryRepository.LockLedgersForUpdateAsync`):**
+  1. Trích xuất danh sách tất cả các mã SKU cần trừ tồn (gồm SKU đơn lẻ và linh kiện bóc tách từ Combo).
+  2. Loại bỏ trùng lặp và sắp xếp danh sách mã SKU theo thứ tự tăng dần (`ORDER BY SkuId ASC`) để loại trừ 100% nguy cơ xảy ra Deadlock giữa các luồng đồng thời.
+  3. Thực thi truy vấn khóa bi quan cưỡng bức ở cấp CSDL SQL Server:
+     ```sql
+     SELECT * FROM StockLedgers WITH (UPDLOCK, ROWLOCK) 
+     WHERE SkuId IN (@p0, @p1, ...) AND WarehouseId = @WarehouseId AND Status = 'GOOD'
+     ORDER BY SkuId ASC
+     ```
+  4. Kiểm tra số lượng tồn trên từng dòng dữ liệu đang giữ khóa:
+     - Nếu tồn kho $< DeductionQty$, hệ thống lập tức thực thi `tx.RollbackAsync()` và trả mã lỗi `ERR-STOCK-001: Không đủ tồn để trừ`.
+     - Nếu thiếu linh kiện Combo, trả mã lỗi `ERR-STOCK-002: Không đủ tồn linh kiện để ghép Combo`.
+  5. Nếu đủ tồn trên toàn bộ các dòng: Trừ số lượng `Quantity -= DeductionQty`, chèn bản ghi lịch sử `StockMovements`, thực thi `tx.CommitAsync()` để lưu vĩnh viễn và tự động giải phóng khóa.
+
+#### SRS-F-12: Phân luồng Phê duyệt Xuất kho 3 cấp độ theo Giá trị tài chính
+- **Hạn mức tài chính:** Ngưỡng phê duyệt cấp Giám đốc mặc định là **100.000.000 VNĐ** (có thể cấu hình trong `SystemConfig.OutboundDirectorApprovalThreshold`).
+- **Phân luồng:**
+  - Nếu `TotalAmount <= 100.000.000 VNĐ`: Phiếu qua 2 cấp duyệt (Cấp 1: Kế toán $\rightarrow$ Cấp 2: Quản lý kho). Sau khi Quản lý kho duyệt, hệ thống kích hoạt xuất kho.
+  - Nếu `TotalAmount > 100.000.000 VNĐ`: Sau khi Quản lý kho duyệt Cấp 2, phiếu chuyển tiếp sang trạng thái `PENDING_L3`. Bắt buộc Giám đốc (`Director`) phê duyệt Cấp 3 mới được phép kích hoạt giao dịch trừ tồn kho.
+
+---
+
+### 3.4. Phân hệ Điều chuyển kho nội bộ (Stock Transfer: SRS-F-13)
+
+#### SRS-F-13: Điều chuyển Kho Nguyên tử (Atomic Stock Transfer)
+- **Mô tả:** Quản lý việc luân chuyển hàng hóa giữa các kho nội bộ (Kho Tổng $\leftrightarrow$ Kho Chi nhánh, hoặc Kho Tổng $\rightarrow$ Kho Hàng lỗi).
+- **Tính giao dịch nguyên tử (Atomic 2 đầu):** Giảm tồn kho tại Kho nguồn (`FromWarehouseId`) và tăng tồn kho tại Kho đích (`ToWarehouseId`) trong **cùng một Transaction CSDL duy nhất**.
+- **Quy tắc khóa chống Deadlock:** Khóa bản ghi tồn kho theo thứ tự tăng dần của `WarehouseId` (`OrderBy(w => w.WarehouseId)`).
+- **Ràng buộc:** Chỉ cho phép chuyển hàng ở trạng thái `GOOD`. Nếu chuyển hàng hỏng đi sửa chữa, phải tạo chứng từ phân loại riêng biệt có Quản lý kho duyệt.
+
+---
+
+### 3.5. Phân hệ Kiểm kê & Cân chỉnh tồn (Inventory Audit & Adjustment: SRS-F-14 $\rightarrow$ SRS-F-15)
+
+#### SRS-F-14: Lập Phiếu Kiểm kê Kho định kỳ
+- **Mô tả:** Hỗ trợ tạo đợt kiểm kê định kỳ theo kho bãi.
+- **Trường dữ liệu:** `InventoryAudit`: `AuditId`, `AuditNumber`, `Date`, `WarehouseId`, `Status` (`DRAFT`, `APPROVED`), `CreatedBy`.
+- **Chi tiết kiểm đếm (`InventoryAuditLine`):** `SkuId`, `BatchNumber`, `StockStatus` (`GOOD`/`DAMAGED`), `SystemQuantity` (Số dư sổ sách tại thời điểm lập phiếu), `ActualQuantity` (Số lượng đếm thực tế), `Notes`.
+
+#### SRS-F-15: Tính toán Sai lệch & Quy tắc Ngưỡng Chênh lệch 5%
+- **Công thức tính tỷ lệ sai lệch:**
+  $$VariancePercent = \frac{|ActualQuantity - SystemQuantity|}{SystemQuantity} \times 100\%$$
+- **Quy tắc xử lý:**
+  - Nếu $VariancePercent \le 5\%$: Quản lý kho có thể duyệt trực tiếp kết quả kiểm kê.
+  - Nếu $VariancePercent > 5\%$: Hệ thống bắt buộc người dùng phải tạo một Phiếu điều chỉnh tồn kho (`StockAdjustment`) riêng biệt, giải trình nguyên nhân cụ thể và phải có chữ ký phê duyệt điện tử của Quản lý kho mới được phép cập nhật số dư hệ thống.
+- **Cân chỉnh tồn kho:** Khi được duyệt, hệ thống tự động sinh các bản ghi `StockMovements` loại `ADJUSTMENT` với số lượng chênh lệch $\Delta = ActualQuantity - SystemQuantity$, bảo toàn 100% dấu vết kiểm toán.
+
+---
+
+### 3.6. Phân hệ Quản lý Hàng lỗi (Damaged Stock Management: SRS-F-16)
+
+#### SRS-F-16: Quản lý & Xử lý Hàng Hỏng (Damaged Stock Lifecycle)
+- **Theo dõi chi tiết (`DamagedRecord`):** `DamagedId`, `SkuId`, `Quantity`, `Reason` (Nguyên nhân: trầy xước, cong vênh, vỡ kính), `Resolution` (Giải pháp xử lý), `ApprovedBy`, `CreatedAt`.
+- **Ba phương án xử lý hàng lỗi:**
+  1. **Sửa chữa hoàn nguyên (`REPAIR`):** Sau khi xưởng mộc khắc phục lỗi, Quản lý kho duyệt chuyển hàng từ `DAMAGED` trở lại tồn khả dụng `GOOD`.
+  2. **Thanh lý giá rẻ (`LIQUIDATE`):** Tạo phiếu xuất kho thanh lý thu hồi vốn, ghi giảm tồn `DAMAGED`.
+  3. **Trả lại Nhà cung cấp (`RETURN_TO_SUPPLIER`):** Tạo phiếu xuất trả hàng liên kết với số lô nhập gốc.
+
+---
+
+### 3.7. Phân hệ Phê duyệt chứng từ đa cấp (Approval Workflow: SRS-F-17)
+
+#### SRS-F-17: Động cơ Phê duyệt Phân tầng (Approval Workflow Engine)
+- **Thực thể quản lý:** `ApprovalStep`: `StepId`, `EntityType` (`PO`, `SO`, `VOUCHER`), `EntityId`, `Level` (1, 2, 3), `ApproverRole` (Kế toán, Quản lý kho, Giám đốc), `Status` (`PENDING`, `APPROVED`, `REJECTED`), `ApprovedBy`, `ApprovedAt`, `Comment`.
+- **Cơ chế hoạt động:**
+  - Cấp $N$ chỉ được phép thao tác khi Cấp $N-1$ đã ở trạng thái `APPROVED`.
+  - Nếu bất kỳ cấp nào bấm **Từ chối (Reject)**, phiếu bị hủy hoặc trả về trạng thái Bản nháp kèm lý do từ chối bắt buộc (`RejectionReason`).
+
+---
+
+### 3.8. Phân hệ Báo cáo & Thống kê (Reporting & Analytics: SRS-F-18 $\rightarrow$ SRS-F-20)
+
+#### SRS-F-18: Báo cáo Nhập - Xuất - Tồn (N-X-T)
+- **Công thức cân đối kế toán bắt buộc:**
+  $$Tồn\_cuối = Tồn\_đầu + Tổng\_nhập - Tổng\_xuất + Nhận\_chuyển - Xuất\_chuyển \pm Điều\_chỉnh$$
+- **Tính năng lọc:** Lọc theo khoảng thời gian, Kho bãi, Danh mục sản phẩm, Nhà cung cấp. Báo cáo phân tách riêng cột hàng đạt chuẩn `GOOD` và hàng lỗi `DAMAGED`.
+
+#### SRS-F-19: Báo cáo Thể tích CBM & Cảnh báo Sức chứa Kho
+- **Công thức:**
+  $$Tổng\_CBM\_Chiếm\_chỗ = \sum (CBM_{SKU} \times Quantity_{GOOD})$$
+  $$FillRate\% = \frac{Tổng\_CBM\_Chiếm\_chỗ}{MaxCapacityCbm} \times 100\%$$
+- **Cảnh báo quá tải:** Khi $FillRate\% \ge CapacityAlertPercent$ (mặc định $90\%$), hệ thống hiển thị cảnh báo đỏ trên Dashboard.
+
+#### SRS-F-20: Xuất dữ liệu đa định dạng (Excel & PDF)
+- Cho phép kết xuất toàn bộ dữ liệu báo cáo ra file Excel (.xlsx) với định dạng bảng tính có kẻ khung, công thức tính tổng và file PDF định dạng A4 chuẩn in ấn.
+
+---
+
+### 3.9. Phân hệ Quản trị hệ thống, Nhật ký & Sao lưu (Admin, Audit & Backup: SRS-F-21 $\rightarrow$ SRS-F-23)
+
+#### SRS-F-21: Quản trị Người dùng & Phân quyền RBAC
+- Quản lý tài khoản người dùng, họ tên, email, trạng thái hoạt động; gán vai trò theo 6 nhóm quyền đã định nghĩa.
+
+#### SRS-F-22: Nhật ký Kiểm toán Bất biến (Immutable Audit Trail)
+- Ghi nhận tự động mọi hành vi CUD và Approve vào bảng `AuditLogs`: `UserId`, `Action`, `EntityType`, `EntityId`, `BeforeSnapshotJson`, `AfterSnapshotJson`, `TimestampUtc`, `IpAddress`. Dữ liệu lưu trữ tối thiểu 5 năm và không thể chỉnh sửa qua giao diện.
+
+#### SRS-F-23: Quản lý Sao lưu & Phục hồi CSDL (Database Backup/Restore)
+- Cung cấp chức năng tạo bản sao lưu toàn bộ 32 bảng CSDL ra file snapshot JSON/SQL có nén và phục hồi hệ thống an toàn khi xảy ra sự cố.
+
+---
+
+### 3.10. Phân hệ Tra cứu thông tin nhanh (Quick Search: SRS-F-24)
+
+#### SRS-F-24: Tra cứu Tức thời Đa đối tượng (Universal Quick Search)
+- Thanh tìm kiếm nhanh tại Header cho phép gõ từ khóa để truy vấn đồng thời: Mã SKU, Tên sản phẩm, Số phiếu nhập/xuất, Tên nhà cung cấp và hiển thị kết quả gợi ý tức thời trong $\le 300$ ms.
+
+---
+
+## 4. Đặc tả yêu cầu Trí tuệ nhân tạo (AI Requirements: SRS-AI-01 $\rightarrow$ SRS-AI-06)
+
+### 4.1. SRS-AI-01: Thuật toán Dự báo Bổ sung hàng tồn kho (Replenishment Engine)
+- **Mục tiêu:** Tự động phát hiện các mặt hàng có nguy cơ đứt hàng và tính toán số lượng cần đặt thêm.
+- **Dữ liệu đầu vào:** Số dư tồn khả dụng $Stock_{GOOD}$ và định mức an toàn $MinStock$ từ `ProductModel`.
+- **Thuật toán xử lý (`AiService.RunAnalysisAsync`):**
+  1. Quét toàn bộ danh mục biến thể SKU.
+  2. Nếu $Stock_{GOOD} < MinStock$:
+     $$NeededQty = MinStock - Stock_{GOOD}$$
+     $$SuggestedQty = \max(NeededQty, MinStock)$$
+  3. Khởi tạo một bản ghi đề xuất tại bảng `AiSuggestions` với `SuggestionType = 'LOW_STOCK'`, `Status = 'PENDING_REVIEW'`.
+  4. Tự động gửi email cảnh báo cho Quản lý kho nếu cấu hình `EnableEmailAlerts = true`.
+
+---
+
+### 4.2. SRS-AI-02: Thuật toán Phát hiện Biến động nhu cầu bất thường (Anomaly Detection $\ge 20\%$)
+- **Mục tiêu:** Nhận diện các mặt hàng có tốc độ bán tăng vọt (sốt hàng) hoặc sụt giảm đột biến so với chu kỳ bình thường.
+- **Dữ liệu đầu vào:** Lịch sử xuất kho của các giao dịch hợp lệ trạng thái `GOOD` trong 60 ngày gần nhất.
+- **Thuật toán xử lý:**
+  1. Tính nhu cầu trung bình ngày trong 60 ngày: $AvgDaily_{60} = \sum Qty_{60} / 60.0$.
+  2. Tính nhu cầu trung bình ngày trong 7 ngày gần nhất: $AvgDaily_{7} = \sum Qty_{7} / 7.0$.
+  3. Tính tỷ lệ biến động:
+     $$Diff = \frac{AvgDaily_{7} - AvgDaily_{60}}{AvgDaily_{60}}$$
+  4. Nếu $|Diff| \ge 0.20$ ($20\%$ trở lên):
+     - Xác định hướng biến động: $Diff \ge 0 \rightarrow$ "TĂNG ĐỘT BIẾN"; $Diff < 0 \rightarrow$ "GIẢM BẤT THƯỜNG".
+     - Tính số lượng nhập dự phòng 30 ngày:
+       $$SuggestedOrder = \max(0, \lceil AvgDaily_{7} \times 30 \rceil - CurrentStock)$$
+     - Tạo bản ghi `AiSuggestions` loại `ANOMALY` với trạng thái `PENDING_REVIEW`.
+
+---
+
+### 4.3. SRS-AI-03: Thuật toán Phát hiện Điểm nghẽn Cấu kiện Combo (Combo Bottleneck Detection)
+- **Mục tiêu:** Ngăn chặn tình trạng ứ đọng linh kiện do thiếu một vài cấu kiện nhỏ khiến không thể lắp ráp Combo hoàn chỉnh.
+- **Thuật toán xử lý:**
+  1. Với mỗi bộ Combo $C$, duyệt qua tập linh kiện cấu thành $\{Comp_1, Comp_2, ..., Comp_k\}$.
+  2. Tính số bộ tối đa mà từng linh kiện có thể đáp ứng: $Sets_i = \lfloor Stock_i / QuantityPerSet_i \rfloor$.
+  3. Xác định linh kiện cổ chai:
+     $$BottleneckComponent = \arg\min_{i} (Sets_i)$$
+     $$MinSets = \min_{i} (Sets_i)$$
+  4. Nếu $MinSets < Combo.MinStock$:
+     - Phát cảnh báo cổ chai: $SuggestedQty = (Combo.MinStock - MinSets) \times QuantityPerSet_{bottleneck}$.
+     - Tạo bản ghi `AiSuggestions` loại `BOTTLENECK` chỉ rõ linh kiện cần ưu tiên nhập.
+
+---
+
+### 4.4. SRS-AI-04: Cảnh báo Giới hạn Dung tích Khối kho hàng (Capacity Exceeded CBM)
+- **Mục tiêu:** Bảo vệ an toàn kết cấu kho hàng, chống xếp chồng quá tải gây nứt vỡ đồ gỗ/kính.
+- **Thuật toán xử lý:**
+  1. Tính tổng thể tích hàng hóa lưu kho theo từng kho: $TotalCbm = \sum (Sku.Cbm \times Stock_{GOOD})$.
+  2. So sánh với $MaxCapacityCbm$ của kho.
+  3. Nếu $TotalCbm > MaxCapacityCbm \times (CapacityAlertPercent / 100.0)$: Tạo cảnh báo nguy cơ quá tải trên Dashboard điều hành.
+
+---
+
+### 4.5. SRS-AI-05: Trợ lý AI Copilot & Kỹ thuật RAG Context Grounding
+- **Mục tiêu:** Cung cấp trải nghiệm hội thoại tự nhiên hỗ trợ người dùng tra cứu dữ liệu kho tức thời mà không bị ảo giác (*Zero Hallucination*).
+- **Quy trình RAG Grounding (`AiChatGroundingService`):**
+  1. Nhận chuỗi Prompt từ người dùng.
+  2. Backend truy vấn CSDL SQL Server trích xuất snapshot:
+     - Tổng số mã SKU hiện có.
+     - Tổng tồn kho khả dụng `GOOD` và Tổng tồn kho lỗi `DAMAGED`.
+     - Thống kê chi tiết toàn bộ chứng từ Nhập, Xuất, Chuyển kho theo các trạng thái `APPROVED`, `PENDING`, `REJECTED`, `DRAFT`.
+     - Nếu người dùng hỏi về phiếu gần đây hoặc mã cụ thể: Tự động nạp thêm danh sách chi tiết các phiếu tương ứng vào ngữ cảnh.
+  3. Lắp ráp ngữ cảnh vào System Prompt gửi đến Local LLM Ollama (`qwen2.5-coder:7b`).
+
+---
+
+### 4.6. SRS-AI-06: Tiến hóa Prompt & Rào chắn an toàn (Regex Guardrails, Action Calling, Human-in-the-loop)
+Quá trình nghiên cứu và chuẩn hóa rào chắn AI trải qua 3 thế hệ tiến hóa:
+- **Thế hệ 1 (Naive Prompt):** Gửi trực tiếp câu hỏi người dùng đến LLM $\rightarrow$ *Kết quả:* LLM nói mò số liệu tồn kho, tự bịa mã phiếu ảo (Hallucination) không có trong DB.
+- **Thế hệ 2 (Database Context Grounding):** Bổ sung ngữ cảnh CSDL vào System Prompt $\rightarrow$ *Kết quả:* Trả lời số lượng chính xác, nhưng người dùng vẫn phải tự thao tác thủ công mở form nhập liệu.
+- **Thế hệ 3 (Guardrails & Action Function Calling - Hiện tại):**
+  - Ép buộc mô hình sinh mã lệnh có cấu trúc khi nhận diện ý định tạo chứng từ:
+    `[ACTION: CREATE_DRAFT_INBOUND: {"counterparty": "...", "sku": "...", "quantity": 10}]`
+  - Backend sử dụng Regex bắt khớp mã lệnh, tự động gọi hàm nội bộ `CreateDraftVoucherInternalAsync` để tạo bản ghi thật vào SQL Server ở trạng thái `DRAFT` với mã phiếu thực tế (VD: `PN-20261029040012`).
+  - Thay thế toàn bộ mã lệnh hoặc chuỗi mã phiếu ảo của LLM bằng thông tin phiếu thật kèm đường dẫn liên kết trực tiếp (`DirectUrl`).
+  - **Nguyên tắc Human-in-the-loop:** Phiếu do AI tạo **luôn ở trạng thái DRAFT**. Số dư tồn kho chỉ thay đổi khi con người có thẩm quyền kiểm tra và phê duyệt.
+
+---
+
+## 5. Thiết kế Cơ sở Dữ liệu & Biểu đồ kỹ thuật (Database & Technical Diagrams)
+
+### 5.1. Sơ đồ Thực thể Liên kết (Entity Relationship Diagram - ERD 32 bảng CSDL)
+
+Hệ thống quản lý 32 bảng CSDL chuẩn 3NF. Sơ đồ dưới đây minh họa các thực thể nghiệp vụ cốt lõi:
 
 ```mermaid
 erDiagram
-    SUPPLIER ||--o{ PURCHASE_ORDER : "cung cấp"
-    WAREHOUSE ||--o{ STOCK_LEDGER : "quản lý tại"
-    PRODUCT_MODEL ||--o{ SKU_VARIANT : "có biến thể"
-    SKU_VARIANT ||--o{ STOCK_LEDGER : "có tồn"
-    SKU_VARIANT }o--o{ BOM_COMPONENT : "là cấu kiện của"
-    COMBO_PRODUCT ||--o{ BOM_COMPONENT : "định nghĩa bởi"
-    PURCHASE_ORDER ||--o{ PURCHASE_ORDER_LINE : "gồm"
-    PURCHASE_ORDER_LINE }o--|| SKU_VARIANT : "tham chiếu"
-    SALES_ORDER ||--o{ SALES_ORDER_LINE : "gồm"
-    SALES_ORDER_LINE }o--|| SKU_VARIANT : "tham chiếu"
-    SALES_ORDER_LINE }o--o| COMBO_PRODUCT : "hoặc tham chiếu Combo"
-    STOCK_TRANSFER ||--o{ STOCK_TRANSFER_LINE : "gồm"
-    STOCK_TRANSFER_LINE }o--|| SKU_VARIANT : "tham chiếu"
-    STOCK_COUNT ||--o{ STOCK_COUNT_LINE : "gồm"
-    STOCK_COUNT_LINE }o--|| SKU_VARIANT : "tham chiếu"
-    STOCK_ADJUSTMENT }o--|| SKU_VARIANT : "điều chỉnh"
-    STOCK_LEDGER ||--o{ DAMAGED_RECORD : "có thể phát sinh"
-    APPROVAL_STEP }o--|| PURCHASE_ORDER : "áp dụng cho"
-    APPROVAL_STEP }o--|| SALES_ORDER : "áp dụng cho"
-    AI_SUGGESTION }o--|| SKU_VARIANT : "gợi ý cho"
-    AUDIT_LOG }o--|| USER_ACCOUNT : "thực hiện bởi"
-    USER_ACCOUNT }o--|| ROLE : "có vai trò"
+    WAREHOUSES ||--o{ STOCK_LEDGERS : "chứa tại"
+    SUPPLIERS ||--o{ PURCHASE_ORDERS : "cung cấp"
+    PRODUCT_MODELS ||--o{ SKU_VARIANTS : "có các biến thể"
+    SKU_VARIANTS ||--o{ STOCK_LEDGERS : "quản lý tồn"
+    SKU_VARIANTS }o--o{ BOM_COMPONENTS : "linh kiện cấu thành"
+    COMBO_PRODUCTS ||--o{ BOM_COMPONENTS : "định nghĩa bởi"
+    
+    INVENTORY_VOUCHERS ||--o{ VOUCHER_LINES : "gồm các dòng"
+    SKU_VARIANTS ||--o{ VOUCHER_LINES : "tham chiếu"
+    WAREHOUSES ||--o{ INVENTORY_VOUCHERS : "phát sinh tại"
 
-    PRODUCT_MODEL {
-        string product_model_id PK
-        string product_name
-        string category
-        string unit
-        int min_stock
-        boolean is_active
+    INVENTORY_AUDITS ||--o{ INVENTORY_AUDIT_LINES : "chi tiết kiểm đếm"
+    SKU_VARIANTS ||--o{ INVENTORY_AUDIT_LINES : "kiểm đếm"
+
+    STOCK_TRANSFERS ||--o{ STOCK_TRANSFER_LINES : "gồm các mặt hàng"
+    SKU_VARIANTS ||--o{ STOCK_TRANSFER_LINES : "điều chuyển"
+
+    SKU_VARIANTS ||--o{ STOCK_MOVEMENTS : "lưu vết biến động"
+    SKU_VARIANTS ||--o{ DAMAGED_RECORDS : "ghi nhận lỗi"
+    SKU_VARIANTS ||--o{ AI_SUGGESTIONS : "phân tích đề xuất"
+
+    ASPNET_USERS ||--o{ AUDIT_LOGS : "thực hiện"
+    ASPNET_ROLES ||--o{ ASPNET_USER_ROLES : "gán cho"
+    ASPNET_USERS ||--o{ ASPNET_USER_ROLES : "sở hữu"
+
+    PRODUCT_MODELS {
+        string ProductModelId PK "Mã gốc duy nhất"
+        string ProductName "Tên sản phẩm"
+        string Category "Danh mục"
+        string Unit "Đơn vị tính"
+        int MinStock "Tồn an toàn"
+        boolean IsActive "Trạng thái"
     }
-    SKU_VARIANT {
-        string sku_id PK
-        string product_model_id FK
-        string color
-        string material
-        int length_mm
-        int width_mm
-        int height_mm
-        decimal cbm
-        decimal unit_price
-        boolean is_active
+
+    SKU_VARIANTS {
+        string SkuId PK "Mã SKU biến thể"
+        string ProductModelId FK "Khóa ngoại Model"
+        string Color "Màu sắc"
+        string Material "Chất liệu"
+        int LengthMm "Dài mm"
+        int WidthMm "Rộng mm"
+        int HeightMm "Cao mm"
+        decimal Cbm "Thể tích m3"
+        decimal UnitPrice "Đơn giá"
     }
-    COMBO_PRODUCT {
-        string combo_id PK
-        string combo_name
-        decimal cbm_override
-        int min_stock
+
+    COMBO_PRODUCTS {
+        string ComboId PK "Mã Combo"
+        string ComboName "Tên gói bộ"
+        int MinStock "Tồn an toàn bộ"
+        decimal CbmOverride "CBM tùy chỉnh"
     }
-    BOM_COMPONENT {
-        string combo_id FK
-        string sku_id FK
-        int quantity_per_set
+
+    BOM_COMPONENTS {
+        int Id PK "Khóa tự tăng"
+        string ComboId FK "Mã Combo"
+        string SkuId FK "Mã linh kiện"
+        int QuantityPerSet "Định mức cấu thành"
     }
-    SUPPLIER {
-        string supplier_id PK
-        string tax_code
-        string name
-        string address
-        string email
-        string phone
+
+    STOCK_LEDGERS {
+        string SkuId PK,FK "Mã SKU"
+        string WarehouseId PK,FK "Mã Kho"
+        string Status PK "GOOD hoặc DAMAGED"
+        string BatchNumber PK "Số lô quản lý"
+        int Quantity "Số lượng tồn"
     }
-    WAREHOUSE {
-        string warehouse_id PK
-        string warehouse_name
-        string warehouse_type
-        decimal max_capacity_cbm
+
+    INVENTORY_VOUCHERS {
+        string VoucherId PK "GUID duy nhất"
+        string VoucherNumber "Mã phiếu PN/PX/PC"
+        string Type "INBOUND, OUTBOUND, TRANSFER"
+        string Status "DRAFT, PENDING, APPROVED, REJECTED"
+        decimal TotalAmount "Tổng tiền"
+        string Counterparty "Tên đối tác"
+        string CreatedBy "Người lập"
     }
-    PURCHASE_ORDER {
-        string po_id PK
-        date po_date
-        string supplier_id FK
-        string warehouse_id FK
-        string status
-        decimal total_amount
-        string created_by
+
+    VOUCHER_LINES {
+        int Id PK "Khóa dòng"
+        string VoucherId FK "Mã chứng từ"
+        string SkuId FK "Mã SKU"
+        int Quantity "Số lượng thực tế"
+        int DocumentQuantity "Số lượng chứng từ"
+        decimal UnitPrice "Đơn giá"
+        decimal LineTotal "Thành tiền"
     }
-    PURCHASE_ORDER_LINE {
-        string po_id FK
-        string sku_id FK
-        int qty_document
-        int qty_actual_good
-        int qty_actual_damaged
-        decimal unit_cost
-        string variance_reason
+
+    AI_SUGGESTIONS {
+        int Id PK "Khóa tự tăng"
+        string SuggestionType "LOW_STOCK, ANOMALY, BOTTLENECK"
+        string SkuId "Mã SKU liên quan"
+        string Status "PENDING_REVIEW, APPROVED, REJECTED"
+        string PayloadJson "Chi tiết tham số"
+        datetime CreatedAt "Thời điểm tạo"
     }
-    SALES_ORDER {
-        string so_id PK
-        date so_date
-        string warehouse_id FK
-        string status
-        decimal total_amount
-        string created_by
-    }
-    SALES_ORDER_LINE {
-        string so_id FK
-        string sku_id FK
-        string combo_id FK
-        int qty
-        decimal unit_price
-    }
-    STOCK_LEDGER {
-        string sku_id FK
-        string warehouse_id FK
-        string status
-        int quantity
-        boolean is_locked
-        string locked_by_txn
-        datetime locked_at
-    }
-    STOCK_TRANSFER {
-        string transfer_id PK
-        string from_warehouse_id FK
-        string to_warehouse_id FK
-        string status
-        string created_by
-    }
-    STOCK_TRANSFER_LINE {
-        string transfer_id FK
-        string sku_id FK
-        int qty
-    }
-    STOCK_COUNT {
-        string count_id PK
-        string warehouse_id FK
-        date count_date
-        string status
-    }
-    STOCK_COUNT_LINE {
-        string count_id FK
-        string sku_id FK
-        int system_qty
-        int counted_qty_good
-        int counted_qty_damaged
-        decimal variance_pct
-    }
-    STOCK_ADJUSTMENT {
-        string adjustment_id PK
-        string sku_id FK
-        string warehouse_id FK
-        int qty_delta
-        string reason
-        string source_type
-        string approved_by
-    }
-    DAMAGED_RECORD {
-        string damaged_id PK
-        string sku_id FK
-        int quantity
-        string reason
-        string resolution
-        string approved_by
-        datetime created_at
-    }
-    APPROVAL_STEP {
-        string step_id PK
-        string entity_type
-        string entity_id
-        int level
-        string approver_role
-        string status
-        string approved_by
-        datetime approved_at
-    }
-    AI_SUGGESTION {
-        string suggestion_id PK
-        string suggestion_type
-        string sku_id FK
-        string payload_json
-        string status
-        string reviewed_by
-        datetime reviewed_at
-    }
-    AUDIT_LOG {
-        string log_id PK
-        string entity_type
-        string entity_id
-        string action
-        string before_json
-        string after_json
-        string performed_by
-        datetime performed_at
-        string reason
-    }
-    USER_ACCOUNT {
-        string user_id PK
-        string username
-        string full_name
-        string role_id FK
-    }
-    ROLE {
-        string role_id PK
-        string role_name
+
+    AUDIT_LOGS {
+        int Id PK "Khóa tự tăng"
+        string UserId "Người thực hiện"
+        string Action "Thao tác"
+        string EntityType "Thực thể"
+        string EntityId "Mã thực thể"
+        string BeforeJson "Snapshot trước"
+        string AfterJson "Snapshot sau"
+        datetime Timestamp "Thời điểm UTC"
     }
 ```
 
-### 7.2. Sequence Diagram — Luồng duyệt phiếu xuất & Khóa giao dịch đồng thời (Pessimistic Locking)
+### 5.2. Sequence Diagram: Quy trình Xuất kho & Khóa bi quan T-SQL UPDLOCK, ROWLOCK
 
 ```mermaid
 sequenceDiagram
-    actor TK as Thủ kho
-    actor KT as Kế toán
-    actor QL as Quản lý kho
-    actor GD as Giám đốc
-    participant SVC as Outbound Service
-    participant DB as CSDL (Stock_Ledger)
-    participant AUD as Audit Log
+    autonumber
+    actor Staff as Thủ kho
+    actor Acct as Kế toán
+    actor Mgr as Quản lý kho
+    actor Dir as Giám đốc
+    participant Ctrl as OutboundController
+    participant Svc as InventoryServiceAdvanced
+    participant Repo as InventoryRepository
+    participant DB as SQL Server (StockLedgers)
 
-    TK->>SVC: Lập phiếu xuất (SKU/Combo, số lượng, thành tiền)
-    SVC->>SVC: Tính total_amount, xác định số cấp duyệt cần thiết
-    SVC-->>TK: Phiếu ở trạng thái PENDING_L1
+    Staff->>Ctrl: Lập phiếu xuất bán (SKU hoặc Combo, Số lượng)
+    Ctrl->>DB: Lưu InventoryVoucher (Status = DRAFT)
+    Ctrl-->>Staff: Tạo phiếu nháp thành công, gửi yêu cầu duyệt C1
 
-    KT->>SVC: Duyệt cấp 1 (đối chiếu chứng từ)
-    SVC->>AUD: Ghi log APPROVE_L1
-    SVC-->>KT: Chuyển trạng thái PENDING_L2
+    Acct->>Ctrl: Kế toán đối chiếu, bấm Duyệt Cấp 1
+    Ctrl->>DB: Cập nhật ApprovalStep Level 1 = APPROVED
+    Ctrl-->>Acct: Chuyển sang chờ Quản lý duyệt Cấp 2
 
-    QL->>SVC: Duyệt cấp 2
-    SVC->>AUD: Ghi log APPROVE_L2
+    Mgr->>Ctrl: Quản lý kho kiểm tra tính sẵn sàng, bấm Duyệt Cấp 2
+    Ctrl->>DB: Cập nhật ApprovalStep Level 2 = APPROVED
 
-    alt total_amount > 100,000,000 VNĐ
-        SVC-->>QL: Chuyển trạng thái PENDING_L3
-        GD->>SVC: Duyệt cấp 3 (bắt buộc)
-        SVC->>AUD: Ghi log APPROVE_L3
-    else total_amount <= 100,000,000 VNĐ
-        SVC-->>QL: Không cần cấp 3
+    alt Tổng giá trị phiếu xuất > 100.000.000 VNĐ
+        Ctrl-->>Mgr: Yêu cầu chuyển Giám đốc duyệt Cấp 3
+        Dir->>Ctrl: Giám đốc kiểm duyệt rủi ro tài chính, bấm Duyệt Cấp 3
+        Ctrl->>DB: Cập nhật ApprovalStep Level 3 = APPROVED
+    else Tổng giá trị phiếu xuất <= 100.000.000 VNĐ
+        Note over Ctrl: Đủ điều kiện xuất kho ngay sau Cấp 2
     end
 
-    Note over SVC,DB: Bắt đầu xử lý trừ tồn sau khi đủ cấp duyệt
-    SVC->>DB: BEGIN TRANSACTION
-    SVC->>DB: SELECT tồn theo SKU FOR UPDATE (khóa bản ghi)
-    alt Bản ghi đang bị khóa bởi giao dịch khác
-        DB-->>SVC: Chờ tối đa lock_timeout (mặc định 5-10s)
-        DB-->>SVC: Hết timeout
-        SVC-->>TK: Lỗi ERR-LOCK-001 "Mặt hàng đang được xử lý, thử lại sau"
-        SVC->>DB: ROLLBACK
-    else Lấy khóa thành công
-        DB-->>SVC: Tồn khả dụng hiện tại (GOOD - Damaged - đang khóa)
-        alt Không đủ tồn (SKU đơn hoặc thiếu cấu kiện Combo)
-            SVC-->>TK: Từ chối - ERR-STOCK-001/002
-            SVC->>DB: ROLLBACK (mở khóa)
-        else Đủ tồn
-            SVC->>DB: Trừ tồn (SKU hoặc từng cấu kiện theo BOM)
-            SVC->>AUD: Ghi log STOCK_DEDUCTED
-            SVC->>DB: COMMIT (mở khóa)
-            DB-->>SVC: Xác nhận thành công
-            SVC-->>TK: Phiếu xuất hoàn tất, trạng thái APPROVED
-        end
+    Note over Svc,DB: BẮT ĐẦU GIAO DỊCH TRỪ TỒN CÓ KHÓA BI QUAN
+    Ctrl->>Svc: LockAndDeductAsync(skuDeductions, warehouseId)
+    Svc->>DB: BEGIN TRANSACTION
+    Svc->>Repo: LockLedgersForUpdateAsync(skuIds, warehouseId, 'GOOD')
+    Repo->>DB: SELECT * FROM StockLedgers WITH (UPDLOCK, ROWLOCK)<br/>WHERE SkuId IN (...) ORDER BY SkuId ASC
+    
+    alt Không đủ tồn khả dụng (hoặc thiếu linh kiện Combo)
+        DB-->>Svc: Tồn kho thực tế < Số lượng yêu cầu xuất
+        Svc->>DB: ROLLBACK TRANSACTION (Mở khóa dòng ngay lập tức)
+        Svc-->>Ctrl: Trả về lỗi: ERR-STOCK-001 / ERR-STOCK-002
+        Ctrl-->>Staff: Báo lỗi: Không đủ hàng khả dụng trong kho!
+    else Đủ tồn khả dụng trên toàn bộ các dòng
+        DB-->>Svc: Khóa thành công và trả về dữ liệu tồn
+        Svc->>DB: UPDATE StockLedgers SET Quantity = Quantity - @Qty
+        Svc->>DB: INSERT INTO StockMovements (Type = 'OUTBOUND', Status = 'GOOD')
+        Svc->>DB: COMMIT TRANSACTION (Lưu vĩnh viễn và Giải phóng khóa)
+        Svc-->>Ctrl: Trừ tồn thành công
+        Ctrl->>DB: Cập nhật InventoryVoucher.Status = 'APPROVED'
+        Ctrl-->>Staff: Xuất kho thành công, hàng đã xuất khỏi kho vật lý!
     end
 ```
 
-### 7.3. Flowchart — Luồng xử lý AI tổng thể
+### 5.3. Sequence Diagram: Quy trình Nhập kho & Phân luồng QC GOOD / DAMAGED
 
 ```mermaid
-flowchart TD
-    A[Kích hoạt chu kỳ xử lý AI - hàng ngày/tuần] --> B[Truy vấn dữ liệu N-X-T từ Stock_Ledger]
-    B --> C[Loại trừ toàn bộ bản ghi trạng thái DAMAGED]
-    C --> D[Tính nhu cầu TB 7 ngày và TB 60 ngày theo từng SKU]
-    D --> E[AI-02: Tính % biến động = TB7 so với TB60]
-    E --> F{Chênh lệch tuyệt đối >= 20%?}
-    F -->|Có| G[Tạo bản ghi AI_SUGGESTION loại ANOMALY - PENDING_REVIEW]
-    F -->|Không| H[Không tạo cảnh báo]
-    D --> I[AI-01: Áp dụng công thức dự báo nhập hàng]
-    I --> J[Số lượng đề xuất = TB60 x Hệ số mùa vụ + Biến động gần nhất - Tồn khả dụng]
-    J --> K{Kết quả > 0?}
-    K -->|Có| L[Tạo bản ghi AI_SUGGESTION loại REPLENISHMENT - PENDING_REVIEW]
-    K -->|Không| M[Không tạo đề xuất]
-    L --> N{SKU là cấu kiện của Combo nào?}
-    N -->|Có| O[AI-03: Tính tồn khả dụng Combo theo BOM]
-    O --> P{Tồn Combo dưới ngưỡng an toàn?}
-    P -->|Có| Q[Xác định cấu kiện bottleneck - argmin]
-    Q --> R[Tạo AI_SUGGESTION loại BOTTLENECK kèm cấu kiện ưu tiên]
-    P -->|Không| S[Không cảnh báo bottleneck]
-    N -->|Không| S
-    G --> T[AI-04: Tổng hợp toàn bộ output kèm dữ liệu căn cứ]
-    L --> T
-    R --> T
-    S --> T
-    T --> U[Hiển thị Dashboard cho Quản lý kho/Kế toán]
-    U --> V{Quản lý kho bấm Duyệt gợi ý AI?}
-    V -->|Duyệt| W[Cập nhật AI_SUGGESTION.status = APPROVED]
-    W --> X[Tạo Phiếu đề xuất nhập hàng / gắn cờ theo dõi chính thức]
-    V -->|Từ chối/Chỉnh sửa| Y[Cập nhật AI_SUGGESTION.status = REJECTED, lưu phản hồi]
-    X --> Z[Kết thúc chu kỳ]
-    Y --> Z[Kết thúc chu kỳ]
+sequenceDiagram
+    autonumber
+    actor Staff as Thủ kho
+    actor QC as Nhân viên QC
+    actor Acct as Kế toán
+    actor Mgr as Quản lý kho
+    participant Ctrl as InboundController
+    participant DB as SQL Server
+
+    Staff->>Ctrl: Khởi tạo phiếu nhập hàng từ Nhà cung cấp
+    Ctrl->>DB: Lưu InventoryVoucher (Status = DRAFT)
+    Ctrl-->>Staff: Chờ nhân viên QC kiểm tra ngoại quan hàng hóa
+
+    QC->>Ctrl: Mở giao diện kiểm định lô hàng (/Quality)
+    QC->>QC: Kiểm tra kích thước, bề mặt gỗ, kính, phụ kiện
+    QC->>Ctrl: Submit kết quả: Số lượng GOOD và Số lượng DAMAGED (kèm lý do)
+    Ctrl->>Ctrl: Validate: GoodQty + DamagedQty == DocumentQty
+    Ctrl->>DB: Cập nhật chi tiết kiểm định vào VoucherLines
+    Ctrl-->>QC: Đã xác lập kết quả QC, chuyển sang duyệt chứng từ
+
+    Acct->>Ctrl: Kế toán đối chiếu hóa đơn tài chính, bấm Duyệt C1
+    Ctrl->>DB: Cập nhật ApprovalStep Level 1 = APPROVED
+    
+    Mgr->>Ctrl: Quản lý kho kiểm tra dung tích kệ kho, bấm Duyệt C2
+    Ctrl->>DB: Cập nhật ApprovalStep Level 2 = APPROVED
+    
+    Note over Ctrl,DB: CẬP NHẬT TỒN KHO PHÂN TÁCH THEO KẾT QUẢ QC
+    Ctrl->>DB: BEGIN TRANSACTION
+    Ctrl->>DB: Tăng tồn hàng chuẩn: StockLedgers(Status='GOOD') += GoodQty
+    alt Có phát sinh hàng lỗi trầy xước / hỏng
+        Ctrl->>DB: Tăng tồn kho lỗi: StockLedgers(Status='DAMAGED') += DamagedQty
+        Ctrl->>DB: INSERT INTO DamagedRecords (SkuId, DamagedQty, Reason)
+    end
+    Ctrl->>DB: INSERT INTO StockMovements (Type = 'INBOUND')
+    Ctrl->>DB: COMMIT TRANSACTION
+    Ctrl-->>Staff: Nhập kho hoàn tất! Hàng GOOD sẵn sàng bán, hàng DAMAGED được cách ly!
 ```
 
-### 7.4. State Diagram — Vòng đời phiếu (Purchase Order / Sales Order)
+### 5.4. Sequence Diagram: AI Copilot RAG Grounding, Guardrails & Action sinh phiếu DRAFT
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Người dùng (Thủ kho / Quản lý)
+    participant ChatCtrl as AiChatController
+    participant Grounding as AiChatGroundingService
+    participant LLM as Local LLM Ollama (qwen2.5-coder:7b)
+    participant DB as SQL Server
+
+    User->>ChatCtrl: Gõ câu lệnh: "Tạo cho tôi một đơn nhập 15 bàn ăn Mango"
+    ChatCtrl->>Grounding: BuildContextPromptAsync(prompt)
+    Grounding->>DB: Truy vấn snapshot kho: Tổng SKU, Tồn GOOD/DAMAGED, Thống kê phiếu
+    DB-->>Grounding: Trả về số liệu kho thời gian thực
+    Grounding-->>ChatCtrl: System Prompt nạp đầy đủ Grounding Context thực tế
+
+    ChatCtrl->>LLM: Gửi POST /api/chat (System Prompt + History + User Prompt)
+    Note over LLM: Phân tích ngữ cảnh kho & áp dụng luật Action Calling
+    LLM-->>ChatCtrl: Phản hồi văn bản kèm mã lệnh:<br/>[ACTION: CREATE_DRAFT_INBOUND: {"counterparty": "NCC An Phát", "sku": "SKU-BAN-MANGO", "quantity": 15}]
+
+    Note over ChatCtrl: RÀO CHẮN AN TOÀN REGEX & FUNCTION CALLING
+    ChatCtrl->>ChatCtrl: Regex match mã lệnh CREATE_DRAFT_INBOUND
+    ChatCtrl->>DB: Khởi tạo phiếu thật: InventoryVoucher (Type=INBOUND, Status=DRAFT, Number='PN-20261029040012')
+    DB-->>ChatCtrl: Xác nhận lưu phiếu DRAFT thành công vào CSDL
+    ChatCtrl->>ChatCtrl: Thay thế mã lệnh bằng thẻ thông báo thành công & URL phiếu thật
+    ChatCtrl-->>User: Hiển thị phản hồi tiếng Việt kèm link: "✅ Đã tạo Bản nháp Phiếu Nhập PN-20261029040012! Bấm vào đây để xem/sửa"
+```
+
+### 5.5. State Diagram: Vòng đời Phê duyệt chứng từ tài chính 3 cấp độ
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DRAFT
-    DRAFT --> PENDING_L1: Gửi duyệt
-    PENDING_L1 --> DRAFT: Kế toán từ chối, trả về sửa
-    PENDING_L1 --> PENDING_L2: Kế toán duyệt (cấp 1)
-    PENDING_L2 --> PENDING_L1: Quản lý kho từ chối, trả về cấp 1
-    PENDING_L2 --> PENDING_L3: Quản lý kho duyệt & total_amount > 100tr (chỉ Sales Order)
-    PENDING_L2 --> APPROVED: Quản lý kho duyệt & không cần cấp 3
-    PENDING_L3 --> PENDING_L2: Giám đốc từ chối, trả về cấp 2
-    PENDING_L3 --> APPROVED: Giám đốc duyệt (cấp 3)
-    APPROVED --> CANCELLED: Quản lý kho hủy (sinh phiếu điều chỉnh ngược)
+    [*] --> DRAFT: Khởi tạo chứng từ kho (Thủ kho hoặc AI sinh nháp)
+    DRAFT --> PENDING_L1: Gửi yêu cầu phê duyệt
+    
+    PENDING_L1 --> DRAFT: Kế toán từ chối (trả về chỉnh sửa)
+    PENDING_L1 --> PENDING_L2: Kế toán duyệt Cấp 1 (Hợp lệ hóa đơn)
+    
+    PENDING_L2 --> PENDING_L1: Quản lý từ chối (trả về cấp 1)
+    PENDING_L2 --> PENDING_L3: Quản lý duyệt Cấp 2 & Phiếu xuất > 100 triệu VNĐ
+    PENDING_L2 --> APPROVED: Quản lý duyệt Cấp 2 & (Phiếu nhập HOẶC Phiếu xuất <= 100 triệu)
+    
+    PENDING_L3 --> PENDING_L2: Giám đốc từ chối (trả về cấp 2)
+    PENDING_L3 --> APPROVED: Giám đốc duyệt Cấp 3 (Chấp thuận tài chính lớn)
+    
+    APPROVED --> CANCELLED: Hủy phiếu đã duyệt (Hệ thống tự sinh bút toán đảo ngược)
     APPROVED --> [*]
     CANCELLED --> [*]
 ```
 
-### 7.5. State Diagram — Vòng đời tồn kho theo trạng thái GOOD/DAMAGED
+### 5.6. State Diagram: Vòng đời Trạng thái Tồn kho hàng hóa (GOOD / DAMAGED)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> QC_Pending
-    QC_Pending --> GOOD: QC xác nhận đạt chất lượng
-    QC_Pending --> DAMAGED: QC phát hiện lỗi
-    GOOD --> Locked: Bắt đầu giao dịch (xuất/điều chỉnh/chuyển kho)
-    Locked --> GOOD: Giao dịch rollback
-    Locked --> Consumed: Giao dịch commit (đã xuất/chuyển đi)
-    GOOD --> DAMAGED: Phát hiện lỗi khi lưu kho/kiểm kê (Quản lý duyệt)
-    DAMAGED --> GOOD: Sửa chữa hoàn tất (Quản lý duyệt)
-    DAMAGED --> Liquidated: Thanh lý (Quản lý duyệt)
-    DAMAGED --> ReturnedToSupplier: Trả NCC (Quản lý duyệt)
-    Consumed --> [*]
-    Liquidated --> [*]
-    ReturnedToSupplier --> [*]
+    [*] --> Tiêp_nhan_chờ_QC: Hàng hóa đến kho từ Nhà cung cấp
+    
+    Tiêp_nhan_chờ_QC --> GOOD: QC xác nhận đạt chuẩn 100%
+    Tiêp_nhan_chờ_QC --> DAMAGED: QC phát hiện lỗi ngoại quan / nứt vỡ
+    
+    state GOOD {
+        [*] --> Lưu_kho_khả_dụng: Đưa lên giá kệ, sẵn sàng xuất bán
+        Lưu_kho_khả_dụng --> Đang_khóa_UPDLOCK: Khởi tạo giao dịch xuất kho / chuyển kho
+        Đang_khóa_UPDLOCK --> Lưu_kho_khả_dụng: Giao dịch thất bại / Rollback
+        Đang_khóa_UPDLOCK --> Đã_xuất_giao: Giao dịch Commit thành công
+    }
+
+    GOOD --> DAMAGED: Hư hỏng trong quá trình lưu kho / kiểm kê
+    
+    state DAMAGED {
+        [*] --> Cách_ly_kho_hỏng: Cách ly hoàn toàn khỏi tồn bán
+        Cách_ly_kho_hỏng --> Đang_sửa_chữa: Quản lý duyệt phương án sửa chữa
+        Đang_sửa_chữa --> Hoàn_nguyên_GOOD: Xưởng mộc sửa xong, QC nghiệm thu đạt
+        Cách_ly_kho_hỏng --> Thanh_lý: Quản lý duyệt bán thanh lý giá vốn
+        Cách_ly_kho_hỏng --> Trả_hàng_NCC: Quản lý duyệt trả lại đơn vị cung cấp
+    }
+
+    Hoàn_nguyên_GOOD --> GOOD
+    Đã_xuất_giao --> [*]
+    Thanh_lý --> [*]
+    Trả_hàng_NCC --> [*]
 ```
 
 ---
 
-## 8. Yêu cầu phi chức năng (Non-Functional Requirements)
+## 6. Yêu cầu phi chức năng (Non-Functional Requirements: SRS-NF-01 $\rightarrow$ SRS-NF-22)
 
-### 8.1. Bảo mật (Security)
+### 6.1. Yêu cầu Bảo mật, Danh tính & Phân quyền (Security & RBAC)
+- **SRS-NF-01 (Mã hóa mật khẩu):** Mật khẩu người dùng được băm bằng thuật toán PBKDF2 với muối ngẫu nhiên (*Salt*) tích hợp trong ASP.NET Core Identity. Tuyệt đối không lưu bản rõ.
+- **SRS-NF-02 (Chống tấn công CSRF):** 100% các yêu cầu HTTP POST/PUT/DELETE từ biểu mẫu giao diện người dùng phải chứa token `__RequestVerificationToken` hợp lệ được kiểm tra qua thuộc tính `[ValidateAntiForgeryToken]`.
+- **SRS-NF-03 (Phân quyền Controller):** Các Controller và Action nhạy cảm bắt buộc khai báo thuộc tính `[Authorize(Roles = "...")]` kiểm soát chặt chẽ quyền truy cập theo 6 nhóm vai trò.
+- **SRS-NF-04 (Bảo mật AI On-Premise):** Mô hình AI vận hành On-Premise 100% qua Ollama, cổng 11434 chỉ mở nội bộ máy chủ, không mở ra Internet, bảo mật tuyệt đối dữ liệu kho doanh nghiệp.
+- **SRS-NF-05 (Chống SQL Injection):** 100% các câu truy vấn tương tác CSDL được thực thi qua Entity Framework Core 9 hoặc tham số hóa tường minh (`SqlParameter`), tuyệt đối không ghép chuỗi SQL trần.
 
-| ID | Yêu cầu |
-|---|---|
-| SRS-NF-01 | Xác thực người dùng qua JWT (JSON Web Token), thời hạn access token ngắn (≤ 1 giờ) kèm refresh token. |
-| SRS-NF-02 | Áp dụng RBAC chi tiết theo ma trận mục 2.2; mọi API endpoint phải kiểm tra quyền trước khi xử lý. |
-| SRS-NF-03 | Mật khẩu người dùng lưu dạng băm (hash) với thuật toán bcrypt/argon2, không lưu plaintext. |
-| SRS-NF-04 | Toàn bộ giao tiếp client-server qua HTTPS/TLS 1.2+. |
-| SRS-NF-05 | Dữ liệu nhạy cảm (mã số thuế NCC, thông tin liên hệ) mã hóa tại tầng lưu trữ (encryption at rest) theo chính sách công ty. |
-| SRS-NF-06 | Giới hạn số lần đăng nhập sai (rate limiting) để chống brute-force. |
+### 6.2. Yêu cầu Khóa bi quan & Toàn vẹn giao dịch đồng thời (Pessimistic Locking)
+- **SRS-NF-06 (Khóa cưỡng bức dòng dữ liệu):** Mọi giao dịch làm thay đổi số dư tồn kho bắt buộc áp dụng T-SQL `WITH (UPDLOCK, ROWLOCK)`.
+- **SRS-NF-07 (Khóa theo thứ tự chống Deadlock):** Danh sách SKU cần khóa trong 1 giao dịch bắt buộc phải được sắp xếp theo thứ tự từ điển tăng dần (`ORDER BY SkuId ASC`).
+- **SRS-NF-08 (Giới hạn thời gian chờ khóa):** Thời gian chờ khóa tối đa (*Lock Timeout*) mặc định từ 5 đến 10 giây. Nếu vượt quá timeout, hệ thống tự động Rollback và trả thông báo hệ thống đang bận.
+- **SRS-NF-09 (Phạm vi khóa):** Khóa bi quan chỉ tồn tại trong vòng đời của một `DbTransaction` duy nhất ở Backend, tự động giải phóng khi Commit hoặc Rollback, không giữ khóa qua các chu kỳ HTTP request.
 
-### 8.2. Cơ chế Khóa giao dịch đồng thời (Pessimistic Locking) — Đặc tả kỹ thuật
+### 6.3. Yêu cầu Sao lưu, Phục hồi & Phòng chống thảm họa (Backup & Disaster Recovery)
+- **SRS-NF-10 (Tần suất sao lưu):** Hệ thống có tiến trình chạy ngầm `DatabaseBackupService` tự động thực hiện sao lưu CSDL định kỳ hàng ngày.
+- **SRS-NF-11 (Chỉ số RPO):** Recovery Point Objective (RPO) đạt mục tiêu $\le 1$ giờ đối với dữ liệu giao dịch kho.
+- **SRS-NF-12 (Chỉ số RTO):** Recovery Time Objective (RTO) đạt mục tiêu $\le 4$ giờ để khôi phục toàn bộ hệ thống từ bản sao lưu gần nhất.
+- **SRS-NF-13 (Lưu trữ kiểm toán):** Bảng `AuditLogs` bảo đảm thời hạn lưu trữ dữ liệu tối thiểu **5 năm** phục vụ công tác thanh tra kiểm toán tài chính.
 
-| ID | Yêu cầu |
-|---|---|
-| SRS-NF-07 | Mọi giao dịch làm thay đổi số lượng tồn của 1 bản ghi `stock_ledger` (nhập, xuất, điều chỉnh, chuyển kho, đổi trạng thái Damaged) phải khóa bản ghi ngay từ bước đọc bằng câu lệnh `SELECT ... FOR UPDATE` (PostgreSQL/MySQL InnoDB) hoặc `SELECT ... WITH (UPDLOCK, ROWLOCK)` (SQL Server). |
-| SRS-NF-08 | Khóa chỉ được giải phóng khi transaction `COMMIT` hoặc `ROLLBACK`; không được giữ khóa qua nhiều request HTTP (khóa phải nằm trọn trong 1 transaction backend, không phải khóa ở tầng UI). |
-| SRS-NF-09 | Thời gian chờ khóa tối đa (`lock_timeout`) mặc định 5–10 giây, có thể cấu hình bởi Admin (SRS-F-32 kế thừa từ URD). Vượt timeout, hệ thống trả lỗi `ERR-LOCK-001` và tự động rollback, không để transaction treo. |
-| SRS-NF-10 | Khi 1 giao dịch cần khóa nhiều bản ghi tồn cùng lúc (VD: xuất Combo có nhiều cấu kiện, hoặc chuyển kho giữa 2 kho), phải khóa theo **thứ tự cố định** (ví dụ sắp xếp theo `sku_id` hoặc `warehouse_id` tăng dần) để loại trừ khả năng deadlock giữa các giao dịch song song. |
-| SRS-NF-11 | Hệ thống phải log mọi trường hợp timeout khóa vào bảng giám sát riêng (`lock_timeout_log`) để phục vụ phân tích hiệu năng và phát hiện điểm nghẽn (hotspot SKU). |
-| SRS-NF-12 | Nếu hệ thống scale nhiều instance backend, cần đảm bảo khóa Pessimistic Locking hoạt động đúng ở cấp CSDL (không dựa vào khóa in-memory riêng lẻ từng instance); có thể bổ sung khóa phân tán (Redis Redlock) cho các thao tác tổng hợp liên bảng nếu cần. |
+### 6.4. Yêu cầu Hiệu năng & Khả năng chịu tải (Performance & Scalability)
+- **SRS-NF-14 (Thời gian phản hồi đọc):** Thời gian phản hồi cho các thao tác đọc và tra cứu tồn kho đạt P95 $\le 500$ ms.
+- **SRS-NF-15 (Thời gian phản hồi ghi có khóa):** Thời gian hoàn tất một giao dịch xuất/nhập kho có khóa bi quan đạt $\le 2$ giây ở điều kiện tải thông thường.
+- **SRS-NF-16 (Khả năng chịu tải đồng thời):** Hệ thống hỗ trợ tối thiểu 50 giao dịch xuất/nhập kho đồng thời trên cùng một mã hàng mà không phát sinh tình trạng Deadlock hay xuất âm kho.
+- **SRS-NF-17 (Tốc độ tính toán CBM):** Thời gian tự động tính toán thể tích $CBM$ khi cập nhật kích thước SKU đạt $\le 50$ ms.
 
-### 8.3. Khôi phục dữ liệu & Sao lưu (Backup & Recovery)
-
-| ID | Yêu cầu |
-|---|---|
-| SRS-NF-13 | Sao lưu CSDL đầy đủ (full backup) tối thiểu 1 lần/ngày; sao lưu tăng dần (incremental/log backup) mỗi 1–4 giờ. |
-| SRS-NF-14 | Recovery Point Objective (RPO) mục tiêu ≤ 1 giờ; Recovery Time Objective (RTO) mục tiêu ≤ 4 giờ cho sự cố mức trung bình. |
-| SRS-NF-15 | Bản sao lưu được kiểm thử khôi phục (restore test) định kỳ tối thiểu mỗi quý để đảm bảo tính khả dụng thực tế. |
-| SRS-NF-16 | Audit log và dữ liệu giao dịch tồn kho được lưu trữ tối thiểu 5 năm (kế thừa REQ-NF-04/SRS-F-22), có chính sách archive dữ liệu cũ sang storage lạnh (cold storage) sau 2 năm để tối ưu chi phí mà vẫn truy xuất được khi cần kiểm toán. |
-
-### 8.4. Hiệu năng (Performance)
-
-| ID | Yêu cầu |
-|---|---|
-| SRS-NF-17 | Thời gian phản hồi API tra cứu tồn kho (đọc) ≤ 500ms ở tải bình thường (P95). |
-| SRS-NF-18 | Giao dịch ghi tồn (nhập/xuất có khóa) hoàn tất ≤ 2 giây/giao dịch ở tải bình thường, không tính thời gian chờ khóa nếu có tranh chấp. |
-| SRS-NF-19 | Việc tự động tính CBM khi cập nhật kích thước không làm chậm thao tác lưu quá 1 giây (kế thừa REQ-NF-08). |
-| SRS-NF-20 | Hệ thống chịu tải tối thiểu 50 giao dịch xuất/nhập đồng thời mà không phát sinh deadlock (nhờ nguyên tắc khóa theo thứ tự tại SRS-NF-10). |
-
-### 8.5. Khả dụng & Khả mở rộng
-
-| ID | Yêu cầu |
-|---|---|
-| SRS-NF-21 | Availability mục tiêu ≥ 99.5% trong giờ hành chính. |
-| SRS-NF-22 | Kiến trúc service theo layer (mục 3.1) cho phép mở rộng theo chiều ngang (horizontal scaling) ở tầng Application Service; tầng CSDL sử dụng read-replica cho các truy vấn báo cáo nặng để tránh ảnh hưởng đến giao dịch ghi tồn thời gian thực. |
+### 6.5. Yêu cầu Khả năng bảo trì & Độ tin cậy (Maintainability & Reliability)
+- **SRS-NF-18 (Độ sẵn sàng hệ thống):** Chỉ số Availability đạt $\ge 99.5\%$ trong khung giờ vận hành kho (07:00 – 19:00 hàng ngày).
+- **SRS-NF-19 (Giao diện chuẩn hóa):** Giao diện Web được thiết kế Responsive, tương thích hiển thị trên máy tính để bàn, máy tính bảng của thủ kho và thiết bị quét cầm tay.
+- **SRS-NF-20 (Khả năng quan sát - Observability):** Toàn bộ lỗi phát sinh không mong muốn (*Unhandled Exceptions*) được ghi nhận chi tiết vào File Log hệ thống kèm StackTrace và thời gian UTC.
+- **SRS-NF-21 (Kiểm thử hồi quy tự động):** Toàn bộ các quy tắc nghiệp vụ cốt lõi (CBM, Combo BOM, Khóa bi quan, QC, AI Replenishment) được bảo vệ bởi bộ 36 ca kiểm thử tự động xUnit; bảo đảm không suy thoái mã nguồn (*No Regression*).
+- **SRS-NF-22 (Tiến trình tự khởi động):** Dịch vụ `OllamaStartupService` có cơ chế tự kiểm tra và khởi động tiến trình Ollama nền khi ứng dụng Web khởi chạy nếu nhận thấy dịch vụ AI chưa hoạt động.
 
 ---
 
-## 9. Đặc tả API tổng quát (REST — mức khái quát cho thiết kế chi tiết)
+## 7. Đặc tả Giao diện Lập trình Ứng dụng (API Specifications)
 
-| Method | Endpoint | Mô tả | Ràng buộc chính |
-|---|---|---|---|
-| POST | `/api/v1/skus` | Tạo SKU (biến thể) mới | Validate CBM (SRS-F-02), chống trùng biến thể (SRS-F-03) |
-| PUT | `/api/v1/skus/{sku_id}/dimensions` | Cập nhật kích thước & tính lại CBM | Ghi audit_log `UPDATE_DIMENSION` |
-| POST | `/api/v1/combos` | Tạo Combo/BOM | Validate cấu kiện tồn tại, định mức > 0 |
-| GET | `/api/v1/combos/{combo_id}/available-stock` | Lấy tồn khả dụng Combo (tính động) | Áp dụng công thức SRS-F-10 |
-| POST | `/api/v1/inbound/purchase-orders` | Tạo phiếu nhập | Trạng thái DRAFT |
-| POST | `/api/v1/inbound/purchase-orders/{id}/qc` | Ghi nhận phân loại QC GOOD/DAMAGED | Validate tổng khớp số lượng thực nhận |
-| POST | `/api/v1/inbound/purchase-orders/{id}/approve` | Duyệt phiếu nhập (theo cấp) | Kiểm tra vai trò người duyệt đúng cấp |
-| POST | `/api/v1/outbound/sales-orders` | Tạo phiếu xuất | Tính total_amount, xác định số cấp duyệt |
-| POST | `/api/v1/outbound/sales-orders/{id}/approve` | Duyệt phiếu xuất (theo cấp, có thể có cấp 3) | Kiểm tra đủ cấp trước khi trừ tồn |
-| POST | `/api/v1/inventory/lock` | (Nội bộ) Khóa bản ghi tồn trước giao dịch | Timeout theo cấu hình (SRS-NF-09) |
-| POST | `/api/v1/inventory/adjustments` | Tạo phiếu điều chỉnh tồn | Bắt buộc khi kiểm kê lệch > 5% (SRS-F-14) |
-| POST | `/api/v1/inventory/damaged` | Gắn cờ hàng Damaged | Yêu cầu duyệt Quản lý kho (SRS-F-12) |
-| POST | `/api/v1/transfers` | Tạo phiếu chuyển kho nội bộ | Atomic 2 bản ghi tồn (SRS-F-15) |
-| GET | `/api/v1/reports/inventory-summary` | Báo cáo N-X-T | Bộ lọc theo kỳ/kho/SKU/trạng thái |
-| GET | `/api/v1/ai/suggestions` | Lấy danh sách gợi ý AI đang chờ duyệt | Chỉ trả dữ liệu `PENDING_REVIEW` cho Quản lý kho |
-| POST | `/api/v1/ai/suggestions/{id}/approve` | Duyệt gợi ý AI | Ghi audit_log, kích hoạt hành động chính thức tương ứng |
-| GET | `/api/v1/audit-logs` | Tra cứu audit log | Chỉ Quản lý kho/Admin/Giám đốc có quyền xem toàn bộ |
+| Phương thức | Endpoint URI | Mô tả chức năng | Quyền hạn truy cập | Ghi chú & Ràng buộc |
+| :---: | :--- | :--- | :---: | :--- |
+| `POST` | `/api/AiChat/chat` | Tương tác hội thoại với Trợ lý AI Copilot | Đăng nhập hệ thống | Nạp context qua RAG Grounding; sinh Action |
+| `POST` | `/Inbound/Create` | Tạo mới hoặc cập nhật phiếu nhập kho nháp | Thủ kho / Admin | Lưu trạng thái DRAFT kèm danh sách dòng hàng |
+| `POST` | `/Inbound/ApproveLevel1` | Phê duyệt phiếu nhập kho Cấp 1 | Kế toán / Admin | Chuyển trạng thái sang PENDING_L2 |
+| `POST` | `/Inbound/ApproveLevel2` | Phê duyệt phiếu nhập kho Cấp 2 | Quản lý kho / Admin | Cập nhật số dư kho GOOD/DAMAGED |
+| `POST` | `/Quality/SubmitCheck` | Gửi kết quả kiểm định chất lượng lô hàng | QC / Admin | Validate GoodQty + DamagedQty == ActualQty |
+| `POST` | `/Outbound/Create` | Tạo mới hoặc cập nhật phiếu xuất kho nháp | Thủ kho / Admin | Bóc tách BOM Combo tự động nếu có |
+| `POST` | `/Outbound/Approve` | Phê duyệt phiếu xuất kho đa cấp | Kế toán / Quản lý / Giám đốc | Kiểm tra hạn mức $> 100$ tr; kích hoạt Khóa bi quan |
+| `POST` | `/StockTransfer/Create` | Lập phiếu điều chuyển kho nội bộ | Thủ kho / Quản lý | Kiểm tra tồn khả dụng tại kho nguồn |
+| `POST` | `/InventoryAudit/Approve` | Phê duyệt phiếu kiểm kê kho | Quản lý kho / Admin | Kiểm tra ngưỡng lệch 5%; sinh bút toán điều chỉnh |
+| `POST` | `/Replenishment/Approve` | Duyệt đề xuất gợi ý nhập hàng của AI | Quản lý kho / Admin | Tự động tạo bản nháp Phiếu nhập kho vào CSDL |
+| `POST` | `/Replenishment/Trigger` | Kích hoạt quét phân tích AI thủ công | Quản lý kho / Admin | Quét dữ liệu 7 ngày vs 60 ngày |
+| `GET` | `/QuickSearch/Index` | Tra cứu nhanh thông tin kho tức thời | Toàn bộ người dùng | Trả về JSON danh sách SKU, Phiếu, Đối tác |
+| `POST` | `/Admin/TriggerBackup` | Kích hoạt sao lưu toàn bộ CSDL | Quản trị viên (Admin) | Sinh file JSON snapshot có nén |
 
 ---
 
-## 10. Ma trận truy vết yêu cầu (Traceability Matrix)
+## 8. Ma trận truy vết yêu cầu phần mềm (Traceability Matrix)
 
-| Nguồn URD | Yêu cầu SRS tương ứng |
-|---|---|
-| REQ-F-27 (CBM) | SRS-F-01, SRS-F-02 |
-| REQ-F-28 (Combo/BOM) | SRS-F-04, SRS-F-10, SRS-F-11 |
-| REQ-F-29 (Biến thể SKU) | SRS-F-03 |
-| REQ-F-30, REQ-F-31 (Damaged) | SRS-F-07, SRS-F-12, SRS-F-13 |
-| REQ-F-17/BR-05 (Chuyển kho) | SRS-F-15 |
-| BR-06 (Kiểm kê >5%) | SRS-F-14 |
-| REQ-F-20/BR-03 (Workflow duyệt đa cấp) | SRS-F-17, mục 2.3, mục 7.2 |
-| REQ-F-24/REQ-NF-04 (Audit log 5 năm) | SRS-F-22, SRS-NF-16 |
-| REQ-NF-07/BR-16 (Pessimistic Locking) | SRS-NF-07 → SRS-NF-12, mục 7.2 |
-| REQ-AI-02/BR-09 (Dự báo nhập) | SRS-AI-01 |
-| REQ-AI-03/TBC-06 (Biến động ≥20%) | SRS-AI-02 |
-| REQ-AI-04 (Bottleneck Combo) | SRS-AI-03 |
-| REQ-F-26/BR-10, TBC-16 (Human-in-the-loop AI) | SRS-F-18, mục 6.5 |
-| REQ-F-13 (Phân quyền) | Mục 2.2, SRS-NF-02 |
-
----
-
-## 11. Tiêu chí nghiệm thu (Acceptance Criteria)
-
-- [ ] Tạo SKU với đủ 3 kích thước → CBM được tính và hiển thị chính xác theo công thức; thiếu 1 chiều → hệ thống chặn lưu với lỗi `ERR-CBM-001`.
-- [ ] Tạo Combo với BOM hợp lệ → tồn khả dụng Combo hiển thị đúng theo công thức MIN(floor(...)).
-- [ ] Xuất Combo khi thiếu 1 cấu kiện → toàn bộ giao dịch bị từ chối, không trừ tồn một phần.
-- [ ] Gắn cờ Damaged cho 1 số lượng SKU → tồn khả dụng giảm tương ứng ngay sau khi Quản lý kho duyệt; tồn vật lý tổng không đổi.
-- [ ] Hai giao dịch xuất đồng thời cùng 1 SKU có tổng vượt tồn → chỉ 1 giao dịch thành công, giao dịch còn lại nhận lỗi hoặc phải chờ đủ tồn (kiểm thử bằng concurrency test tối thiểu 20 luồng song song).
-- [ ] Phiếu xuất có `total_amount > 100.000.000 VNĐ` → bắt buộc phải qua đủ 3 cấp duyệt (Kế toán → Quản lý kho → Giám đốc) mới chuyển trạng thái APPROVED.
-- [ ] Kiểm kê có SKU lệch >5% → hệ thống bắt buộc sinh phiếu điều chỉnh tồn và chặn cập nhật tồn trực tiếp nếu chưa được Quản lý kho duyệt.
-- [ ] Mọi thao tác CUD trên phiếu/tồn kho đều sinh bản ghi trong `audit_log`, có thể tra cứu lại sau tối thiểu 5 năm.
-- [ ] AI sinh gợi ý nhập hàng đúng công thức đã chốt; gợi ý ở trạng thái `PENDING_REVIEW` và không tạo phiếu đề xuất chính thức nếu Quản lý kho chưa bấm "Duyệt gợi ý AI".
-- [ ] AI phát hiện đúng các trường hợp biến động ≥20%/7 ngày trong bộ dữ liệu kiểm thử mẫu; không tạo cảnh báo dưới ngưỡng.
-- [ ] Giao dịch bị khóa vượt quá `lock_timeout` cấu hình → trả lỗi rõ ràng cho người dùng, không treo hệ thống, không để lại khóa "mồ côi" (orphaned lock) trong CSDL.
+| Yêu cầu URD v2.0 | Yêu cầu SRS tương ứng | Thành phần Mã nguồn (.NET 9) | Ca kiểm thử xUnit bảo chứng |
+| :--- | :--- | :--- | :--- |
+| **REQ-F-01, 02 (CBM)** | SRS-F-01, SRS-F-02 | `SkuVariant.cs`, `AdminController.cs` | `CalculateCbm_ShouldReturnCorrectValue`<br/>`InvalidDimensions_ShouldThrowException` |
+| **REQ-F-03 (Combo BOM)** | SRS-F-03, SRS-F-04 | `ComboProduct.cs`, `BomComponent.cs` | `GetComboAvailable_ShouldReturnCorrectCount` |
+| **REQ-F-06, 07 (Inbound QC)** | SRS-F-06, SRS-F-07, SRS-F-08 | `InboundController.cs`, `QualityController.cs` | `Inbound_GoodAndDamaged_ShouldSeparateCorrectly` |
+| **REQ-F-09, 10 (Outbound BOM)**| SRS-F-09, SRS-F-10 | `OutboundController.cs`, `InventoryServiceAdvanced` | `DeductCombo_SufficientStock_ShouldDeductAllComponents` |
+| **REQ-F-11, BR-05 (Locking)** | SRS-F-11, SRS-NF-06..09 | `InventoryRepository.cs`, `InventoryServiceAdvanced` | `LockAndDeduct_ConcurrentRequests_ShouldPreventOverselling` |
+| **REQ-F-12, BR-06 (Duyệt 3 cấp)**| SRS-F-12, SRS-F-17 | `ApprovalWorkflowService.cs`, `ApprovalStep.cs` | `Outbound_AboveThreshold_ShouldRequireDirectorApproval` |
+| **REQ-F-13 (Chuyển kho)** | SRS-F-13 | `StockTransferController.cs` | `StockTransfer_ShouldBeAtomicBetweenWarehouses` |
+| **REQ-F-14, 15 (Kiểm kê 5%)** | SRS-F-14, SRS-F-15 | `InventoryAuditController.cs`, `StockAdjustment.cs` | `AuditVariance_Above5Percent_ShouldRequireAdjustmentVoucher` |
+| **REQ-F-16 (Hàng lỗi Damaged)**| SRS-F-16 | `DamagedService.cs`, `DamagedRecord.cs` | `DamagedStock_ShouldNotBeIncludedInAvailableStock` |
+| **REQ-AI-01 (Tồn kho thấp)** | SRS-AI-01 | `AiService.cs`, `ReplenishmentController.cs` | `AiReplenishment_LowStock_ShouldGenerateSuggestion` |
+| **REQ-AI-02 (Biến động 20%)** | SRS-AI-02 | `AiService.cs` (7 days vs 60 days) | `AiAnomaly_SpikeAbove20Percent_ShouldTriggerAlert` |
+| **REQ-AI-03 (Nghẽn cổ chai)** | SRS-AI-03 | `AiService.cs` (Combo Bottleneck Analysis) | `AiComboBottleneck_ShouldIdentifyLimitingComponent` |
+| **REQ-AI-04, 05 (Copilot RAG)**| SRS-AI-05, SRS-AI-06 | `AiChatController.cs`, `AiChatGroundingService.cs` | `AiChat_CreateDraftAction_ShouldCreateRealVoucherInDb` |
+| **REQ-NF-01 (Bảo mật RBAC)** | SRS-NF-01..05 | `RoleHelper.cs`, `DbSeeder.cs`, ASP.NET Identity | `Authorization_UnauthorizedRole_ShouldBeRejected` |
+| **REQ-NF-04 (Audit Trail)** | SRS-NF-13, SRS-F-22 | `AuditLog.cs`, `InventoryRepository.cs` | `AuditLog_EveryTransaction_ShouldRecordSnapshot` |
 
 ---
 
-## 12. Phụ lục: Danh sách mã lỗi & Thông báo hệ thống
+## 9. Bộ Tiêu chí Nghiệm thu & Kết quả Kiểm thử (36/36 xUnit Tests Passed)
 
-| Mã lỗi | Thông báo hiển thị | Ngữ cảnh phát sinh |
-|---|---|---|
-| ERR-CBM-001 | "Vui lòng nhập đầy đủ Dài, Rộng, Cao để tính thể tích." | Tạo/sửa SKU thiếu kích thước |
-| ERR-SKU-DUPLICATE | "Tổ hợp biến thể (màu sắc/chất liệu) này đã tồn tại." | Tạo biến thể SKU trùng |
-| ERR-STOCK-001 | "Số lượng xuất vượt quá tồn khả dụng." | Xuất SKU đơn lẻ vượt tồn |
-| ERR-STOCK-002 | "Không đủ tồn cấu kiện: {tên cấu kiện} để ghép đủ Combo." | Xuất Combo thiếu cấu kiện |
-| ERR-LOCK-001 | "Mặt hàng đang được xử lý bởi giao dịch khác, vui lòng thử lại sau." | Hết thời gian chờ khóa (lock timeout) |
-| ERR-APPROVAL-001 | "Bạn không có quyền duyệt ở bước này hoặc phiếu chưa đến lượt duyệt của bạn." | Duyệt sai cấp/sai vai trò |
-| ERR-VARIANCE-001 | "Chênh lệch kiểm kê vượt 5%, vui lòng lập phiếu điều chỉnh tồn trước khi tiếp tục." | Kiểm kê phát hiện lệch lớn |
-| ERR-AI-001 | "Gợi ý AI chưa được duyệt, không thể tạo đề xuất nhập hàng chính thức." | Cố gắng bỏ qua bước duyệt gợi ý AI |
+Toàn bộ hệ thống phần mềm đã được kiểm chứng tự động thông qua bộ kiểm thử xUnit độc lập (`DuAnCode.Tests`), đạt tỷ lệ **100% ca kiểm thử thành công**:
+
+```
+Test run for DuAnCode.Tests.dll (.NETCoreApp,Version=v9.0)
+Passed!  - Failed: 0, Passed: 36, Skipped: 0, Total: 36, Duration: 1 s
+```
+
+### Chi tiết 7 nhóm ca kiểm thử nghiệm thu kỹ thuật:
+1. **MasterDataAndCbmTests (4 tests):**
+   - Xác thực công thức tính $CBM = (D \times R \times C) / 10^9$ với độ chính xác số thực dấu phẩy động.
+   - Kiểm tra cơ chế chặn kích thước âm hoặc bằng 0 với thông báo lỗi chuẩn `ERR-CBM-001`.
+   - Kiểm tra tính toàn vẹn và duy nhất của mã biến thể SKU.
+2. **InboundWorkflowTests (6 tests):**
+   - Kiểm tra luồng lập phiếu nhập kho, tiếp nhận số lượng chứng từ đối tác.
+   - Kiểm tra khâu kiểm định chất lượng QC: phân luồng chuẩn xác giữa hàng `GOOD` và `DAMAGED`.
+   - Xác thực số dư tồn kho tăng đúng theo từng trạng thái sau khi đủ 2 cấp phê duyệt.
+3. **OutboundWorkflowTests & Combo BOM (8 tests):**
+   - Kiểm tra thuật toán bóc tách linh kiện Combo BOM tự động theo định mức cấu thành.
+   - Kiểm tra chặn xuất kho khi thiếu bất kỳ một linh kiện nào trong bộ Combo.
+   - Kiểm tra cơ chế Khóa bi quan T-SQL `WITH (UPDLOCK, ROWLOCK)` bảo vệ số dư khi nhiều luồng cùng xuất một mã hàng.
+   - Kiểm tra phân luồng phê duyệt 3 cấp độ đối với phiếu xuất $> 100$ triệu VNĐ.
+4. **StockTransferWorkflowTests (4 tests):**
+   - Kiểm tra tính giao dịch nguyên tử 2 đầu (Atomic Transaction): giảm kho xuất, tăng kho nhập đồng thời.
+   - Chặn điều chuyển vượt quá số lượng tồn khả dụng tại kho nguồn.
+5. **InventoryAuditWorkflowTests (4 tests):**
+   - Kiểm tra tính toán tỷ lệ chênh lệch giữa số lượng đếm thực tế và số liệu hệ thống.
+   - Kiểm tra quy tắc bắt buộc lập phiếu điều chỉnh tồn kho khi chênh lệch $> 5\%$.
+   - Kiểm tra cập nhật cân chỉnh số dư kho sau khi Quản lý duyệt.
+6. **DamagedStockTests (4 tests):**
+   - Kiểm tra cách ly hàng hư hỏng: bảo đảm hàng `DAMAGED` không bao giờ bị tính vào tồn khả dụng xuất bán.
+   - Kiểm tra quy trình xử lý hàng hỏng: sửa chữa hoàn nguyên về `GOOD` hoặc thanh lý.
+7. **AiServiceAndMonitoringTests (6 tests):**
+   - Kiểm tra thuật toán phát hiện tồn kho thấp ($Stock < MinStock$) và sinh đề xuất nhập bù.
+   - Kiểm tra thuật toán phát hiện đột biến tiêu thụ 7 ngày vs 60 ngày với ngưỡng $\ge 20\%$.
+   - Kiểm tra thuật toán xác định linh kiện cổ chai kìm hãm sản phẩm Combo.
+   - Kiểm tra rào chắn Regex Guardrails và cơ chế tạo bản nháp phiếu trong CSDL khi AI nhận diện ý định người dùng.
 
 ---
 
-*Hết tài liệu SRS_Furniture_WMS.md. Tài liệu này là baseline kỹ thuật để đội phát triển tiến hành thiết kế chi tiết (Detailed Design), xây dựng Database Schema vật lý, và lập kế hoạch kiểm thử (Test Plan) cho Hệ thống Quản lý Kho Nội thất tích hợp AI.*
+## 10. Phụ lục: Danh mục Mã lỗi chuẩn hóa hệ thống
+
+| Mã lỗi | Thông điệp thông báo hiển thị | Ngữ cảnh nghiệp vụ phát sinh |
+| :--- | :--- | :--- |
+| **`ERR-CBM-001`** | "Vui lòng nhập đầy đủ Dài, Rộng, Cao (> 0) để tính thể tích CBM." | Người dùng nhập thiếu kích thước hoặc nhập số $\le 0$ khi tạo/sửa SKU. |
+| **`ERR-SKU-DUPLICATE`** | "Tổ hợp biến thể (Màu sắc và Chất liệu) này đã tồn tại trong sản phẩm." | Trùng lặp tổ hợp biến thể trong cùng một dòng sản phẩm Product Model. |
+| **`ERR-STOCK-001`** | "Số lượng xuất vượt quá tồn kho khả dụng đạt chuẩn (GOOD)." | Xuất kho SKU đơn lẻ khi số lượng yêu cầu lớn hơn tồn khả dụng thực tế. |
+| **`ERR-STOCK-002`** | "Không đủ tồn linh kiện cấu thành để ghép đủ bộ Combo: {SkuId}." | Xuất hàng Combo khi có ít nhất 1 linh kiện bị thiếu hụt theo định mức BOM. |
+| **`ERR-LOCK-TIMEOUT`** | "Mặt hàng đang được xử lý bởi một giao dịch khác, vui lòng thử lại sau giây lát." | Quá thời gian chờ khóa dòng CSDL (Lock Timeout 5-10s) do tranh chấp đồng thời cao. |
+| **`ERR-APPROVAL-001`** | "Bạn không có thẩm quyền phê duyệt ở bước này hoặc chứng từ chưa đến lượt duyệt của bạn." | Người dùng cố tình duyệt sai cấp độ hoặc không thuộc vai trò được phân quyền. |
+| **`ERR-QC-VARIANCE`** | "Tổng số lượng hàng Tốt (GOOD) và hàng Lỗi (DAMAGED) phải bằng đúng số lượng thực nhận." | Nhân viên QC nhập số liệu kiểm định không khớp với tổng số lượng thực tế nhận. |
+| **`ERR-AUDIT-THRESHOLD`**| "Chênh lệch kiểm kê vượt quá 5%, bắt buộc phải lập Phiếu điều chỉnh tồn kho có giải trình." | Kiểm kê phát hiện tỷ lệ chênh lệch kiểm đếm thực tế lớn hơn 5%. |
+| **`ERR-AI-UNAPPROVED`** | "Đề xuất AI đang ở trạng thái Chờ xem xét, không thể tạo chứng từ nhập chính thức." | Người dùng cố gắng bỏ qua bước phê duyệt đề xuất AI của Quản lý kho. |
+
+---
+
+*Hết tài liệu SRS-WMS-AI-FURNITURE-001 (v1.0). Tài liệu này là căn cứ kỹ thuật chuẩn hóa cao nhất của Hệ thống Quản lý Kho Hàng Nội Thất Tích Hợp AI phục vụ công tác phát triển, kiểm thử, vận hành và nghiệm thu đề tài.*

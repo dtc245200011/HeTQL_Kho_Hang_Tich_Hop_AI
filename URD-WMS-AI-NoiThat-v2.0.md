@@ -1,903 +1,752 @@
-# HỆ THỐNG QUẢN LÝ KHO NỘI THẤT CÓ TÍCH HỢP AI – NHÓM 05
-## ĐẶC TẢ YÊU CẦU ỨNG DỤNG – V2.0 (Cập nhật chuyên biệt hóa cho ngành Nội thất)
-
-> Tài liệu đặc tả yêu cầu người dùng – phiên bản 2.0. Kế thừa toàn bộ nội dung đã chốt tại URD v1.1 (16 điểm TBC), đồng thời bổ sung logic nghiệp vụ đặc thù ngành **Nội thất**: thuộc tính kích thước (CBM), hàng Combo/BOM, biến thể SKU, trạng thái hàng lỗi/damaged, và cơ chế khóa bản ghi tồn kho (Pessimistic Locking).
-
-| Thông tin | Giá trị |
-|---|---|
-| Mã tài liệu | URD-WMS-AI-002 |
-| Phiên bản | 2.0 – Bổ sung nghiệp vụ Kho Nội thất |
-| Nguồn đầu vào | URD-WMS-AI-001 (v1.1) + Yêu cầu bổ sung nghiệp vụ Nội thất |
-| Phạm vi | Quản lý hàng hóa (kèm CBM, Combo/BOM, biến thể SKU), NCC, nhập, xuất, tồn (kèm trạng thái Damaged), cảnh báo, lịch sử, báo cáo, phân quyền, AI, khóa đồng thời |
-| Trạng thái | Đã chốt nghiệp vụ – cơ sở phát triển SRS |
-
-### Nguyên tắc xây dựng
-Tài liệu này giữ nguyên toàn bộ cấu trúc và nội dung đã chốt của URD v1.1, đồng thời **bổ sung** (không thay thế) các mục nghiệp vụ đặc thù ngành nội thất. Các nội dung mới được đánh dấu **[MỚI – NỘI THẤT]** để dễ đối chiếu với bản gốc.
+# HỆ THỐNG QUẢN LÝ KHO HÀNG NỘI THẤT TÍCH HỢP AI (FURNITURE WMS WITH INTEGRATED AI)
+## TÀI LIỆU ĐẶC TẢ YÊU CẦU NGƯỜI DÙNG – USER REQUIREMENTS DOCUMENT (URD)
+### Phiên bản: 2.0 (Hoàn thiện đồng bộ 100% theo Kiến trúc & Mã nguồn Thực tế Dự án)
 
 ---
 
-## MỤC LỤC
-1. Tổng quan
-2. Mục tiêu và phạm vi
-3. Stakeholder và Actor
-4. Bối cảnh hệ thống
-5. Hiện trạng AS-IS
-6. Nghiệp vụ TO-BE
-7. Use Case
-8. Business Rules
-9. Yêu cầu chức năng
-10. Yêu cầu AI
-11. Yêu cầu phi chức năng
-12. Mô hình dữ liệu nghiệp vụ
-13. Báo cáo và đầu ra
-14. Ma trận truy vết
-15. Tiêu chí nghiệm thu cấp URD
-16. Các điểm đã xác nhận và chốt
-17. Phụ lục
-18. **[MỚI – NỘI THẤT] Đặc tả nghiệp vụ chuyên biệt ngành Kho Nội thất**
-19. **[MỚI – NỘI THẤT] Sơ đồ kỹ thuật (Mermaid.js): ERD, Sequence Diagram, Flowchart AI**
+> **Học phần:** Ứng dụng Trí tuệ Nhân tạo trong Phát triển Phần mềm (GenAI Software Development)  
+> **Khoa:** Công nghệ Thông tin – Trường Đại học Công nghệ Thông tin & Truyền thông (ICTU) – Đại học Thái Nguyên  
+> **Nhóm thực hiện:** Nhóm 7  
+> **Thành viên đề tài:**  
+> - **Nguyễn Đức Hiếu** (Trưởng nhóm – Kiến trúc hệ thống, Backend, AI Integration & Automated Testing)  
+> - **Trần Minh Hiếu** (Thành viên – Database Design, Master Data, UI/UX & QA Testing)  
+> **Thời gian thực hiện:** Năm học 2025 – 2026  
+> **Trạng thái tài liệu:** Đã nghiệm thu thực tế • Đồng bộ 100% với Mã nguồn .NET 9 & 36/36 Automated xUnit Tests  
 
 ---
 
-## 1. Tổng quan
-
-Mục đích: chuyển kết quả khảo sát nghiệp vụ thành bộ yêu cầu người dùng có cấu trúc, đủ làm đầu vào cho SRS, dành riêng cho mô hình **kho hàng nội thất** (bàn, ghế, tủ, giường, sofa...). Tài liệu nguồn xác định trọng tâm là quản lý hàng hóa, nhập kho, xuất kho, tồn kho, cảnh báo tồn thấp, lịch sử giao dịch, báo cáo, phân quyền và ba hướng AI: sinh báo cáo/nhận xét, gợi ý nhập hàng, phát hiện biến động.
-
-**[MỚI – NỘI THẤT]** Đặc thù ngành nội thất khiến hệ thống WMS thông thường không đủ đáp ứng, cụ thể:
-- Hàng hóa có **kích thước vật lý lớn** (Dài x Rộng x Cao), cần quản lý thể tích (CBM) để tính diện tích lưu kho, tối ưu xe tải/công-te-nơ vận chuyển.
-- Nhiều sản phẩm được bán theo **bộ/combo** (VD: Bộ bàn ăn 6 ghế), cấu thành từ nhiều cấu kiện (BOM – Bill of Materials), cần tách rời khi nhập và ghép bộ khi xuất.
-- Một mã hàng gốc có thể có nhiều **biến thể (variant)** theo màu sắc, chất liệu (gỗ sồi/gỗ công nghiệp, bọc da/bọc nỉ...), mỗi biến thể là một SKU tồn kho riêng biệt.
-- Hàng nội thất dễ phát sinh **lỗi/trầy xước trong quá trình vận chuyển, bốc dỡ**, cần một trạng thái tồn riêng để cách ly khỏi tồn khả dụng bán ra.
-- Do giá trị đơn hàng lớn và nhiều nhân viên thao tác kho đồng thời, cần cơ chế **khóa bản ghi tồn kho (locking)** chặt chẽ hơn để tránh xuất vượt tồn khi có giao dịch chạy song song.
-
-### 1.1. Tài liệu tham chiếu
-
-| Nguồn | Vai trò |
-|---|---|
-| URD-WMS-AI-001 (v1.1) | Nguồn gốc – các nội dung chốt về nghiệp vụ WMS tổng quát |
-| Yêu cầu bổ sung nghiệp vụ Nội thất (khảo sát mở rộng) | Cơ sở xây dựng mục 18–19 của tài liệu này |
-
-### 1.2. Quy ước
-
-| Ký hiệu | Ý nghĩa |
-|---|---|
-| REQ-F | Functional/User requirement |
-| REQ-NF | Non-functional requirement |
-| REQ-AI | AI requirement |
-| BR | Business Rule |
-| UC | Use Case |
-| TBC | To Be Confirmed – cần xác nhận |
-| AS-IS | Hiện trạng |
-| TO-BE | Quy trình mục tiêu |
-| CBM | Cubic Meter – thể tích tính bằng m³ |
-| BOM | Bill of Materials – định mức cấu kiện của hàng Combo/Bộ |
-| SKU | Stock Keeping Unit – mã hàng tồn kho duy nhất (đã gồm biến thể) |
+| Thông tin tài liệu | Giá trị chi tiết |
+| :--- | :--- |
+| **Mã tài liệu** | `URD-WMS-AI-FURNITURE-002` |
+| **Tên tài liệu** | Đặc tả Yêu cầu Người dùng cho Hệ thống Quản lý Kho Hàng Nội thất Tích hợp AI |
+| **Phiên bản** | v2.0 (Bản hoàn thiện theo mã nguồn dự án thực tế) |
+| **Nền tảng ứng dụng** | Web Application (.NET 9 ASP.NET Core MVC, EF Core 9, SQL Server 2022, Local LLM Ollama) |
+| **Phạm vi nghiệp vụ** | Master Data (Kích thước CBM, SKU biến thể, Combo BOM), Nhập kho & QC, Xuất kho & Khóa bi quan, Điều chuyển kho, Kiểm kê, Quản lý hàng lỗi Damaged, Phê duyệt 3 cấp, Báo cáo N-X-T, Trợ lý AI Copilot & Replenishment |
+| **Đối tượng sử dụng** | Ban Giám đốc, Kế toán kho, Quản lý kho, Nhân viên Kiểm định chất lượng (QC), Thủ kho, Quản trị hệ thống (Admin) |
 
 ---
 
-## 2. Mục tiêu và phạm vi
+## 📌 MỤC LỤC
 
-### 2.1. Mục tiêu nghiệp vụ
-- Giảm nhập dữ liệu lặp lại và sai lệch giữa các file.
-- Tự động cập nhật tồn sau nghiệp vụ nhập/xuất.
-- Không cho phép xuất vượt tồn và hạn chế tồn âm.
-- Tự động cảnh báo hàng dưới mức tồn tối thiểu.
-- Lưu lịch sử giao dịch/thao tác để truy vết.
-- Tự động hóa báo cáo nhập–xuất–tồn.
-- Hỗ trợ AI nhận xét báo cáo, gợi ý nhập hàng và phát hiện biến động.
-- **[MỚI – NỘI THẤT]** Tự động tính thể tích (CBM) từ kích thước sản phẩm để hỗ trợ tối ưu không gian kho và vận chuyển.
-- **[MỚI – NỘI THẤT]** Quản lý chính xác hàng Combo/BOM và biến thể SKU, tránh sai lệch tồn giữa cấu kiện lẻ và hàng bộ.
-- **[MỚI – NỘI THẤT]** Cách ly hàng lỗi/hư hỏng nhẹ khỏi tồn khả dụng để tránh bán nhầm hàng lỗi cho khách.
-- **[MỚI – NỘI THẤT]** Ngăn chặn triệt để tình trạng xuất vượt tồn khi nhiều giao dịch xử lý đồng thời trên cùng một mã hàng, thông qua khóa bản ghi tồn kho ở tầng CSDL.
-
-### 2.2. Phạm vi trong URD
-
-| Nhóm | Trong phạm vi |
-|---|---|
-| Danh mục | Hàng hóa (kèm kích thước/CBM, biến thể SKU), Combo/BOM, nhà cung cấp |
-| Kho | Phiếu nhập, phiếu xuất, tồn kho (kèm trạng thái Damaged), kiểm soát tồn |
-| Kiểm soát | Trạng thái phiếu, quyền, audit/history, khóa bản ghi tồn (locking) |
-| Cảnh báo | Tồn dưới tồn tối thiểu, hàng lỗi phát sinh |
-| Báo cáo | Nhập–xuất–tồn (phân tách theo trạng thái tồn); Excel/PDF |
-| AI | Sinh báo cáo/nhận xét; gợi ý nhập; phát hiện biến động |
-
-### 2.3. Ngoài phạm vi/chưa đủ dữ liệu
-Chưa đủ căn cứ để chốt: mô hình xử lý bảo hành/đổi trả hàng lỗi về NCC, quy trình sơn sửa/tái chế hàng Damaged, chính sách chiết khấu theo combo. Các điểm này được đưa vào mục 18.6 (TBC bổ sung) để xác nhận.
-
----
-
-## 3. Stakeholder và Actor
-
-| Actor | Vai trò nghiệp vụ | Quyền sơ bộ |
-|---|---|---|
-| Thủ kho | Thao tác nhập/xuất, kiểm kê, cập nhật/tra cứu tồn, theo dõi cảnh báo, **[MỚI]** đánh giá và gắn trạng thái hàng lỗi | Tạo phiếu nhập/xuất; sửa khi chưa duyệt |
-| Kế toán | Kiểm tra, đối chiếu chứng từ và báo cáo | Kiểm tra/đối chiếu, duyệt phiếu |
-| Quản lý | Kiểm soát cuối, báo cáo, **[MỚI]** duyệt xử lý hàng lỗi (thanh lý/trả NCC) | Duyệt cuối, hủy phiếu, xem báo cáo |
-| Nhân viên | Lập chứng từ nháp | Chỉ tạo phiếu nháp; không duyệt/xóa |
-| Nhà cung cấp | Nguồn giao hàng | Không phải người dùng hệ thống theo khảo sát; là đối tượng nghiệp vụ |
-| **[MỚI]** Nhân viên đóng gói/QC kho | Kiểm tra chất lượng hàng nội thất khi nhập, khi ghép Combo | Ghi nhận tình trạng cấu kiện, gắn cờ lỗi |
-
-Tài liệu khảo sát xác định thủ kho là đối tượng trọng tâm; vai trò và quyền được ghi nhận ở mức sơ bộ.
+1. [Tổng quan đề tài & Giới thiệu bài toán](#1-tổng-quan-đề-tài--giới-thiệu-bài-toán)  
+   1.1. [Bối cảnh nghiệp vụ ngành kho hàng nội thất](#11-bối-cảnh-nghiệp-vụ-ngành-kho-hàng-nội-thất)  
+   1.2. [Tài liệu tham chiếu & Căn cứ kỹ thuật](#12-tài-liệu-tham-chiếu--căn-cứ-kỹ-thuật)  
+   1.3. [Bảng thuật ngữ & Ký hiệu quy ước](#13-bảng-thuật-ngữ--ký-hiệu-quy-ước)  
+2. [Mục tiêu và Phạm vi dự án](#2-mục-tiêu-và-phạm-vi-dự-án)  
+   2.1. [Mục tiêu nghiệp vụ người dùng](#21-mục-tiêu-nghiệp-vụ-người-dùng)  
+   2.2. [Phạm vi chức năng hệ thống](#22-phạm-vi-chức-năng-hệ-thống)  
+   2.3. [Phạm vi ngoài hệ thống (Out of Scope)](#23-phạm-vi-ngoài-hệ-thống-out-of-scope)  
+3. [Phân tích Stakeholder & Vai trò người dùng (Actors)](#3-phân-tích-stakeholder--vai-trò-người-dùng-actors)  
+   3.1. [Danh mục Stakeholder](#31-danh-mục-stakeholder)  
+   3.2. [Đặc tả 6 Actor người dùng & Actor Trí tuệ nhân tạo](#32-đặc-tả-6-actor-người-dùng--actor-trí-tuệ-nhân-tạo)  
+   3.3. [Ma trận phân quyền sơ bộ theo vai trò](#33-ma-trận-phân-quyền-sơ-bộ-theo-vai-trò)  
+4. [Khảo sát hiện trạng (AS-IS) & Mô hình chuyển đổi mục tiêu (TO-BE)](#4-khảo-sát-hiện-trạng-as-is--mô-hình-chuyển-đổi-mục-tiêu-to-be)  
+   4.1. [Phân tích hiện trạng AS-IS (Quy trình thủ công bằng Excel)](#41-phân-tích-hiện-trạng-as-is-quy-trình-thủ-công-bằng-excel)  
+   4.2. [Bảng đối chiếu Vấn đề - Hệ quả - Giải pháp TO-BE](#42-bảng-đối-chiếu-vấn-đề---hệ-quả---giải-pháp-to-be)  
+   4.3. [Mô hình mục tiêu TO-BE tích hợp AI](#43-mô-hình-mục-tiêu-to-be-tích-hợp-ai)  
+5. [Đặc tả Ca sử dụng người dùng (Use Cases)](#5-đặc-tả-ca-sử-dụng-người-dùng-use-cases)  
+   5.1. [Danh mục Use Case tổng thể](#51-danh-mục-use-case-tổng-thể)  
+   5.2. [Đặc tả chi tiết các Use Case trọng tâm](#52-đặc-tả-chi-tiết-các-use-case-trọng-tâm)  
+6. [Quy tắc nghiệp vụ doanh nghiệp (Business Rules)](#6-quy-tắc-nghiệp-vụ-doanh-nghiệp-business-rules)  
+7. [Yêu cầu chức năng người dùng (User Functional Requirements)](#7-yêu-cầu-chức-năng-người-dùng-user-functional-requirements)  
+8. [Yêu cầu Trí tuệ nhân tạo (AI Functional Requirements)](#8-yêu-cầu-trí-tuệ-nhân-tạo-ai-functional-requirements)  
+   8.1. [Năng lực Cảnh báo Tồn kho thấp (LOW_STOCK)](#81-năng-lực-cảnh-báo-tồn-kho-thấp-low_stock)  
+   8.2. [Năng lực Phát hiện biến động bất thường (ANOMALY $\ge 20\%$)](#82-năng-lực-phát-hiện-biến-động-bất-thường-anomaly-ge-20)  
+   8.3. [Năng lực Cảnh báo Nghẽn cổ chai cấu kiện Combo (BOTTLENECK)](#83-năng-lực-cảnh-báo-nghẽn-cổ-chai-cấu-kiện-combo-bottleneck)  
+   8.4. [Năng lực Trợ lý AI Copilot tương tác tự nhiên & RAG Grounding](#84-năng-lực-trợ-lý-ai-copilot-tương-tác-tự-nhiên--rag-grounding)  
+   8.5. [Nguyên tắc con người phê duyệt (Human-in-the-loop)](#85-nguyên-tắc-con-người-phê-duyệt-human-in-the-loop)  
+9. [Yêu cầu phi chức năng người dùng (User Non-Functional Requirements)](#9-yêu-cầu-phi-chức-năng-người-dùng-user-non-functional-requirements)  
+10. [Mô hình dữ liệu nghiệp vụ & Cấu trúc chứng từ](#10-mô-hình-dữ-liệu-nghiệp-vụ--cấu-trúc-chứng-từ)  
+11. [Báo cáo & Kết xuất dữ liệu](#11-báo-cáo--kết-xuất-dữ-liệu)  
+12. [Tiêu chí nghiệm thu người dùng (User Acceptance Criteria - UAC)](#12-tiêu-chí-nghiệm-thu-người-dùng-user-acceptance-criteria---uac)  
+13. [Sơ đồ quy trình nghiệp vụ trực quan (Mermaid Diagrams)](#13-sơ-đồ-quy-trình-nghiệp-vụ-trực-quan-mermaid-diagrams)  
+    13.1. [Sơ đồ Use Case tổng thể hệ thống WMS](#131-sơ-đồ-use-case-tổng-thể-hệ-thống-wms)  
+    13.2. [Sequence Diagram: Quy trình Xuất kho & Khóa bi quan (Pessimistic Locking)](#132-sequence-diagram-quy-trình-xuất-kho--khóa-bi-quan-pessimistic-locking)  
+    13.3. [Sequence Diagram: Quy trình Nhập kho & Kiểm định chất lượng QC](#133-sequence-diagram-quy-trình-nhập-kho--kiểm-định-chất-lượng-qc)  
+    13.4. [Flowchart: Luồng xử lý AI Phân tích nhu cầu & Replenishment](#134-flowchart-luồng-xử-lý-ai-phân-tích-nhu-cầu--replenishment)  
+    13.5. [State Diagram: Vòng đời trạng thái tồn kho hàng hóa nội thất](#135-state-diagram-vòng-đời-trạng-thái-tồn-kho-hàng-hóa-nội-thất)  
 
 ---
 
-## 4. Bối cảnh hệ thống
+## 1. Tổng quan đề tài & Giới thiệu bài toán
 
-Sơ đồ thể hiện các actor nghiệp vụ và các nhóm tương tác chính được khảo sát; không coi Nhà cung cấp là user hệ thống nếu chưa có xác nhận. Xem sơ đồ chi tiết (Mermaid) tại mục 19.1.
+### 1.1. Bối cảnh nghiệp vụ ngành kho hàng nội thất
+Quản lý kho hàng nội thất (**Furniture Warehouse Management System - WMS**) là một bài toán vận hành logistics đặc thù với những thách thức vượt xa các hệ thống quản lý bán lẻ hay kho hàng tiêu dùng thông thường:
+1. **Kích thước cồng kềnh, tính toán thể tích khối ($CBM$):** Các mặt hàng nội thất (bàn, ghế, giường, tủ, sofa) có thể tích chiếm chỗ rất lớn. Doanh nghiệp cần quản lý chi tiết kích thước 3 chiều $Dài \times Rộng \times Cao$ ($mm$) để tự động quy đổi ra thể tích $CBM$ ($m^3$), từ đó phân bổ sức chứa mặt sàn, kệ chứa và tính toán tải trọng xe tải vận chuyển.
+2. **Sản phẩm lắp ráp theo bộ (Combo / BOM - Bill of Materials):** Nhiều sản phẩm nội thất bán thương mại dưới dạng bộ combo hoàn chỉnh (ví dụ: "Bộ bàn ăn Mango 6 ghế", "Bộ giường ngủ cao cấp kèm 2 táp đầu giường"). Bộ combo được cấu thành từ nhiều linh kiện/cấu kiện độc lập được nhập và đóng gói rời. Số lượng bộ combo có thể xuất bán không được lưu cứng mà phụ thuộc động vào số lượng linh kiện sẵn có tối thiểu.
+3. **Phân loại chất lượng nghiêm ngặt (QC - Quality Control):** Quá trình vận chuyển, bốc dỡ đồ gỗ, da, kính rất dễ gây trầy xước, sứt mẻ. Ngay tại khâu tiếp nhận nhập kho, nhân viên QC bắt buộc phải kiểm định và phân luồng độc lập: số lượng đạt chuẩn (`GOOD`) được nhập vào tồn khả dụng xuất bán; số lượng trầy xước/lỗi (`DAMAGED`) phải cách ly hoàn toàn vào kho hàng hỏng để chờ sửa chữa hoặc thanh lý, tuyệt đối không được bán nhầm cho khách hàng.
+4. **Nguy cơ bán âm & Xung đột giao dịch đồng thời:** Khi nhiều thủ kho hoặc nhân viên cùng thao tác tạo phiếu xuất trên cùng một mã SKU có số lượng tồn thấp, việc thiếu cơ chế khóa dữ liệu tức thời sẽ dẫn đến tình trạng xuất vượt tồn (xuất âm kho), gây vỡ hợp đồng giao dịch và tranh chấp pháp lý.
+5. **Nhu cầu Trợ lý AI thông minh phục vụ vận hành:** Khối lượng mã hàng biến thể và chứng từ lớn đòi hỏi một trợ lý AI thông minh có khả năng trả lời ngôn ngữ tự nhiên tiếng Việt, tra cứu số liệu tồn kho chính xác theo thời gian thực (RAG Grounding), cảnh báo sớm biến động tiêu thụ đột biến và tự động đề xuất tạo phiếu nhập hàng dự phòng.
 
-### 4.1. Giả định và ràng buộc từ khảo sát
-- Dữ liệu hiện tại chủ yếu được thao tác bằng Excel.
-- Tồn cuối kỳ được xác định theo công thức: **Tồn cuối = Tồn đầu + Nhập – Xuất**.
-- Cập nhật tồn cần thực hiện nhất quán trong cùng transaction CSDL để tránh sai số khi giao dịch đồng thời.
-- Lịch sử cần phục vụ truy vết và kiểm toán; khảo sát đề xuất tối thiểu 2–3 năm nhưng thời hạn chính thức đã được chốt là 5 năm (xem mục 16).
-- **[MỚI – NỘI THẤT]** Tồn kho khả dụng để xuất bán = Tổng tồn vật lý **trừ** tồn ở trạng thái Damaged/Lỗi nhẹ và trừ tồn đang bị khóa bởi giao dịch khác (xem mục 18.3, 18.4).
-- **[MỚI – NỘI THẤT]** Tồn của hàng Combo là tồn **suy diễn (derived)** từ tồn cấu kiện theo BOM, không lưu trực tiếp như hàng đơn lẻ (xem mục 18.2).
+### 1.2. Tài liệu tham chiếu & Căn cứ kỹ thuật
+1. **Chương trình đào tạo:** Học phần *Ứng dụng AI trong Phát triển Phần mềm (GenAI Software Development)*, Khoa CNTT - ICTU.
+2. **Mô hình quy trình:** Mô hình Nhà máy Phát triển Phần mềm bằng AI (*AI Software Factory*) với 5 Agent chuyên trách (`agents/`).
+3. **Tiêu chuẩn tài liệu:** URD v2.0 làm căn cứ trực tiếp xây dựng Đặc tả Yêu cầu Phần mềm (SRS v1.0 chuẩn IEEE 830).
+4. **Mã nguồn và Kiểm thử:** Dự án triển khai trên nền tảng .NET 9.0 ASP.NET Core MVC, Entity Framework Core 9, Microsoft SQL Server 2022 (32 bảng) và Local LLM Ollama (`qwen2.5-coder:7b`), bao phủ bởi 36 ca kiểm thử tự động xUnit đạt 100% tỷ lệ vượt qua (*Passed*).
 
----
+### 1.3. Bảng thuật ngữ & Ký hiệu quy ước
 
-## 5. Hiện trạng AS-IS
-
-### 5.1. Nhập kho
-Nhận hàng → Kiểm đếm → Đối chiếu chứng từ → Ghi Excel → Cập nhật tồn. Ví dụ khảo sát: chứng từ ghi 50 bàn phím nhưng thực tế 48, nhân viên phải ghi nhận sai lệch và báo bộ phận liên quan.
-
-**[MỚI – NỘI THẤT]** Với hàng nội thất, thực tế khảo sát bổ sung: khi bốc dỡ container/xe tải, nhân viên phát hiện ván gỗ bị trầy, mặt kính bị nứt nhưng vẫn phải ghi nhận nhập kho vì hàng đã về, dẫn đến hàng lỗi bị trộn lẫn tồn kho tốt trên cùng một dòng Excel, gây khó khăn khi xuất bán (khách nhận hàng lỗi).
-
-### 5.2. Cập nhật tồn
-Nhân viên ghi số lượng nhập trên một bảng tính rồi mở bảng khác để cập nhật tồn, gây nguy cơ nhập sai, quên cập nhật, nhầm mã, không thống nhất và khó truy vết người sửa.
-
-### 5.3. Xuất kho
-Nhân viên kiểm tra tồn trên file trước khi xuất; khảo sát ghi nhận nguy cơ xuất vượt tồn khi nhiều người cùng cập nhật. Quy tắc: số lượng xuất phải nhỏ hơn hoặc bằng số lượng tồn.
-
-**[MỚI – NỘI THẤT]** Với hàng Combo (VD: bộ bàn ăn), nhân viên phải kiểm tra thủ công tồn của từng cấu kiện (mặt bàn, chân bàn, 6 ghế) trước khi xuất, dễ xuất thiếu/dư cấu kiện do không có công cụ kiểm tra tự động.
-
-### 5.4. Tồn thấp và báo cáo
-Tồn thấp hiện được phát hiện thủ công; báo cáo cuối tháng cần lọc Excel, tổng hợp tồn đầu, nhập, xuất, tồn cuối và tự viết nhận xét.
-
-| Vấn đề | Tác động | Định hướng URD |
-|---|---|---|
-| Nhập dữ liệu nhiều lần | Sai lệch, tăng thao tác | Tự động cập nhật tồn |
-| Sai số/mã hàng | Tồn không chính xác | Kiểm tra dữ liệu/đối chiếu |
-| Khó truy vết | Khó tìm nguyên nhân | Audit/history |
-| Nguy cơ tồn âm | Ảnh hưởng xuất | Chặn xuất vượt tồn |
-| Khó phát hiện hàng sắp hết | Bỏ sót nhập | Cảnh báo tự động |
-| Báo cáo thủ công | Tốn thời gian | Báo cáo tự động |
-| Khó phát hiện biến động | Chậm nhận biết | AI phân tích |
-| Khó quyết định nhập bao nhiêu | Phụ thuộc đánh giá thủ công | AI gợi ý |
-| **[MỚI]** Hàng lỗi lẫn vào tồn tốt | Bán nhầm hàng lỗi cho khách | Trạng thái tồn Damaged riêng biệt |
-| **[MỚI]** Kiểm tồn Combo thủ công | Xuất thiếu/dư cấu kiện | Tồn Combo tự tính từ BOM |
-| **[MỚI]** Nhiều người thao tác cùng SKU | Xuất vượt tồn khi tranh chấp bản ghi | Pessimistic Locking |
+| Thuật ngữ / Ký hiệu | Tên tiếng Anh đầy đủ | Định nghĩa nghiệp vụ trong hệ thống |
+| :--- | :--- | :--- |
+| **WMS** | Warehouse Management System | Hệ thống phần mềm quản trị toàn diện hoạt động vận hành kho hàng. |
+| **SKU** | Stock Keeping Unit | Mã định danh đơn vị hàng tồn kho duy nhất ứng với một tổ hợp biến thể (Mã gốc + Màu sắc + Chất liệu). |
+| **CBM** | Cubic Meter ($m^3$) | Đơn vị thể tích mét khối: $CBM = (Dài \times Rộng \times Cao) / 10^9$ (kích thước tính theo mm). |
+| **BOM** | Bill of Materials | Bảng định mức cấu kiện kỹ thuật cấu thành nên một sản phẩm Combo/Bộ. |
+| **Combo Product** | Assembled / Set Product | Sản phẩm ghép bộ; tồn kho khả dụng được tính suy diễn từ tồn cấu kiện theo định mức BOM. |
+| **QC** | Quality Control | Quy trình và nhân sự kiểm định chất lượng phân loại hàng Đạt (`GOOD`) và hàng Lỗi (`DAMAGED`). |
+| **Damaged Stock** | Defective / Damaged Inventory | Tồn kho hàng lỗi/hỏng; hoàn toàn bị cách ly khỏi tồn kho khả dụng bán hàng thương mại. |
+| **Pessimistic Locking** | Khóa bi quan CSDL | Cơ chế khóa cưỡng bức dòng dữ liệu tồn kho bằng T-SQL `WITH (UPDLOCK, ROWLOCK)` trong suốt giao dịch xuất/chuyển kho để loại trừ xung đột đồng thời. |
+| **RBAC** | Role-Based Access Control | Kiểm soát truy cập và ủy quyền chức năng dựa trên vai trò người dùng trong tổ chức. |
+| **RAG** | Retrieval-Augmented Generation | Kỹ thuật truy xuất dữ liệu CSDL kho thời gian thực nạp vào ngữ cảnh AI để chống ảo giác số liệu. |
+| **Human-in-the-loop** | Con người giám sát quyết định | Nguyên tắc an toàn: AI chỉ sinh bản nháp (*DRAFT*) hoặc đề xuất (*PENDING_REVIEW*); chỉ con người có thẩm quyền mới được phê duyệt ghi dữ liệu chính thức. |
 
 ---
 
-## 6. Nghiệp vụ TO-BE
+## 2. Mục tiêu và Phạm vi dự án
 
-### 6.1. Luồng nhập kho
-Nhập kho gồm: kiểm tra → ghi số thực tế → **[MỚI] QC phân loại Tốt/Damaged** → lập/duyệt phiếu → cập nhật tồn theo đúng trạng thái → lưu lịch sử. Xem sequence diagram chi tiết tại mục 19.2.
+### 2.1. Mục tiêu nghiệp vụ người dùng
+- **Số hóa và tự động hóa 100% quy trình vận hành kho:** Chuyển đổi toàn diện từ sổ sách, file Excel rời rạc sang nền tảng quản trị tập trung, tự động hóa cập nhật số dư kho sau mỗi chứng từ hợp lệ.
+- **Tối ưu hóa dung tích chứa và phương tiện vận chuyển:** Tự động tính toán thể tích $CBM$ của từng SKU và cảnh báo khi tổng thể tích vượt ngưỡng an toàn của từng kho lưu trữ.
+- **Quản lý chính xác sản phẩm Combo theo BOM:** Tự động tính tồn khả dụng của Combo theo linh kiện tối thiểu; tự động bóc tách linh kiện khi xuất bán.
+- **Bảo đảm chất lượng hàng hóa xuất giao khách hàng:** Bắt buộc phân luồng kiểm định QC; ngăn chặn tuyệt đối việc xuất nhầm hàng lỗi (`DAMAGED`) cho khách hàng thương mại.
+- **Loại trừ triệt để tình trạng bán âm và xung đột giao dịch:** Triển khai cơ chế Khóa bi quan ở tầng CSDL, bảo đảm an toàn dữ liệu khi có nhiều thủ kho thao tác song song.
+- **Nâng cao năng suất bằng Trợ lý Trí tuệ nhân tạo:** Cung cấp Chatbot tra cứu thông tin kho bằng tiếng Việt tự nhiên; tự động phân tích dữ liệu 7 ngày vs 60 ngày để phát hiện bất thường nhu cầu $\ge 20\%$ và tự sinh phiếu nhập nháp khi tồn kho dưới định mức an toàn.
+- **Bảo mật tuyệt đối bí mật kinh doanh:** Vận hành mô hình Local AI On-Premise 100%, bảo đảm không gửi dữ liệu giá vốn, đối tác ra máy chủ bên ngoài Internet.
 
-### 6.2. Luồng xuất kho
-Xuất kho gồm: chọn mặt hàng/biến thể → **[MỚI] khóa bản ghi tồn (lock)** → kiểm tra tồn khả dụng (loại trừ Damaged) → nếu là Combo thì kiểm tra tồn tất cả cấu kiện theo BOM → lập phiếu → duyệt → giảm tồn → **[MỚI] mở khóa (unlock)** → lưu lịch sử; từ chối nếu không đủ tồn. Xem sequence diagram chi tiết tại mục 19.2.
+### 2.2. Phạm vi chức năng hệ thống
+Hệ thống bao phủ trọn vẹn 9 phân hệ chức năng:
+1. **Phân hệ Dữ liệu gốc (Master Data):** Quản lý Danh mục Kho (kèm giới hạn CBM), Danh mục Nhà cung cấp, Danh mục Sản phẩm, Biến thể SKU (Màu sắc, Chất liệu, Kích thước 3 chiều, $CBM$, Đơn giá), Định mức linh kiện Combo BOM.
+2. **Phân hệ Nhập kho (Inbound):** Lập phiếu nhập kho, tiếp nhận chứng từ đối tác, tích hợp bước kiểm định chất lượng QC phân loại số lượng `GOOD` và `DAMAGED`, quản lý duyệt phiếu.
+3. **Phân hệ Xuất kho (Outbound):** Lập phiếu xuất bán / xuất công trình cho SKU đơn lẻ hoặc Combo, tự động bóc tách BOM, áp dụng Khóa bi quan T-SQL `UPDLOCK, ROWLOCK`, phân luồng phê duyệt 3 cấp độ.
+4. **Phân hệ Điều chuyển kho nội bộ (Stock Transfer):** Quản lý điều chuyển hàng hóa giữa các kho nội bộ (Kho Tổng $\leftrightarrow$ Kho Chi nhánh, Kho Hàng lỗi), bảo đảm tính giao dịch nguyên tử 2 đầu.
+5. **Phân hệ Quản lý Hàng lỗi (Damaged Stock):** Theo dõi số lượng hư hỏng, ghi nhận nguyên nhân, phân luồng xử lý: Sửa chữa hoàn nguyên về `GOOD`, Thanh lý hoặc Trả nhà cung cấp.
+6. **Phân hệ Kiểm kê kho (Inventory Audit):** Lập phiếu kiểm kê định kỳ, ghi nhận số lượng đếm thực tế, tính chênh lệch Thừa/Thiếu so với sổ sách, sinh phiếu cân chỉnh kho có lưu vết kiểm toán.
+7. **Phân hệ Phê duyệt đa cấp (Approval Workflow):** Kiểm soát rủi ro tài chính: Phiếu nhập và phiếu xuất $\le 100$ triệu VNĐ duyệt 2 cấp (Kế toán $\rightarrow$ Quản lý kho); Phiếu xuất $> 100$ triệu VNĐ bắt buộc Giám đốc phê duyệt cấp 3.
+8. **Phân hệ Báo cáo & Thống kê (Reporting):** Báo cáo Nhập - Xuất - Tồn theo kỳ (phân tách hàng Đạt và hàng Lỗi), Báo cáo Thể tích CBM lưu kho, xuất dữ liệu chuẩn Excel (.xlsx) và PDF.
+9. **Phân hệ Trí tuệ nhân tạo (AI Copilot & Replenishment):** Trợ lý tương tác tự nhiên tiếng Việt, RAG Grounding dữ liệu thời gian thực, quét phát hiện biến động nhu cầu $\ge 20\%$, cảnh báo nghẽn cổ chai cấu kiện Combo và tự động sinh bản nháp chứng từ.
 
-### 6.3. Báo cáo và AI
-Báo cáo đi qua thống kê rồi AI phân tích. **[MỚI – NỘI THẤT]** Dữ liệu thống kê tách riêng tồn Tốt và tồn Damaged; AI chỉ dùng tồn khả dụng (Tốt) để tính gợi ý nhập và phát hiện biến động, tránh gợi ý sai do hàng lỗi làm giảm ảo số liệu xuất bán.
-
----
-
-## 7. Use Case
-
-| ID | Use Case | Actor chính | Mục tiêu |
-|---|---|---|---|
-| UC-01 | Quản lý hàng hóa | Thủ kho/Quản lý | Duy trì danh mục hàng hóa |
-| UC-02 | Quản lý nhà cung cấp | Thủ kho/Quản lý | Duy trì NCC |
-| UC-03 | Lập phiếu nhập | Thủ kho/Nhân viên | Ghi nhận hàng thực nhập |
-| UC-04 | Lập phiếu xuất | Thủ kho/Nhân viên | Ghi nhận xuất theo yêu cầu |
-| UC-05 | Kiểm soát tồn | Thủ kho | Đảm bảo tồn nhất quán |
-| UC-06 | Cảnh báo tồn thấp | Thủ kho/Quản lý | Phát hiện hàng dưới ngưỡng |
-| UC-07 | Tra cứu lịch sử | Thủ kho/Kế toán/Quản lý | Truy vết giao dịch/thao tác |
-| UC-08 | Báo cáo N-X-T | Kế toán/Quản lý | Theo dõi tồn đầu/nhập/xuất/tồn cuối |
-| UC-09 | Xuất Excel/PDF | Kế toán/Quản lý | Xuất báo cáo |
-| UC-10 | AI sinh báo cáo | Quản lý/Kế toán | Nhận báo cáo kèm nhận xét |
-| UC-11 | AI gợi ý nhập | Quản lý | Ưu tiên mặt hàng và lượng nhập |
-| UC-12 | AI phát hiện biến động | Quản lý | Nhận diện tăng/giảm đáng kể |
-| UC-13 | Phân quyền | Quản lý | Kiểm soát thao tác theo vai trò |
-| **UC-14** [MỚI] | Quản lý kích thước & tính CBM | Thủ kho/Quản lý | Tự động tính thể tích hàng hóa |
-| **UC-15** [MỚI] | Quản lý Combo/BOM | Quản lý | Định nghĩa cấu kiện cho hàng bộ |
-| **UC-16** [MỚI] | Quản lý biến thể SKU | Quản lý | Quản lý các biến thể màu sắc/chất liệu |
-| **UC-17** [MỚI] | Ghi nhận & xử lý hàng lỗi (Damaged) | Thủ kho/QC/Quản lý | Cách ly hàng lỗi khỏi tồn khả dụng |
-| **UC-18** [MỚI] | Khóa bản ghi tồn kho khi giao dịch | Hệ thống | Ngăn xuất vượt tồn do tranh chấp đồng thời |
-
-### 7.1. Đặc tả Use Case trọng tâm
-
-**UC-03 – Lập phiếu nhập**
-
-| Mục | Đặc tả |
-|---|---|
-| Actor | Thủ kho/Nhân viên |
-| Tiền điều kiện | Có hàng giao; mã hàng hợp lệ |
-| Luồng chính | Nhận hàng → kiểm đếm → đối chiếu → nhập số thực tế → **[MỚI] QC phân loại từng đơn vị hàng: Tốt/Damaged** → lập phiếu → duyệt theo quyền → tăng tồn theo đúng trạng thái → lưu lịch sử |
-| Ngoại lệ/điểm mở | Nếu số thực tế khác chứng từ: lưu số thực tế và sai lệch; nếu dữ liệu không hợp lệ: không hoàn tất |
-| Hậu điều kiện | Phiếu có trạng thái; tồn Tốt và tồn Damaged được cập nhật riêng biệt nếu xử lý thành công |
-
-**UC-04 – Lập phiếu xuất**
-
-| Mục | Đặc tả |
-|---|---|
-| Actor | Thủ kho/Nhân viên |
-| Tiền điều kiện | Có yêu cầu xuất |
-| Luồng chính | Chọn kho/mặt hàng/biến thể → **[MỚI] hệ thống khóa (lock) bản ghi tồn liên quan** → kiểm tra tồn khả dụng (không tính Damaged) → **[MỚI] nếu là Combo: kiểm tra tồn tất cả cấu kiện theo BOM** → lập phiếu → duyệt → giảm tồn → **[MỚI] mở khóa bản ghi** → lưu lịch sử |
-| Ngoại lệ/điểm mở | Nếu không đủ tồn (kể cả thiếu 1 cấu kiện của Combo): từ chối toàn bộ giao dịch |
-| Hậu điều kiện | Không phát sinh tồn âm; không có bản ghi tồn nào bị khóa treo sau khi giao dịch kết thúc |
-
-**UC-06 – Cảnh báo tồn thấp**
-
-| Mục | Đặc tả |
-|---|---|
-| Actor | Hệ thống + Thủ kho |
-| Tiền điều kiện | Có tồn khả dụng và tồn tối thiểu |
-| Luồng chính | So sánh tồn khả dụng (Tốt) với tồn tối thiểu → tạo/hiển thị cảnh báo |
-| Ngoại lệ/điểm mở | Kênh thông báo: Dashboard + Email nội bộ cho Quản lý (đã chốt) |
-| Hậu điều kiện | Danh sách hàng cần chú ý |
-
-**UC-08 – Báo cáo N-X-T**
-
-| Mục | Đặc tả |
-|---|---|
-| Actor | Kế toán/Quản lý |
-| Tiền điều kiện | Có dữ liệu kỳ báo cáo |
-| Luồng chính | Tổng hợp tồn đầu + nhập + xuất → tính tồn cuối (tách Tốt/Damaged) → hiển thị/xuất |
-| Ngoại lệ/điểm mở | Lịch chạy: tuần/tháng (đã chốt) |
-| Hậu điều kiện | Báo cáo sẵn sàng |
-
-**UC-10 – AI sinh báo cáo**
-
-| Mục | Đặc tả |
-|---|---|
-| Actor | Quản lý/Kế toán |
-| Tiền điều kiện | Có dữ liệu thống kê (tồn khả dụng) |
-| Luồng chính | Gửi dữ liệu N-X-T → AI tạo nhận xét → trả báo cáo kèm nhận xét |
-| Ngoại lệ/điểm mở | Người dùng có thể phản hồi/điều chỉnh nhận xét AI trong SRS |
-| Hậu điều kiện | Có nội dung AI và dữ liệu nền |
-
-**UC-11 – AI gợi ý nhập**
-
-| Mục | Đặc tả |
-|---|---|
-| Actor | Quản lý |
-| Tiền điều kiện | Có tồn khả dụng, tồn tối thiểu, dữ liệu xuất |
-| Luồng chính | Phân tích nhu cầu → đề xuất mặt hàng/biến thể → ưu tiên → gợi ý lượng nhập |
-| Ngoại lệ/điểm mở | Công thức đã chốt tại mục 10/16 |
-| Hậu điều kiện | Có danh sách gợi ý; Quản lý phải duyệt trước khi áp dụng |
-
-**UC-12 – AI phát hiện biến động**
-
-| Mục | Đặc tả |
-|---|---|
-| Actor | Quản lý |
-| Tiền điều kiện | Có dữ liệu xuất theo kỳ |
-| Luồng chính | Phân tích tăng/giảm → nhận diện biến động → gợi ý kiểm tra nguyên nhân |
-| Ngoại lệ/điểm mở | Ngưỡng đã chốt: ≥20%/7 ngày so với TB 60 ngày |
-| Hậu điều kiện | Có cảnh báo/nhận xét |
-
-**UC-14 [MỚI] – Quản lý kích thước & tính CBM**
-
-| Mục | Đặc tả |
-|---|---|
-| Actor | Thủ kho/Quản lý |
-| Tiền điều kiện | Có thông tin Dài (mm), Rộng (mm), Cao (mm) của sản phẩm |
-| Luồng chính | Nhập/cập nhật kích thước → hệ thống tự động tính CBM = (Dài × Rộng × Cao) / 1.000.000.000 (m³) → lưu vào hồ sơ hàng hóa |
-| Ngoại lệ/điểm mở | Nếu thiếu 1 trong 3 chiều: không cho phép lưu; đơn vị đo mặc định mm, có thể chuyển đổi hiển thị sang cm/m |
-| Hậu điều kiện | CBM/đơn vị và tổng CBM tồn kho theo mã hàng luôn sẵn sàng cho báo cáo diện tích/khối kho, tối ưu xếp container |
-
-**UC-15 [MỚI] – Quản lý Combo/BOM**
-
-| Mục | Đặc tả |
-|---|---|
-| Actor | Quản lý |
-| Tiền điều kiện | Các mã hàng cấu kiện đã tồn tại trong danh mục |
-| Luồng chính | Tạo mã Combo (VD: "Bộ bàn ăn 6 ghế – Gỗ sồi") → định nghĩa danh sách cấu kiện & số lượng mỗi cấu kiện (BOM) → hệ thống tính CBM Combo = tổng CBM cấu kiện (hoặc CBM đóng gói riêng nếu khai báo) |
-| Ngoại lệ/điểm mở | Không cho lưu BOM nếu cấu kiện không tồn tại hoặc số lượng ≤ 0 |
-| Hậu điều kiện | Combo sẵn sàng để lập phiếu xuất; tồn Combo được suy diễn tự động từ tồn cấu kiện |
-
-**UC-16 [MỚI] – Quản lý biến thể SKU**
-
-| Mục | Đặc tả |
-|---|---|
-| Actor | Quản lý |
-| Tiền điều kiện | Có mã hàng gốc (Product Model) |
-| Luồng chính | Chọn mã hàng gốc → khai báo các thuộc tính biến thể (màu sắc, chất liệu, kích cỡ) → hệ thống sinh mã SKU riêng cho từng tổ hợp biến thể → mỗi SKU có tồn kho, giá, CBM riêng |
-| Ngoại lệ/điểm mở | Trùng tổ hợp biến thể: hệ thống cảnh báo và không cho tạo trùng SKU |
-| Hậu điều kiện | Danh sách SKU biến thể sẵn sàng cho nhập/xuất/tồn/báo cáo độc lập |
-
-**UC-17 [MỚI] – Ghi nhận & xử lý hàng lỗi (Damaged)**
-
-| Mục | Đặc tả |
-|---|---|
-| Actor | Thủ kho/QC/Quản lý |
-| Tiền điều kiện | Phát hiện hàng lỗi/hư hỏng khi nhập, lưu kho, hoặc kiểm kê |
-| Luồng chính | Ghi nhận số lượng & lý do lỗi → chuyển trạng thái tồn của số lượng đó từ "Tốt" sang "Damaged/Lỗi nhẹ" → **tồn khả dụng để xuất bán giảm tương ứng, tổng tồn vật lý không đổi** → Quản lý duyệt phương án xử lý (thanh lý, trả NCC, sửa chữa) |
-| Ngoại lệ/điểm mở | Phương án xử lý cụ thể (trả NCC/thanh lý) chi tiết hóa tại SRS (xem TBC-17, mục 18.6) |
-| Hậu điều kiện | Tồn Damaged tách biệt hoàn toàn khỏi tồn khả dụng trong mọi truy vấn xuất kho và báo cáo bán hàng |
-
-**UC-18 [MỚI] – Khóa bản ghi tồn kho khi giao dịch (Pessimistic Locking)**
-
-| Mục | Đặc tả |
-|---|---|
-| Actor | Hệ thống |
-| Tiền điều kiện | Có giao dịch nhập/xuất/điều chỉnh/chuyển kho tác động đến bản ghi tồn của một SKU |
-| Luồng chính | Giao dịch A yêu cầu xử lý SKU X → hệ thống khóa (SELECT ... FOR UPDATE) bản ghi tồn của SKU X → giao dịch A thực hiện kiểm tra & cập nhật tồn → commit → mở khóa. Nếu giao dịch B yêu cầu cùng SKU X trong lúc đang khóa → giao dịch B phải chờ (hoặc bị timeout/từ chối theo cấu hình) |
-| Ngoại lệ/điểm mở | Timeout khóa tối đa: TBC ở SRS (đề xuất 5–10 giây); vượt timeout → báo lỗi "Bản ghi đang được xử lý, vui lòng thử lại" |
-| Hậu điều kiện | Không có 2 giao dịch cùng lúc làm giảm tồn của cùng 1 SKU vượt quá tồn thực tế |
+### 2.3. Phạm vi ngoài hệ thống (Out of Scope)
+- Hệ thống điều phối tuyến đường vận chuyển xe tải chặng cuối ngoài khuôn viên kho (Transportation Management System - TMS).
+- Hệ thống hạch toán kế toán tài chính chuyên sâu toàn doanh nghiệp (tính lương, trích khấu hao tài sản cố định, quyết toán thuế nhà nước).
+- Kênh bán lẻ trực tuyến (E-commerce B2C) hoặc tích hợp cổng thanh toán trực tiếp qua thẻ ngân hàng của người tiêu dùng.
 
 ---
 
-## 8. Business Rules
+## 3. Phân tích Stakeholder & Vai trò người dùng (Actors)
 
-| ID | Quy tắc | Diễn giải |
-|---|---|---|
-| BR-01 | Số lượng xuất ≤ số lượng tồn khả dụng. | Không cho phép lập/hoàn tất giao dịch xuất vượt tồn khả dụng (đã loại trừ Damaged). |
-| BR-02 | Tồn không được âm. | Mọi cập nhật xuất phải kiểm tra tồn trong cùng giao dịch có khóa. |
-| BR-03 | Phiếu có trạng thái Nháp/Đã duyệt/Hủy. | Chuyển trạng thái phải theo quyền. |
-| BR-04 | Sửa/hủy phiếu bị giới hạn theo trạng thái. | Nếu đã cập nhật tồn, hủy phải điều chỉnh tồn ngược lại. |
-| BR-05 | Tồn thấp khi tồn khả dụng < tồn tối thiểu. | Tạo cảnh báo cho mặt hàng cần nhập. |
-| BR-06 | Tồn cuối = Tồn đầu + Nhập – Xuất. | Áp dụng riêng cho từng trạng thái tồn (Tốt/Damaged); dùng cho báo cáo N-X-T. |
-| BR-07 | Cập nhật tồn và giao dịch cần nhất quán trong transaction CSDL. | Giảm rủi ro sai số khi thao tác đồng thời. |
-| BR-08 | Lưu lịch sử thao tác/giao dịch. | Phải truy được người, thời điểm và giao dịch liên quan. |
-| BR-09 | Ngưỡng AI bất thường và công thức dự báo. | Đã chốt tại mục 10/16. |
-| **BR-10** [MỚI] | CBM = (Dài × Rộng × Cao)/1.000.000.000, đơn vị mm → m³. | Tự động tính lại mỗi khi cập nhật kích thước sản phẩm. |
-| **BR-11** [MỚI] | Tồn Combo = MIN( floor(Tồn cấu kiện[i] / Định mức BOM[i]) ) với mọi cấu kiện i thuộc BOM. | Không lưu tồn Combo trực tiếp; luôn tính động (derived) tại thời điểm truy vấn/xuất. |
-| **BR-12** [MỚI] | Xuất hàng Combo chỉ thành công khi TẤT CẢ cấu kiện trong BOM đủ tồn khả dụng theo đúng định mức; nếu thiếu dù chỉ 1 cấu kiện, từ chối toàn bộ giao dịch. | Tránh xuất bộ bàn ghế thiếu ghế. |
-| **BR-13** [MỚI] | Mỗi biến thể (màu sắc, chất liệu...) là một SKU tồn kho độc lập, có tồn/CBM/giá riêng, không được gộp tồn giữa các biến thể của cùng 1 mã hàng gốc. | Đảm bảo tồn theo đúng biến thể thực tế trong kho. |
-| **BR-14** [MỚI] | Số lượng ở trạng thái "Damaged/Lỗi nhẹ" bị loại trừ hoàn toàn khỏi Tồn khả dụng dùng cho: xuất bán, cảnh báo tồn thấp, AI gợi ý nhập, AI phát hiện biến động. | Tồn khả dụng = Tồn vật lý − Tồn Damaged − Tồn đang bị khóa bởi giao dịch khác chưa commit. |
-| **BR-15** [MỚI] | Chuyển trạng thái từ Damaged sang Tốt (sau khi sửa chữa) hoặc từ Tốt sang Damaged đều phải được Quản lý duyệt và ghi log lý do. | Đảm bảo kiểm soát/không lạm dụng để gian lận tồn kho. |
-| **BR-16** [MỚI] | Mọi giao dịch làm thay đổi tồn (nhập/xuất/điều chỉnh/chuyển kho/đổi trạng thái Damaged) phải khóa bản ghi tồn liên quan (Pessimistic Locking – `SELECT ... FOR UPDATE`) trong suốt thời gian xử lý và chỉ mở khóa sau khi commit hoặc rollback. | Ngăn 2 giao dịch đồng thời cùng đọc tồn cũ rồi cùng ghi đè, gây xuất vượt tồn. |
+### 3.1. Danh mục Stakeholder
+- **Ban Giám đốc Doanh nghiệp Nội thất:** Đòi hỏi số liệu tồn kho trung thực, báo cáo tổng thể tức thời, kiểm soát rủi ro các đơn hàng giá trị lớn ($> 100$ triệu VNĐ).
+- **Bộ phận Quản lý Vận hành Kho:** Cần công cụ giám sát trực quan thể tích kho, phát hiện sớm nguy cơ thiếu hàng và nghẽn cấu kiện Combo.
+- **Bộ phận Kế toán Kho:** Yêu cầu đối soát chứng từ nhập/xuất chặt chẽ, kiểm tra đơn giá, thuế, đối soát số dư cuối kỳ khớp đúng 100%.
+- **Đội ngũ Kiểm định Chất lượng (QC):** Cần quy trình chuẩn để ghi nhận hàng lỗi, quy trách nhiệm và cách ly hàng hỏng ngay khi tiếp nhận.
+- **Đội ngũ Thủ kho / Nhân viên Kho:** Cần giao diện tiếng Việt thân thiện, hỗ trợ thao tác nhanh, cảnh báo tức thời khi xuất vượt tồn.
+- **Bộ phận Quản trị Hệ thống (IT/Admin):** Đòi hỏi tính ổn định, cơ chế sao lưu/phục hồi an toàn, quản lý tài khoản và giám sát toàn diện nhật ký kiểm toán.
 
----
+### 3.2. Đặc tả 6 Actor người dùng & Actor Trí tuệ nhân tạo
 
-## 9. Yêu cầu chức năng
-
-| ID | Tên | Mô tả yêu cầu người dùng |
-|---|---|---|
-| REQ-F-01 | Quản lý hàng hóa | Hệ thống cho phép quản lý mã hàng, tên hàng, đơn vị tính và thông tin phục vụ nhập/xuất/tồn. |
-| REQ-F-02 | Quản lý nhà cung cấp | Hệ thống cho phép quản lý thông tin NCC và liên kết NCC với nhập kho. |
-| REQ-F-03 | Phiếu nhập | Cho phép lập phiếu với số phiếu, ngày nhập, NCC, kho nhận, hàng hóa, số lượng thực nhập, đơn giá, thành tiền, người lập, trạng thái. |
-| REQ-F-04 | Sai lệch nhập | Cho phép ghi nhận số lượng thực tế khác chứng từ. |
-| REQ-F-05 | Kiểm tra dữ liệu | Kiểm tra mã hàng và dữ liệu phiếu trước xử lý. |
-| REQ-F-06 | Cập nhật tồn nhập | Sau khi phiếu nhập xử lý thành công, tự động tăng tồn theo đúng trạng thái (Tốt/Damaged). |
-| REQ-F-07 | Phiếu xuất | Cho phép lập phiếu với số phiếu, ngày xuất, kho xuất, đơn vị nhận, hàng hóa/biến thể/Combo, số lượng, đơn giá nếu cần, thành tiền, người lập, trạng thái. |
-| REQ-F-08 | Chặn vượt tồn | Không cho phép hoàn tất xuất nếu số lượng vượt tồn khả dụng. |
-| REQ-F-09 | Cảnh báo tồn thấp | Tự động xác định hàng có tồn khả dụng dưới tồn tối thiểu và tạo cảnh báo. |
-| REQ-F-10 | Lịch sử | Lưu lịch sử nhập/xuất và thao tác, phục vụ truy vết. |
-| REQ-F-11 | Báo cáo N-X-T | Cung cấp tồn đầu, tổng nhập, tổng xuất, tồn cuối, tách theo trạng thái Tốt/Damaged. |
-| REQ-F-12 | Xuất báo cáo | Hỗ trợ xuất Excel/PDF theo khảo sát. |
-| REQ-F-13 | Phân quyền | Kiểm soát tạo/sửa/duyệt/hủy/xem theo vai trò. |
-| REQ-F-14 | Tra cứu | Cho phép tra cứu lịch sử theo tiêu chí nghiệp vụ, bao gồm lọc theo trạng thái tồn, biến thể, Combo. |
-| REQ-F-15 | Quản lý trạng thái | Hỗ trợ Nháp/Đã duyệt/Hủy. |
-| REQ-F-16 | Quản lý lô hàng và hạn sử dụng | Kế thừa từ v1.1; áp dụng cho nhóm hàng nội thất có lớp phủ/sơn có hạn bảo quản (nếu có). |
-| REQ-F-17 | Chuyển kho nội bộ | Chuyển kho giữa kho chính và kho chi nhánh, cập nhật CBM tồn theo từng kho. |
-| REQ-F-18 | Kiểm kê định kỳ | Lập và xử lý phiếu kiểm kê hàng quý, tách riêng kiểm đếm hàng Tốt và Damaged. |
-| REQ-F-19 | Điều chỉnh tồn | Lập phiếu điều chỉnh tồn khi sai lệch kiểm kê >5% hoặc khi sửa/hủy phiếu đã duyệt. |
-| REQ-F-20 | Workflow duyệt | 2 cấp Kế toán → Quản lý; cấp Giám đốc cho phiếu xuất >100 triệu. |
-| REQ-F-21 | Tra cứu/lọc báo cáo | Theo tuần/tháng, theo NCC, mặt hàng, biến thể, kho, trạng thái tồn. |
-| REQ-F-22 | Cảnh báo email | Gửi email nội bộ cảnh báo tồn thấp cho Quản lý. |
-| REQ-F-23 | Khóa bản ghi tồn | **[Cập nhật – NỘI THẤT]** Áp dụng cơ chế Pessimistic Locking (`SELECT ... FOR UPDATE`) khi có giao dịch nhập/xuất/điều chỉnh/chuyển kho/đổi trạng thái Damaged tác động đến một SKU; timeout và cơ chế retry đặc tả chi tiết ở SRS. |
-| REQ-F-24 | Audit log | Lưu audit log 5 năm với lý do thao tác. |
-| REQ-F-25 | Quản lý nhà cung cấp mở rộng | Mã số thuế, địa chỉ, email, số điện thoại, lịch sử giao dịch. |
-| REQ-F-26 | Duyệt gợi ý AI | Quản lý duyệt gợi ý AI trước khi áp dụng vào nghiệp vụ. |
-| **REQ-F-27** [MỚI] | Quản lý kích thước & CBM | Cho phép nhập/sửa Dài, Rộng, Cao (mm) theo từng SKU; hệ thống tự động tính và hiển thị CBM (m³); tổng hợp CBM tồn kho theo kho/khu vực. |
-| **REQ-F-28** [MỚI] | Quản lý Combo/BOM | Cho phép tạo mã hàng loại "Combo", định nghĩa danh sách cấu kiện & định mức số lượng (BOM); tự tính tồn Combo suy diễn theo BR-11; validate đủ cấu kiện khi xuất theo BR-12. |
-| **REQ-F-29** [MỚI] | Quản lý biến thể SKU | Cho phép khai báo thuộc tính biến thể (màu sắc, chất liệu, kích cỡ...) trên mã hàng gốc; tự sinh SKU con cho mỗi tổ hợp biến thể; mỗi SKU con quản lý tồn/giá/CBM độc lập. |
-| **REQ-F-30** [MỚI] | Ghi nhận trạng thái hàng lỗi (Damaged) | Cho phép Thủ kho/QC gắn cờ Damaged/Lỗi nhẹ cho một số lượng cụ thể của SKU kèm lý do & hình ảnh minh chứng (tùy chọn); tự động loại trừ số lượng này khỏi tồn khả dụng; yêu cầu Quản lý duyệt việc chuyển trạng thái. |
-| **REQ-F-31** [MỚI] | Xử lý hàng Damaged | Cho phép Quản lý chọn phương án xử lý hàng Damaged: chuyển về Tốt (đã sửa), thanh lý, hoặc trả lại NCC; mỗi phương án tạo bút toán điều chỉnh tồn tương ứng. |
-| **REQ-F-32** [MỚI] | Cấu hình timeout khóa | Cho phép Quản trị hệ thống cấu hình thời gian chờ khóa (lock timeout) và số lần retry khi giao dịch bị chặn bởi Pessimistic Locking. |
-
----
-
-## 10. Yêu cầu AI
-
-| ID | Nhóm | Input | Output mong muốn | Tình trạng |
-|---|---|---|---|---|
-| REQ-AI-01 | Sinh báo cáo | Dữ liệu nhập/xuất/tồn (chỉ tính tồn khả dụng) | Báo cáo N-X-T kèm nhận xét | Đã xác định |
-| REQ-AI-02 | Gợi ý nhập | Tồn khả dụng, tồn tối thiểu, dữ liệu xuất, nhu cầu dự báo | Mặt hàng/biến thể nên nhập và mức độ ưu tiên | Đã xác định |
-| REQ-AI-03 | Phát hiện biến động | Số liệu xuất theo các kỳ (chỉ tính hàng Tốt xuất bán, loại trừ Damaged) | Nhận xét tăng/giảm đáng kể và gợi ý kiểm tra nguyên nhân | Đã xác định |
-| **REQ-AI-04** [MỚI] | Gợi ý nhập theo cấu kiện Combo | Tồn cấu kiện, BOM, tốc độ bán Combo | Cảnh báo "cấu kiện nghẽn cổ chai" (bottleneck component) làm giới hạn khả năng ghép Combo, kèm gợi ý ưu tiên nhập cấu kiện đó | Mới bổ sung – công thức chi tiết ở SRS |
-
-Yêu cầu AI đã được chốt: phát hiện biến động bất thường khi nhu cầu tăng/giảm ≥20% trong 7 ngày liên tiếp so với trung bình 60 ngày; dự báo sử dụng nhu cầu trung bình 60 ngày, hệ số mùa vụ và biến động gần nhất. Hệ số mùa vụ: 1,2 cho tháng cao điểm và 0,8 cho tháng thấp điểm.
-
-### 10.1. Nguyên tắc kiểm soát AI
-- AI chỉ đưa ra nhận xét/gợi ý dựa trên dữ liệu nghiệp vụ được cung cấp, **và chỉ trên phần tồn khả dụng (đã loại trừ Damaged)**.
-- Kết quả AI cần hiển thị cùng dữ liệu/thời kỳ làm căn cứ để người dùng kiểm tra.
-- Kết quả gợi ý AI không được tự động áp dụng vào nghiệp vụ. Quản lý phải thực hiện chức năng "Duyệt gợi ý AI" trước khi hệ thống tạo/áp dụng đề xuất nhập hàng hoặc xử lý cảnh báo theo quy trình.
-- **[MỚI]** Với hàng Combo, AI phải cảnh báo rõ khi gợi ý nhập bị giới hạn bởi 1 cấu kiện cụ thể (bottleneck), tránh gợi ý nhập chung chung không khả thi.
-
----
-
-## 11. Yêu cầu phi chức năng
-
-| ID | Nhóm | Yêu cầu URD | Mức xác định |
-|---|---|---|---|
-| REQ-NF-01 | Tính nhất quán dữ liệu | Cập nhật tồn phải nhất quán trong transaction CSDL. | Đã xác định ở mức nghiệp vụ/kỹ thuật |
-| REQ-NF-02 | Phân quyền | Thao tác phải tuân theo vai trò. | Đã xác định |
-| REQ-NF-03 | Audit/Traceability | Lưu người thực hiện, thời điểm, giao dịch liên quan. | Đã xác định |
-| REQ-NF-04 | Lưu trữ | Lịch sử phục vụ kiểm toán; lưu 5 năm. | Đã chốt |
-| REQ-NF-05 | Định dạng đầu ra | Báo cáo hỗ trợ Excel/PDF. | Đã xác định |
-| REQ-NF-06 | Đồng thời | Ngăn sai số do nhiều người cùng thao tác tồn. | Đã đặc tả cơ chế – xem REQ-NF-07 |
-| **REQ-NF-07** [MỚI] | Khóa bản ghi (Locking) | Áp dụng Pessimistic Locking (`SELECT ... FOR UPDATE`) ở tầng CSDL cho mọi bản ghi tồn kho bị tác động bởi giao dịch nhập/xuất/điều chỉnh/Damaged; timeout khóa đề xuất 5–10 giây; quá thời gian phải trả lỗi rõ ràng cho người dùng thay vì treo hệ thống. | Cần đặc tả kỹ thuật chi tiết ở SRS |
-| **REQ-NF-08** [MỚI] | Hiệu năng tính CBM | Việc tự động tính CBM khi cập nhật kích thước hoặc tồn kho không được làm chậm thao tác nhập/xuất quá 1 giây/giao dịch (ràng buộc mức nghiệp vụ, sẽ lượng hóa kỹ thuật ở SRS). | Cần đặc tả kỹ thuật ở SRS |
-
-Các yêu cầu hiệu năng, availability, backup, mã hóa, logging kỹ thuật, DR, SLA… chưa xuất hiện đủ trong tài liệu khảo sát nên không tự bổ sung thành yêu cầu bắt buộc trong URD, ngoại trừ các mục đã nêu ở trên liên quan trực tiếp đến locking và CBM.
-
----
-
-## 12. Mô hình dữ liệu nghiệp vụ
-
-Các thực thể dưới đây được suy ra trực tiếp từ trường dữ liệu phiếu nhập/xuất, hàng hóa, tồn và lịch sử trong khảo sát, **mở rộng thêm các thực thể đặc thù ngành nội thất**. Đây là mô hình nghiệp vụ sơ bộ, không phải thiết kế CSDL vật lý. Sơ đồ ERD chi tiết dạng Mermaid xem tại mục 19.1.
-
-| Đối tượng | Thuộc tính chính được khảo sát |
-|---|---|
-| Hàng hóa (Product Model) | Mã hàng gốc, tên hàng, đơn vị tính, tồn tối thiểu |
-| **[MỚI]** SKU (biến thể) | Mã SKU, mã hàng gốc, màu sắc, chất liệu, Dài/Rộng/Cao (mm), CBM (m³), tồn Tốt, tồn Damaged |
-| **[MỚI]** Combo/BOM | Mã Combo, tên Combo, danh sách cấu kiện (SKU + định mức số lượng) |
-| Nhà cung cấp | Mã số thuế, địa chỉ, email, số điện thoại, lịch sử giao dịch |
-| Phiếu nhập | Số phiếu, ngày nhập, NCC, kho nhận, danh sách hàng (SKU), số lượng thực nhập, **[MỚI] số lượng phân loại Tốt/Damaged**, đơn giá, thành tiền, người lập, trạng thái |
-| Phiếu xuất | Số phiếu, ngày xuất, kho xuất, đơn vị nhận, danh sách hàng (SKU/Combo), số lượng, đơn giá nếu cần, thành tiền, người lập, trạng thái |
-| Tồn kho | SKU, kho, **[MỚI] trạng thái tồn (Tốt/Damaged)**, số lượng, **[MỚI] cờ khóa giao dịch (lock flag)** |
-| Lịch sử | Người thực hiện, thời điểm, giao dịch liên quan, thao tác, **[MỚI] lý do đổi trạng thái Damaged (nếu có)** |
-
----
-
-## 13. Báo cáo và đầu ra
-
-| Báo cáo/đầu ra | Nội dung | Đối tượng |
-|---|---|---|
-| Báo cáo N-X-T | Tồn đầu kỳ, tổng nhập, tổng xuất, tồn cuối kỳ (tách Tốt/Damaged) | Kế toán/Quản lý |
-| Excel/PDF | Định dạng xuất báo cáo | Kế toán/Quản lý |
-| Cảnh báo tồn thấp | Mã hàng/SKU, tình trạng cần nhập | Thủ kho/Quản lý |
-| AI nhận xét | Nhận xét trên dữ liệu N-X-T (tồn khả dụng) | Kế toán/Quản lý |
-| AI gợi ý nhập | Mặt hàng/biến thể, ưu tiên, lượng gợi ý | Quản lý |
-| AI biến động | Tăng/giảm đáng kể, gợi ý kiểm tra | Quản lý |
-| **[MỚI]** Báo cáo hàng Damaged | Số lượng, giá trị, lý do lỗi, phương án xử lý theo kỳ | Quản lý |
-| **[MỚI]** Báo cáo CBM/diện tích kho | Tổng CBM tồn theo kho/khu vực, hỗ trợ lập kế hoạch nhập hàng theo sức chứa | Thủ kho/Quản lý |
-| **[MỚI]** Báo cáo cấu kiện nghẽn cổ chai (Combo) | Cấu kiện đang giới hạn khả năng ghép Combo | Quản lý |
-
-Báo cáo được chốt theo tuần và tháng; hỗ trợ bộ lọc theo nhà cung cấp, mặt hàng, biến thể, kho và trạng thái tồn. Chi tiết định dạng file và layout báo cáo sẽ được đặc tả trong SRS.
-
----
-
-## 14. Ma trận truy vết
-
-| Nguồn khảo sát | Yêu cầu/artefact URD |
-|---|---|
-| Nhập dữ liệu nhiều lần | REQ-F-06, UC-03, BR-07 |
-| Sai số số lượng/mã hàng | REQ-F-04, REQ-F-05, UC-03 |
-| Khó truy vết | REQ-F-10, REQ-NF-03, UC-07 |
-| Nguy cơ tồn âm | REQ-F-08, BR-01, BR-02, UC-04 |
-| Khó phát hiện hàng sắp hết | REQ-F-09, UC-06 |
-| Báo cáo thủ công | REQ-F-11, REQ-F-12, UC-08, UC-09 |
-| Khó phát hiện biến động | REQ-AI-03, UC-12 |
-| Khó quyết định nhập bao nhiêu | REQ-AI-02, UC-11 |
-| Phân quyền chưa tốt | REQ-F-13, UC-13 |
-| **[MỚI]** Hàng lỗi lẫn tồn tốt | REQ-F-30, REQ-F-31, BR-14, BR-15, UC-17 |
-| **[MỚI]** Xuất vượt tồn do đồng thời | REQ-F-23, REQ-NF-07, BR-16, UC-18 |
-| **[MỚI]** Khó quản lý kích thước/thể tích | REQ-F-27, BR-10, UC-14 |
-| **[MỚI]** Khó quản lý hàng bộ/Combo | REQ-F-28, BR-11, BR-12, UC-15 |
-| **[MỚI]** Khó quản lý biến thể màu/chất liệu | REQ-F-29, BR-13, UC-16 |
-
----
-
-## 15. Tiêu chí nghiệm thu cấp URD
-
-- Người dùng có thể lập phiếu nhập và ghi số lượng thực tế; sai lệch chứng từ được lưu.
-- Phiếu nhập được xử lý thành công thì tồn tăng tương ứng, đúng trạng thái Tốt/Damaged.
-- Người dùng không thể hoàn tất phiếu xuất vượt số lượng tồn khả dụng.
-- Phiếu xuất được xử lý thành công thì tồn giảm tương ứng.
-- Hàng dưới tồn tối thiểu được hệ thống xác định và cảnh báo.
-- Có thể tra cứu lịch sử nhập/xuất và thao tác để truy vết.
-- Báo cáo N-X-T thể hiện tồn đầu, nhập, xuất, tồn cuối và tuân thủ công thức nghiệp vụ.
-- Có thể xuất báo cáo Excel/PDF theo phạm vi khảo sát.
-- Quyền thao tác được phân vai: Nhân viên tạo phiếu nháp; Thủ kho lập nhập/xuất và kiểm kê; Kế toán duyệt sơ bộ và đối chiếu; Quản lý duyệt cuối, hủy phiếu và xem báo cáo; Giám đốc duyệt phiếu xuất >100 triệu.
-- AI có ba (bốn, kể cả gợi ý cấu kiện Combo) nhóm đầu ra: nhận xét báo cáo, gợi ý nhập, phát hiện biến động, cảnh báo cấu kiện nghẽn cổ chai.
-- **[MỚI]** Kích thước sản phẩm được nhập vào thì CBM được tự động tính chính xác và hiển thị ngay.
-- **[MỚI]** Không thể xuất một Combo nếu thiếu bất kỳ cấu kiện nào theo BOM.
-- **[MỚI]** Hai giao dịch xuất đồng thời trên cùng một SKU có tổng số lượng vượt tồn: chỉ một giao dịch được xử lý thành công, giao dịch còn lại bị từ chối hoặc phải chờ đến khi có đủ tồn.
-- **[MỚI]** Số lượng hàng được gắn Damaged không xuất hiện trong tồn khả dụng và không được hệ thống gợi ý bán/xuất.
-
----
-
-## 16. Các điểm đã xác nhận và chốt (kế thừa từ URD v1.1)
-
-Toàn bộ 16 điểm TBC-01 đến TBC-16 tại URD v1.1 (workflow duyệt, số lượng kho, dữ liệu hàng hóa, kiểm kê, sửa/hủy sau duyệt, bất thường AI, dự báo AI, báo cáo, lưu trữ, cảnh báo, duyệt giá trị lớn, audit, đồng thời, phân vai, nhà cung cấp, AI human-in-the-loop) **được giữ nguyên hiệu lực** và bổ sung chi tiết kỹ thuật hóa tại mục 18 của tài liệu này (đặc biệt TBC-13 "Đồng thời" nay được cụ thể hóa bằng cơ chế Pessimistic Locking).
-
-### 16.1. Bảng chốt bổ sung theo nghiệp vụ Nội thất
-
-| ID | Chủ đề | Quyết định đã chốt |
-|---|---|---|
-| TBC-17 [MỚI] | Kích thước & CBM | Bắt buộc khai báo Dài, Rộng, Cao (mm) cho mọi SKU; CBM tự tính, hiển thị và dùng cho báo cáo diện tích kho. |
-| TBC-18 [MỚI] | Combo/BOM | Combo được định nghĩa bằng danh sách cấu kiện + định mức; tồn Combo luôn suy diễn động, không lưu cứng. |
-| TBC-19 [MỚI] | Biến thể SKU | Mỗi tổ hợp (màu sắc × chất liệu × kích cỡ) là 1 SKU tồn kho độc lập. |
-| TBC-20 [MỚI] | Hàng Damaged | Trạng thái tồn "Damaged/Lỗi nhẹ" tách biệt hoàn toàn khỏi tồn khả dụng; xử lý (sửa/thanh lý/trả NCC) do Quản lý duyệt. |
-| TBC-21 [MỚI] | Locking | Áp dụng Pessimistic Locking (`SELECT ... FOR UPDATE`) cho mọi giao dịch thay đổi tồn; timeout đề xuất 5–10 giây, cấu hình được. |
-
----
-
-## 17. Phụ lục
-
-### 17.1. Danh sách yêu cầu sơ bộ từ khảo sát (kế thừa)
-- REQ-01 Quản lý hàng hóa
-- REQ-02 Quản lý nhà cung cấp
-- REQ-03 Lập phiếu nhập kho
-- REQ-04 Ghi nhận số lượng thực tế khác chứng từ
-- REQ-05 Kiểm tra mã hàng và dữ liệu phiếu
-- REQ-06 Tự động cập nhật tồn kho
-- REQ-07 Lập phiếu xuất kho
-- REQ-08 Không cho phép xuất vượt tồn
-- REQ-09 Cảnh báo tồn kho thấp
-- REQ-10 Lưu lịch sử nhập/xuất và thao tác
-- REQ-11 Báo cáo nhập–xuất–tồn
-- REQ-12 Xuất báo cáo Excel/PDF
-- REQ-13 Phân quyền theo vai trò
-- REQ-14 AI sinh báo cáo và nhận xét
-- REQ-15 AI gợi ý nhập hàng
-- REQ-16 AI phát hiện biến động bất thường
-- **REQ-17 [MỚI]** Quản lý kích thước & CBM
-- **REQ-18 [MỚI]** Quản lý Combo/BOM
-- **REQ-19 [MỚI]** Quản lý biến thể SKU
-- **REQ-20 [MỚI]** Ghi nhận & xử lý hàng lỗi (Damaged)
-- **REQ-21 [MỚI]** Khóa bản ghi tồn kho (Pessimistic Locking)
-
-### 17.2. Định hướng chuyển sang SRS
-1. Chốt các TBC bổ sung (TBC-17 đến TBC-21) với chủ nghiệp vụ.
-2. Chuyển từng REQ-F/REQ-AI thành requirement có ID duy nhất, điều kiện, input/output, validation và acceptance criteria chi tiết.
-3. Đặc tả sequence/activity cho các use case trọng tâm, bao gồm UC-14 đến UC-18.
-4. Chuyển mô hình dữ liệu khái niệm (mục 12, 19.1) thành logical/physical data model, thiết kế bảng `product_model`, `sku_variant`, `bom_component`, `stock_ledger` (có cột `status: GOOD/DAMAGED`, `locked_by`, `locked_at`).
-5. Đặc tả transaction/concurrency (cơ chế lock cụ thể theo DBMS: PostgreSQL `SELECT FOR UPDATE`, SQL Server `WITH (UPDLOCK, ROWLOCK)`), security, audit, backup, performance và integration ở SRS.
-6. Đặc tả AI: dữ liệu, pipeline, prompt/model, ngưỡng, confidence, explainability, human approval và logging, có tính đến việc loại trừ Damaged khỏi dữ liệu huấn luyện/tính toán.
-
----
-
-## 18. [MỚI – NỘI THẤT] Đặc tả nghiệp vụ chuyên biệt ngành Kho Nội thất
-
-### 18.1. Quản lý kích thước và tính CBM
-
-**Mục tiêu:** Mỗi SKU nội thất phải khai báo kích thước đóng gói thực tế để hệ thống tự động tính thể tích, phục vụ:
-- Tính diện tích/khối lưu kho cần thiết.
-- Tối ưu số lượng SKU có thể xếp vào 1 container/xe tải khi lập kế hoạch nhập/xuất.
-- Cảnh báo khi tổng CBM tồn kho vượt sức chứa kho.
-
-**Công thức:**
-```
-CBM (m³) = (Dài_mm × Rộng_mm × Cao_mm) / 1.000.000.000
-Tổng CBM tồn kho của 1 SKU = CBM đơn vị × Số lượng tồn
-```
-
-**Quy tắc dữ liệu:**
-- Bắt buộc nhập đủ 3 chiều khi tạo mới SKU; không cho phép giá trị ≤ 0.
-- Khi cập nhật kích thước, hệ thống tính lại CBM ngay và ghi log thay đổi (vì ảnh hưởng đến kế hoạch kho).
-- Báo cáo tồn kho hiển thị thêm cột "Tổng CBM" bên cạnh số lượng.
-
-### 18.2. Quản lý hàng Combo/BOM
-
-**Mục tiêu:** Cho phép bán sản phẩm dạng bộ (ví dụ "Bộ bàn ăn 6 ghế") trong khi vẫn quản lý tồn kho vật lý ở cấp cấu kiện (mặt bàn, chân bàn, ghế).
-
-**Cấu trúc BOM ví dụ:**
-
-| Combo | Cấu kiện | Định mức/bộ |
-|---|---|---|
-| Bộ bàn ăn 6 ghế – Gỗ sồi | Mặt bàn gỗ sồi 1m8 | 1 |
-| Bộ bàn ăn 6 ghế – Gỗ sồi | Chân bàn gỗ sồi (bộ 4 chân) | 1 |
-| Bộ bàn ăn 6 ghế – Gỗ sồi | Ghế gỗ sồi bọc nỉ | 6 |
-
-**Công thức tồn Combo suy diễn (BR-11):**
-```
-Tồn khả dụng của Combo = MIN( floor(Tồn khả dụng cấu kiện[i] ÷ Định mức[i]) ), với mọi cấu kiện i
-```
-Ví dụ: Mặt bàn tồn 10, chân bàn tồn 8 (bộ), ghế tồn 50 → Tồn khả dụng Combo = MIN(10, 8, floor(50/6)=8) = **8 bộ**.
-
-**Quy tắc xuất Combo (BR-12):** Khi xuất N bộ Combo, hệ thống phải trừ đồng thời N × định mức của từng cấu kiện, tất cả trong cùng một giao dịch có khóa (locking); nếu bất kỳ cấu kiện nào không đủ, toàn bộ giao dịch bị hủy (rollback), không xuất được một phần.
-
-### 18.3. Quản lý biến thể SKU (Variant)
-
-**Mục tiêu:** Một mẫu sản phẩm (Product Model) như "Sofa băng 3 chỗ" có thể có nhiều biến thể: màu sắc (Nâu, Xám, Be), chất liệu bọc (Da, Nỉ), mỗi tổ hợp là một SKU tồn kho riêng.
-
-**Nguyên tắc:**
-- SKU = Product Model + Tổ hợp thuộc tính biến thể (không được trùng lặp).
-- Mỗi SKU biến thể có: tồn riêng, giá riêng, kích thước/CBM riêng (vì chất liệu khác nhau có thể dẫn đến kích thước đóng gói khác nhau), trạng thái Damaged riêng.
-- Báo cáo và AI (gợi ý nhập, phát hiện biến động) hoạt động ở cấp SKU biến thể để đảm bảo độ chính xác (ví dụ: màu Nâu bán chạy nhưng màu Xám tồn đọng).
-
-### 18.4. Trạng thái tồn kho "Damaged/Lỗi nhẹ"
-
-**Mục tiêu:** Cách ly hàng lỗi khỏi tồn khả dụng, tránh xuất bán nhầm cho khách, đồng thời vẫn theo dõi được giá trị hàng lỗi để xử lý (thanh lý, trả NCC, sửa chữa).
-
-**Mô hình trạng thái tồn:**
+Hệ thống thiết kế chuẩn hóa 6 vai trò người dùng (RBAC) và 1 tác nhân kỹ thuật:
 
 ```
-Tồn vật lý (Physical Stock)
-        │
-        ├── Trạng thái: GOOD (Tốt)         → tính vào Tồn khả dụng để xuất bán
-        └── Trạng thái: DAMAGED (Lỗi nhẹ)  → KHÔNG tính vào Tồn khả dụng
+┌────────────────────────────────────────────────────────────────────────┐
+│                        ACTORS TRONG HỆ THỐNG WMS                       │
+├───────────────────┬────────────────────────────────────────────────────┤
+│ 1. Admin          │ Quản trị viên hệ thống (Toàn quyền cấu hình/backup)│
+│ 2. Giám đốc       │ Director (Phê duyệt tài chính cấp cao > 100 triệu) │
+│ 3. Quản lý kho    │ Warehouse Manager (Duyệt chứng từ kho & Gợi ý AI)  │
+│ 4. Kế toán        │ Accountant (Đối chiếu chứng từ, duyệt tài chính C1)│
+│ 5. QC             │ Quality Control (Kiểm định chất lượng GOOD/DAMAGED)│
+│ 6. Thủ kho / NV   │ Warehouse Keeper / Staff (Lập phiếu, đếm kiểm kê)  │
+├───────────────────┼────────────────────────────────────────────────────┤
+│ 7. AI Copilot     │ Technical Actor (Trợ lý tra cứu, phân tích, đề xuất│
+│                   │ chứng từ nháp có người giám sát)                   │
+└───────────────────┴────────────────────────────────────────────────────┘
 ```
 
-**Quy trình xử lý:**
-1. Phát hiện lỗi (khi nhập, khi lưu kho, khi kiểm kê) → Thủ kho/QC lập "Biên bản hàng lỗi" ghi rõ số lượng, lý do, SKU.
-2. Hệ thống chuyển số lượng tương ứng từ trạng thái GOOD sang DAMAGED (hoặc ghi nhận thẳng là DAMAGED nếu phát hiện ngay lúc nhập).
-3. Quản lý xem xét và duyệt phương án: (a) Sửa chữa → chuyển lại GOOD sau khi hoàn tất, (b) Thanh lý → xuất kho với lý do "Thanh lý hàng lỗi", (c) Trả NCC → lập phiếu trả hàng liên kết phiếu nhập gốc.
-4. Mọi thay đổi trạng thái đều ghi audit log (người thực hiện, thời điểm, lý do).
+1. **Quản trị viên (Admin - `admin`):**
+   - Quản trị tài khoản người dùng, phân quyền RBAC.
+   - Cấu hình tham số hệ thống (ngưỡng tồn an toàn, ngưỡng cảnh báo CBM, ngưỡng phê duyệt Giám đốc, cấu hình URL Ollama).
+   - Quản lý sao lưu (Backup) và phục hồi (Restore) dữ liệu toàn diện (JSON/SQL).
+   - Giám sát toàn bộ nhật ký hệ thống (Audit Logs, Exception Logs).
+2. **Giám đốc (Director - `giamdoc`):**
+   - Xem bảng điều khiển điều hành (Executive Dashboard) và báo cáo tổng hợp giá trị tồn kho.
+   - Thực hiện thẩm quyền phê duyệt Cấp 3 đối với các phiếu xuất kho có giá trị lớn hơn **100.000.000 VNĐ**.
+3. **Quản lý kho (Warehouse Manager - `quanly`):**
+   - Phê duyệt Cấp 2 cho toàn bộ phiếu nhập kho, phiếu xuất kho, phiếu chuyển kho.
+   - Thẩm định và ra quyết định xử lý hàng lỗi (Damaged Stock): Sửa chữa, Thanh lý hoặc Trả NCC.
+   - Phê duyệt kết quả kiểm kê và bút toán điều chỉnh tồn kho khi có chênh lệch.
+   - Thẩm định và bấm nút **"Duyệt gợi ý AI"** để chuyển đề xuất phân tích thành chứng từ chính thức.
+4. **Kế toán kho (Accountant - `ketoan`):**
+   - Đối chiếu chứng từ nhà cung cấp và khách hàng với số liệu kiểm đếm thực tế.
+   - Phê duyệt Cấp 1 trên các chứng từ nhập kho và xuất kho.
+   - Xem và kết xuất báo cáo Nhập - Xuất - Tồn, báo cáo giá trị hàng hóa định kỳ ra Excel/PDF.
+5. **Nhân viên Kiểm định chất lượng (QC - `qc`):**
+   - Trực tiếp kiểm tra ngoại quan sản phẩm tại khu vực đệm tiếp nhận nhập kho.
+   - Ghi nhận số lượng đạt chuẩn (`GOOD`) và số lượng trầy xước/lỗi kết cấu (`DAMAGED`), bắt buộc nhập lý do lỗi cụ thể.
+6. **Thủ kho / Nhân viên (Warehouse Keeper / Staff - `thukho`):**
+   - Khởi tạo các bản nháp phiếu nhập, phiếu xuất, phiếu chuyển kho.
+   - Thực hiện thao tác kiểm đếm thực tế khi kiểm kê định kỳ và nhập số lượng vào hệ thống.
+   - Tra cứu nhanh vị trí và số lượng tồn kho qua thanh công cụ tìm kiếm và Trợ lý AI Copilot.
+7. **Hệ thống AI / Trợ lý Copilot (AI Engine):**
+   - Tác nhân kỹ thuật chạy ngầm định kỳ (`AiMonitoringService`) quét dữ liệu kho để phát hiện bất thường nhu cầu $\ge 20\%$ và hàng dưới mức an toàn.
+   - Trực tiếp hỗ trợ người dùng hội thoại tự nhiên, tra cứu số liệu kho thời gian thực và sinh mã lệnh tạo phiếu nháp theo chuẩn an toàn.
 
-**Công thức tồn khả dụng (BR-14):**
-```
-Tồn khả dụng = Tồn vật lý (GOOD) − Số lượng đang bị khóa bởi giao dịch khác chưa commit
-```
+### 3.3. Ma trận phân quyền sơ bộ theo vai trò
 
-### 18.5. Cơ chế khóa bản ghi tồn kho (Pessimistic Locking)
-
-**Vấn đề cần giải quyết:** Khi 2 nhân viên cùng lập phiếu xuất cho cùng 1 SKU gần như đồng thời, nếu hệ thống đọc tồn trước khi ghi mà không khóa, cả hai giao dịch có thể đều "thấy" đủ tồn và cùng xuất, dẫn đến tồn âm.
-
-**Giải pháp chốt – Pessimistic Locking:**
-- Khi một giao dịch (nhập/xuất/điều chỉnh/chuyển kho/đổi trạng thái Damaged) bắt đầu xử lý một bản ghi tồn của SKU X, hệ thống phải khóa bản ghi đó ngay từ bước đọc dữ liệu (ví dụ `SELECT ... FOR UPDATE` trong PostgreSQL/MySQL, hoặc `WITH (UPDLOCK, ROWLOCK)` trong SQL Server).
-- Bản ghi chỉ được mở khóa khi giao dịch **commit** (hoàn tất) hoặc **rollback** (hủy do lỗi/từ chối).
-- Giao dịch khác cố gắng truy cập cùng bản ghi trong lúc đang khóa sẽ phải **chờ** cho đến khi khóa được giải phóng, hoặc bị từ chối nếu vượt quá thời gian chờ tối đa (lock timeout, đề xuất 5–10 giây, cấu hình được).
-- Khi hết timeout, hệ thống trả thông báo rõ ràng: "Mặt hàng đang được xử lý bởi giao dịch khác, vui lòng thử lại sau" thay vì để người dùng chờ vô thời hạn.
-
-**Phạm vi áp dụng khóa:** Tất cả các nghiệp vụ làm thay đổi số lượng tồn của một SKU: lập phiếu nhập (tăng tồn), lập phiếu xuất (giảm tồn), điều chỉnh tồn sau kiểm kê, chuyển kho nội bộ, chuyển trạng thái GOOD ↔ DAMAGED, xuất hàng Combo (khóa đồng thời tất cả cấu kiện liên quan trong BOM theo thứ tự mã SKU tăng dần để tránh deadlock).
-
-### 18.6. Các điểm cần xác nhận bổ sung (TBC mới)
-
-| ID | Điểm cần xác nhận | Ảnh hưởng |
-|---|---|---|
-| TBC-22 | Ngưỡng % lỗi cho phép trước khi bắt buộc trả hàng NCC (thay vì thanh lý nội bộ)? | Business rule xử lý Damaged |
-| TBC-23 | Có cho phép sửa chữa hàng Damaged tại kho hay bắt buộc gửi về xưởng/NCC? | Quy trình vận hành |
-| TBC-24 | Thời gian chờ khóa (lock timeout) chính thức là bao nhiêu giây? | Cấu hình kỹ thuật SRS |
-| TBC-25 | Có cần chính sách giá riêng/chiết khấu khi bán Combo so với tổng giá lẻ cấu kiện? | Pricing (ngoài phạm vi WMS thuần túy, cần xác nhận có đưa vào hệ thống này không) |
+| Chức năng nghiệp vụ | Thủ kho / NV | Nhân viên QC | Kế toán | Quản lý kho | Giám đốc | Quản trị viên |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Quản lý Danh mục (Master Data)** | Xem | Xem | Xem | Thêm / Sửa | Xem | Toàn quyền |
+| **Lập phiếu Nhập/Xuất/Chuyển (DRAFT)** | **Tạo / Sửa** | - | Xem | Xem | Xem | Toàn quyền |
+| **Kiểm định chất lượng QC (GOOD/DAMAGED)** | - | **Thực hiện** | Xem | Xem | Xem | Toàn quyền |
+| **Phê duyệt Cấp 1 (Kế toán)** | - | - | **Duyệt C1** | - | - | Toàn quyền |
+| **Phê duyệt Cấp 2 (Quản lý kho)** | - | - | - | **Duyệt C2** | - | Toàn quyền |
+| **Phê duyệt Cấp 3 (Phiếu xuất $> 100$ tr)** | - | - | - | - | **Duyệt C3** | Toàn quyền |
+| **Thực hiện Kiểm kê & Đếm thực tế** | **Thực hiện** | - | Xem | **Duyệt** | Xem | Toàn quyền |
+| **Xử lý Hàng lỗi Damaged** | Đề xuất | Ghi nhận | Xem | **Duyệt** | Xem | Toàn quyền |
+| **Duyệt đề xuất AI (Replenishment)** | Xem | - | Xem | **Duyệt** | Xem | Toàn quyền |
+| **Báo cáo N-X-T, Báo cáo CBM** | Xem | Xem | **Xuất file** | **Xuất file** | Xem | Toàn quyền |
+| **Sao lưu & Phục hồi CSDL** | - | - | - | - | - | **Toàn quyền** |
 
 ---
 
-## 19. [MỚI – NỘI THẤT] Sơ đồ kỹ thuật (Mermaid.js)
+## 4. Khảo sát hiện trạng (AS-IS) & Mô hình chuyển đổi mục tiêu (TO-BE)
 
-### 19.1. Sơ đồ ERD (Entity Relationship Diagram)
+### 4.1. Phân tích hiện trạng AS-IS (Quy trình thủ công bằng Excel)
+Trước khi triển khai dự án, hoạt động quản lý kho nội thất tại doanh nghiệp bộc lộ những hạn chế nghiêm trọng:
+- **Quản lý dữ liệu phân mảnh:** Mỗi thủ kho và kế toán duy trì các file Excel riêng. Việc đồng bộ số liệu cuối tháng mất từ 3 đến 5 ngày, thường xuyên xảy ra lệch số dư đầu kỳ và cuối kỳ.
+- **Bỏ quên kiểm tra thể tích CBM:** Nhân viên chỉ đếm số lượng chiếc/cái mà không tính được thể tích $m^3$, dẫn đến tình trạng kho bị quá tải cục bộ, hàng hóa xếp chồng gây nứt vỡ hoặc xe tải đến nhận hàng bị quá khổ không thể chở hết.
+- **Sai lệch nghiêm trọng tồn kho Combo:** Do sản phẩm bộ (VD: Bàn ăn 6 ghế) được bán theo set nhưng nhập theo từng kiện lẻ, nhân viên kiểm tra thủ công thường xuất nhầm khi mặt bàn còn nhưng chân bàn hoặc ghế đã hết, dẫn đến khiếu nại gay gắt từ khách hàng.
+- **Trộn lẫn hàng lỗi vào hàng tốt:** Hàng hóa bị trầy xước trong quá trình bốc xếp không được phân loại rõ ràng trong sổ sách, bị để lẫn vào khu vực hàng đạt chuẩn và vô tình xuất giao cho khách hàng mới.
+- **Xuất âm kho do tranh chấp đồng thời:** Hai nhân viên bán hàng cùng nhìn thấy số tồn trên file Excel là 5 chiếc và đồng thời xuất bán cho 2 khách khác nhau, dẫn đến tồn thực tế bị âm.
+- **Phụ thuộc vào cảm tính khi đặt hàng:** Việc quyết định nhập thêm hàng hóa hoàn toàn dựa vào kinh nghiệm thủ công, không phân tích được xu hướng biến động tiêu thụ 7 ngày so với 60 ngày.
+
+### 4.2. Bảng đối chiếu Vấn đề - Hệ quả - Giải pháp TO-BE
+
+| STT | Vấn đề hiện trạng (AS-IS) | Hậu quả thực tế phát sinh | Giải pháp hệ thống mục tiêu (TO-BE) |
+| :---: | :--- | :--- | :--- |
+| **1** | Nhập liệu thủ công nhiều lần trên Excel | Sai lệch số liệu, lãng phí 40% thời gian hành chính | CSDL SQL Server 32 bảng chuẩn 3NF, tự động cập nhật tồn tức thời sau giao dịch. |
+| **2** | Không quản lý kích thước và thể tích | Kho quá tải thể tích, xe tải không xếp vừa hàng | Tự động tính $CBM = (D \times R \times C) / 10^9$; cảnh báo vượt sức chứa kho. |
+| **3** | Kiểm tra thủ công linh kiện hàng Combo | Xuất thiếu chân bàn/ghế, vỡ hợp đồng đơn hàng | Định nghĩa BOM; tồn Combo tự động suy diễn theo linh kiện tối thiểu; tự động bóc tách khi xuất. |
+| **4** | Hàng trầy xước để lẫn hàng đạt chuẩn | Giao nhầm hàng lỗi cho khách, mất uy tín | Quy trình QC bắt buộc; phân tách rạch ròi trạng thái `GOOD` và `DAMAGED`; cách ly kho lỗi. |
+| **5** | Xuất vượt tồn khi nhiều người thao tác | Bán âm kho, tồn kho ảo trên hệ thống | Cơ chế Khóa bi quan (*Pessimistic Locking*) với `UPDLOCK, ROWLOCK` ở cấp CSDL. |
+| **6** | Duyệt chi và xuất hàng lỏng lẻo | Thất thoát tài chính với các đơn hàng giá trị lớn | Workflow phê duyệt 3 cấp độ; đơn hàng $> 100$ triệu bắt buộc Giám đốc duyệt. |
+| **7** | Dự báo đặt hàng theo cảm tính | Thiếu hàng bán chạy, ứ đọng vốn hàng tồn chậm | AI Engine phân tích 7 ngày vs 60 ngày; cảnh báo biến động $\ge 20\%$ và tự sinh phiếu nhập nháp. |
+
+### 4.3. Mô hình mục tiêu TO-BE tích hợp AI
+Trong mô hình TO-BE, toàn bộ dòng chảy thông tin và vật chất được kết nối liền mạch:
+1. **Tiếp nhận & QC:** Hàng về kho $\rightarrow$ Thủ kho nhập số chứng từ $\rightarrow$ QC kiểm tra phân loại `GOOD`/`DAMAGED` $\rightarrow$ Kế toán duyệt C1 $\rightarrow$ Quản lý duyệt C2 $\rightarrow$ Tồn kho tự động cập nhật tăng tương ứng.
+2. **Xuất kho & Khóa bi quan:** Thủ kho tạo phiếu xuất $\rightarrow$ Kế toán duyệt C1 $\rightarrow$ Quản lý duyệt C2 (nếu $>100$ triệu chuyển Giám đốc duyệt C3) $\rightarrow$ Hệ thống áp dụng khóa `UPDLOCK, ROWLOCK` $\rightarrow$ Kiểm tra tồn khả dụng `GOOD` $\rightarrow$ Bóc tách linh kiện BOM $\rightarrow$ Trừ tồn $\rightarrow$ Mở khóa và lưu Audit Log.
+3. **Giám sát thông minh AI:** Tiến trình `AiMonitoringService` quét liên tục $\rightarrow$ Phát hiện biến động $\ge 20\%$ hoặc tồn $< MinStock$ $\rightarrow$ Tạo đề xuất `PENDING_REVIEW` $\rightarrow$ Quản lý kho bấm duyệt $\rightarrow$ Tự động chuyển thành Phiếu nhập nháp.
+4. **Trợ lý AI Copilot:** Người dùng gõ câu lệnh tiếng Việt $\rightarrow$ Trợ lý nạp snapshot CSDL thực tế $\rightarrow$ Giải đáp chính xác hoặc sinh mã lệnh tạo phiếu nháp $\rightarrow$ Backend kiểm tra rào chắn an toàn và lưu vào CSDL.
+
+---
+
+## 5. Đặc tả Ca sử dụng người dùng (Use Cases)
+
+### 5.1. Danh mục Use Case tổng thể
+
+| Nhóm chức năng | Mã UC | Tên Use Case | Actor chính | Mục tiêu nghiệp vụ |
+| :--- | :--- | :--- | :--- | :--- |
+| **Master Data** | **UC-01** | Quản lý Danh mục Hàng hóa | Quản lý / Admin | Khai báo mã hàng, tên hàng, đơn vị tính, mức tồn tối thiểu. |
+| | **UC-02** | Quản lý Kích thước & Tính CBM | Quản lý / Thủ kho | Nhập Dài, Rộng, Cao (mm) $\rightarrow$ Tự động tính CBM ($m^3$). |
+| | **UC-03** | Quản lý Biến thể SKU | Quản lý kho | Tạo biến thể theo Màu sắc, Chất liệu, Đơn giá. |
+| | **UC-04** | Quản lý Hàng Combo & Định mức BOM | Quản lý kho | Thiết lập định mức linh kiện cấu thành nên bộ combo. |
+| | **UC-05** | Quản lý Nhà cung cấp & Kho hàng | Quản lý / Admin | Quản lý đối tác và kho bãi kèm sức chứa CBM tối đa. |
+| **Inbound & QC** | **UC-06** | Lập Phiếu nhập kho | Thủ kho / Nhân viên | Ghi nhận chứng từ nhập hàng từ nhà cung cấp. |
+| | **UC-07** | Kiểm định Chất lượng (QC) | Nhân viên QC | Phân tách số lượng thực nhận thành hàng GOOD và DAMAGED. |
+| | **UC-08** | Phê duyệt Phiếu nhập kho | Kế toán $\rightarrow$ Quản lý | Duyệt 2 cấp trước khi tăng số dư tồn kho chính thức. |
+| **Outbound** | **UC-09** | Lập Phiếu xuất kho | Thủ kho / Nhân viên | Lập chứng từ xuất bán SKU lẻ hoặc Combo. |
+| | **UC-10** | Phê duyệt Phiếu xuất đa cấp | Kế toán $\rightarrow$ Quản lý $\rightarrow$ Giám đốc | Duyệt 2 cấp ($\le 100$ tr) hoặc 3 cấp ($> 100$ tr) theo giá trị. |
+| | **UC-11** | Xuất kho & Khóa bi quan | Hệ thống (Tự động) | Khóa `UPDLOCK`, kiểm tra tồn khả dụng, bóc tách BOM, trừ tồn. |
+| **Inventory** | **UC-12** | Điều chuyển kho nội bộ | Thủ kho / Quản lý | Luân chuyển hàng hóa giữa các kho với tính giao dịch nguyên tử. |
+| | **UC-13** | Kiểm kê kho định kỳ | Thủ kho / Quản lý | Đếm thực tế, tính tỷ lệ chênh lệch, lập bút toán cân chỉnh tồn. |
+| | **UC-14** | Xử lý Hàng lỗi (Damaged Stock) | Quản lý kho | Duyệt phương án Sửa chữa, Thanh lý hoặc Trả NCC. |
+| **Reporting** | **UC-15** | Xem Báo cáo Nhập - Xuất - Tồn | Kế toán / Quản lý | Đối chiếu Tồn đầu + Nhập - Xuất = Tồn cuối; xuất Excel/PDF. |
+| | **UC-16** | Xem Báo cáo Dung tích CBM Kho | Quản lý / Giám đốc | Giám sát mức độ lấp đầy thể tích $m^3$ của từng kho. |
+| **AI Copilot** | **UC-17** | Chat Tra cứu & Tương tác AI | Toàn bộ người dùng | Tra cứu tồn, hỏi đáp vận hành, tạo bản nháp bằng giọng văn tự nhiên. |
+| | **UC-18** | Duyệt Đề xuất Nhập hàng AI | Quản lý kho | Thẩm định cảnh báo biến động 20% và duyệt tạo đơn nhập nháp. |
+| **System Admin**| **UC-19** | Quản trị Người dùng & Phân quyền | Quản trị viên (Admin) | Tạo tài khoản, gán vai trò RBAC, đặt lại mật khẩu. |
+| | **UC-20** | Sao lưu & Phục hồi CSDL | Quản trị viên (Admin) | Tạo bản snapshot JSON/SQL và phục hồi hệ thống khi có sự cố. |
+
+### 5.2. Đặc tả chi tiết các Use Case trọng tâm
+
+#### UC-07: Kiểm định Chất lượng (QC) khi Nhập kho
+- **Actor chính:** Nhân viên QC (`qc`).
+- **Tiền điều kiện:** Phiếu nhập kho đã được tạo ở trạng thái `DRAFT` và hàng hóa vật lý đã cập bến khu vực nhận hàng.
+- **Luồng sự kiện chính (Happy Path):**
+  1. Nhân viên QC mở danh sách phiếu nhập chờ kiểm định chất lượng.
+  2. Nhân viên tiến hành kiểm tra ngoại quan từng kiện hàng của từng dòng sản phẩm.
+  3. Ghi nhận số lượng đạt chuẩn vào ô `Số lượng Tốt (GOOD)`.
+  4. Nếu phát hiện trầy xước, nứt vỡ, ghi nhận vào ô `Số lượng Lỗi (DAMAGED)` và bắt buộc nhập lý do chi tiết (VD: "Trầy xước mặt gỗ sồi do va quẹt trong container").
+  5. Hệ thống kiểm tra ràng buộc: $Số\_lượng\_Tốt + Số\_lượng\_Lỗi = Số\_lượng\_Thực\_nhận$.
+  6. Bấm "Lưu kết quả QC". Trạng thái phiếu chuyển sang chờ Kế toán duyệt Cấp 1.
+- **Ngoại lệ:**
+  - Nếu tổng số lượng Tốt và Lỗi không khớp với số lượng thực nhận, hệ thống báo lỗi và chặn không cho lưu.
+- **Hậu điều kiện:** Bản ghi kiểm định được xác lập; hàng `DAMAGED` được đánh dấu để khi duyệt sẽ tự động phân loại cách ly khỏi tồn bán hàng.
+
+#### UC-11: Xuất kho & Khóa bi quan (Pessimistic Locking)
+- **Actor chính:** Hệ thống (tự động kích hoạt khi phiếu xuất hoàn tất phê duyệt).
+- **Tiền điều kiện:** Phiếu xuất đã nhận đủ phê duyệt (Cấp 2 nếu $\le 100$ tr; Cấp 3 nếu $> 100$ tr).
+- **Luồng sự kiện chính:**
+  1. Hệ thống khởi tạo một Giao dịch CSDL (`DbTransaction`).
+  2. Trích xuất danh sách tất cả mã SKU liên quan (nếu là Combo, tự động bóc tách thành các SKU linh kiện theo định mức BOM).
+  3. Sắp xếp danh sách mã SKU theo thứ tự bảng chữ cái tăng dần (`ORDER BY SkuId ASC`) để chống Deadlock.
+  4. Thực thi câu lệnh truy vấn cưỡng bức khóa bi quan:
+     ```sql
+     SELECT * FROM StockLedgers WITH (UPDLOCK, ROWLOCK) 
+     WHERE SkuId IN (...) AND WarehouseId = @WarehouseId AND Status = 'GOOD'
+     ORDER BY SkuId ASC
+     ```
+  5. Hệ thống tính toán tồn khả dụng: Chỉ tính tồn có trạng thái `GOOD`.
+  6. Kiểm tra số lượng tồn:
+     - Nếu là SKU đơn lẻ: $Tồn\_khả\_dụng \ge Số\_lượng\_xuất$.
+     - Nếu là Combo: Mọi linh kiện đều phải thỏa mãn $Tồn\_khả\_dụng_i \ge Số\_lượng\_Combo \times Định\_mức_i$.
+  7. Trừ số lượng tồn trực tiếp trên dòng dữ liệu `StockLedgers`.
+  8. Ghi nhận bản ghi lịch sử biến động kho (`StockMovements`) với loại `OUTBOUND`.
+  9. Ghi nhận nhật ký kiểm toán (`AuditLogs`).
+  10. Thực thi `CommitTransaction` để lưu vĩnh viễn và tự động giải phóng khóa dòng.
+  11. Chuyển trạng thái phiếu xuất sang `APPROVED` (Đã xuất kho).
+- **Ngoại lệ:**
+  - Nếu thiếu tồn bất kỳ linh kiện nào: Toàn bộ giao dịch bị `RollbackTransaction`, không trừ một phần, trả thông báo lỗi `ERR-STOCK-001` hoặc `ERR-STOCK-002`.
+  - Nếu bản ghi đang bị khóa bởi thủ kho khác quá thời gian chờ (Timeout 5-10s): Trả thông báo hệ thống đang bận, yêu cầu thử lại sau.
+
+#### UC-18: Duyệt Đề xuất Nhập hàng AI (Smart Replenishment)
+- **Actor chính:** Quản lý kho (`quanly`).
+- **Tiền điều kiện:** Hệ thống đã chạy phân tích ngầm và tạo bản ghi đề xuất ở bảng `AiSuggestions` với trạng thái `PENDING_REVIEW`.
+- **Luồng sự kiện chính:**
+  1. Quản lý kho truy cập chức năng **Gợi ý Nhập hàng & Cảnh báo AI** (`/Replenishment`).
+  2. Hệ thống hiển thị danh sách thẻ phân loại: Cảnh báo tồn thấp, Cảnh báo biến động nhu cầu 20%, Cảnh báo nghẽn cấu kiện Combo.
+  3. Quản lý bấm xem chi tiết căn cứ tính toán (MinStock, tồn thực tế, nhu cầu trung bình 7 ngày vs 60 ngày, % biến động).
+  4. Quản lý có thể điều chỉnh số lượng đề xuất nhập nếu cần thiết.
+  5. Quản lý bấm nút **"Duyệt gợi ý AI"**.
+  6. Hệ thống tự động khởi tạo một Phiếu nhập kho bản nháp (`InventoryVoucher` type `INBOUND`, status `DRAFT`), gắn thông tin mặt hàng, số lượng đề xuất và ghi chú nguồn gốc AI.
+  7. Cập nhật trạng thái đề xuất AI thành `APPROVED`.
+  8. Hệ thống điều hướng trực tiếp đến màn hình chi tiết phiếu nhập nháp vừa tạo để tiến hành quy trình duyệt kho chuẩn.
+
+---
+
+## 6. Quy tắc nghiệp vụ doanh nghiệp (Business Rules)
+
+| Mã luật | Tên quy tắc nghiệp vụ | Nội dung chi tiết quy tắc |
+| :--- | :--- | :--- |
+| **BR-01** | **Công thức tính CBM** | Thể tích của từng mã SKU bắt buộc tính tự động theo công thức: $$CBM = \frac{Dài (mm) \times Rộng (mm) \times Cao (mm)}{1.000.000.000}$$ Cả 3 chiều kích thước phải là số nguyên dương $> 0$. Không cho phép nhập kích thước âm hoặc bằng 0. |
+| **BR-02** | **Tồn khả dụng Combo (Derived Stock)** | Tồn kho của hàng Combo là tồn suy diễn động, tuyệt đối **không lưu cứng** vào bảng tồn kho. Công thức: $$Available(Combo) = \min_{i} \left\lfloor \frac{Available(Component_i)}{QuantityPerSet_i} \right\rfloor$$ |
+| **BR-03** | **Bóc tách BOM khi Xuất Combo** | Khi xuất 1 bộ Combo, hệ thống bắt buộc tự động phân rã và trừ tồn từng linh kiện theo định mức cấu thành. Thiếu bất kỳ 1 linh kiện nào cũng bị từ chối toàn bộ đơn hàng. |
+| **BR-04** | **Phân tách Trạng thái Tồn kho** | Tồn kho phân định tuyệt đối giữa hàng Đạt chuẩn (`GOOD`) và hàng Lỗi/Hỏng (`DAMAGED`). Hàng `DAMAGED` không bao giờ được tính vào tồn khả dụng xuất bán thương mại. |
+| **BR-05** | **Khóa bi quan chống xuất âm** | Mọi thao tác xuất kho hoặc trừ tồn bắt buộc phải áp dụng khóa cưỡng bức dòng dữ liệu `WITH (UPDLOCK, ROWLOCK)` trong cùng một Transaction CSDL; sắp xếp khóa theo `SkuId ASC` để chống Deadlock. |
+| **BR-06** | **Phân luồng Phê duyệt 3 cấp độ** | - Phiếu nhập và Phiếu xuất $\le 100.000.000$ VNĐ: Bắt buộc đủ 2 cấp duyệt (Cấp 1: Kế toán $\rightarrow$ Cấp 2: Quản lý kho).<br>- Phiếu xuất $> 100.000.000$ VNĐ: Bắt buộc phải có thêm Cấp 3 do Giám đốc phê duyệt. |
+| **BR-07** | **Ngưỡng Biến động Nhu cầu AI** | AI phát hiện và kích hoạt cảnh báo biến động bất thường khi tốc độ xuất bán trung bình 7 ngày gần nhất chênh lệch **$\ge 20\%$** so với trung bình 60 ngày: $$|\% Biến\_động| = \frac{|TB\_7\_ngày - TB\_60\_ngày|}{TB\_60\_ngày} \ge 0.20$$ |
+| **BR-08** | **Nguyên tắc Human-in-the-loop** | AI Engine hoàn toàn **KHÔNG CÓ QUYỀN ghi đè** trực tiếp số dư tồn kho hoặc phê duyệt chứng từ. AI chỉ được phép sinh bản nháp (`DRAFT`) hoặc đề xuất (`PENDING_REVIEW`). Mọi cập nhật số dư kho bắt buộc phải do con người phê duyệt. |
+| **BR-09** | **Bảo toàn Số dư (Audit-first)** | Số dư kho cuối kỳ luôn tuân thủ nguyên tắc cân bằng kế toán: $$Tồn\_cuối = Tồn\_đầu + Nhập - Xuất + Nhận\_chuyển - Xuất\_chuyển \pm Điều\_chỉnh$$ Mọi biến động đều phải lưu vết vào bảng `AuditLogs` tối thiểu 5 năm. |
+| **BR-10** | **Ngưỡng Chênh lệch Kiểm kê 5%** | Trong quá trình kiểm kê, nếu tỷ lệ chênh lệch giữa số lượng đếm thực tế và số liệu hệ thống vượt quá $5\%$, hệ thống bắt buộc phải lập Phiếu điều chỉnh tồn kho và chuyển Quản lý duyệt trước khi cân chỉnh. |
+
+---
+
+## 7. Yêu cầu chức năng người dùng (User Functional Requirements)
+
+| Mã yêu cầu | Phân hệ nghiệp vụ | Đặc tả yêu cầu chức năng người dùng |
+| :--- | :--- | :--- |
+| **REQ-F-01** | Master Data | Cho phép quản lý danh mục sản phẩm, biến thể SKU kèm hình ảnh, đơn giá và định mức tồn tối thiểu ($MinStock$). |
+| **REQ-F-02** | Master Data | Tự động tính $CBM$ khi nhập Dài, Rộng, Cao. Chặn lưu nếu thiếu một trong ba kích thước. |
+| **REQ-F-03** | Master Data | Cho phép định nghĩa sản phẩm Combo và bảng định mức linh kiện cấu thành ($BOM$). |
+| **REQ-F-04** | Master Data | Quản lý danh mục Kho bãi kèm sức chứa thể tích tối đa ($MaxCapacityCbm$). |
+| **REQ-F-05** | Master Data | Quản lý danh mục Đối tác Nhà cung cấp và Khách hàng kèm mã số thuế, địa chỉ, số điện thoại. |
+| **REQ-F-06** | Inbound | Cho phép lập Phiếu nhập kho từ Nhà cung cấp ở trạng thái Bản nháp ($DRAFT$). |
+| **REQ-F-07** | Inbound & QC | Hỗ trợ giao diện kiểm định QC: phân tách số lượng thực nhận thành hàng `GOOD` và hàng `DAMAGED` kèm lý do lỗi. |
+| **REQ-F-08** | Inbound | Phân quyền phê duyệt phiếu nhập 2 cấp (Kế toán duyệt Cấp 1 $\rightarrow$ Quản lý kho duyệt Cấp 2). |
+| **REQ-F-09** | Outbound | Cho phép lập Phiếu xuất kho bán hàng, xuất dự án công trình cho SKU lẻ hoặc Combo. |
+| **REQ-F-10** | Outbound | Tự động bóc tách linh kiện Combo BOM khi xuất và kiểm tra tính sẵn sàng của tất cả linh kiện. |
+| **REQ-F-11** | Outbound | Áp dụng cơ chế Khóa bi quan chống xuất âm kho; từ chối giao dịch nếu không đủ tồn khả dụng `GOOD`. |
+| **REQ-F-12** | Outbound | Tự động kiểm tra giá trị phiếu: nếu $> 100$ triệu VNĐ, bắt buộc chuyển Giám đốc phê duyệt cấp 3. |
+| **REQ-F-13** | Stock Transfer | Quản lý điều chuyển hàng hóa giữa các kho nội bộ với tính giao dịch nguyên tử 2 đầu (Atomic Transaction). |
+| **REQ-F-14** | Inventory Audit | Hỗ trợ tạo phiếu kiểm kê theo kho, nhập số lượng đếm thực tế, tính chênh lệch Thừa/Thiếu. |
+| **REQ-F-15** | Inventory Audit | Tự động sinh bút toán cân chỉnh kho khi kết quả kiểm kê được Quản lý kho phê duyệt. |
+| **REQ-F-16** | Damaged Stock | Quản lý tồn kho hàng lỗi riêng biệt; hỗ trợ phê duyệt phương án: Sửa chữa, Thanh lý, Trả NCC. |
+| **REQ-F-17** | Reporting | Cung cấp Báo cáo Nhập - Xuất - Tồn theo kỳ, hỗ trợ lọc theo kho, mã hàng, nhà cung cấp. |
+| **REQ-F-18** | Reporting | Cung cấp Báo cáo Thể tích lưu kho CBM và phát hiện các kho có nguy cơ quá tải sức chứa. |
+| **REQ-F-19** | Reporting | Hỗ trợ kết xuất báo cáo ra định dạng file Excel (.xlsx) và file PDF chuẩn hóa. |
+| **REQ-F-20** | System Admin | Quản trị tài khoản, gán vai trò RBAC trong 6 nhóm quyền, hỗ trợ kích hoạt/khóa tài khoản. |
+| **REQ-F-21** | System Admin | Hỗ trợ Sao lưu toàn bộ 32 bảng CSDL ra file JSON/SQL và khôi phục khi có sự cố. |
+| **REQ-F-22** | Audit Trail | Ghi nhận tự động nhật ký kiểm toán mọi hành động Thêm/Sửa/Xóa/Duyệt, lưu vết tối thiểu 5 năm. |
+
+---
+
+## 8. Yêu cầu Trí tuệ nhân tạo (AI Functional Requirements)
+
+### 8.1. Năng lực Cảnh báo Tồn kho thấp (LOW_STOCK)
+- **Mã yêu cầu:** `REQ-AI-01`.
+- **Mô tả:** Hệ thống tự động so sánh số lượng tồn khả dụng (chỉ tính hàng `GOOD`) của từng mã SKU với chỉ số $MinStock$ đã cấu hình tại Product Model.
+- **Xử lý:** Khi $Stock_{GOOD} < MinStock$, hệ thống tự động sinh bản ghi đề xuất nhập bổ sung:
+  $$SuggestedQty = \max(MinStock - Stock_{GOOD}, MinStock)$$
+- **Thông báo:** Hiển thị trực quan trên giao diện Replenishment và gửi email cảnh báo tự động cho Quản lý kho nếu được bật cấu hình.
+
+### 8.2. Năng lực Phát hiện biến động bất thường (ANOMALY $\ge 20\%$)
+- **Mã yêu cầu:** `REQ-AI-02`.
+- **Mô tả:** Hệ thống phân tích lịch sử xuất kho của các mặt hàng đạt chuẩn `GOOD` trong 60 ngày gần nhất.
+- **Công thức tính toán:**
+  - Nhu cầu trung bình ngày trong 60 ngày: $AvgDaily_{60} = \sum Qty_{60} / 60$.
+  - Nhu cầu trung bình ngày trong 7 ngày gần nhất: $AvgDaily_{7} = \sum Qty_{7} / 7$.
+  - Tỷ lệ sai lệch: $Diff = (AvgDaily_{7} - AvgDaily_{60}) / AvgDaily_{60}$.
+- **Ngưỡng kích hoạt:** Khi $|Diff| \ge 0.20$ (Tăng hoặc giảm từ $20\%$ trở lên), hệ thống xác định đây là biến động nhu cầu bất thường.
+- **Đề xuất dự phòng:** Tự động tính lượng hàng cần bù đắp cho nhu cầu 30 ngày tiếp theo để tránh đứt gãy nguồn cung.
+
+### 8.3. Năng lực Cảnh báo Nghẽn cổ chai cấu kiện Combo (BOTTLENECK)
+- **Mã yêu cầu:** `REQ-AI-03`.
+- **Mô tả:** Quét toàn bộ danh mục Combo Products và định mức linh kiện BOM liên kết.
+- **Xác định điểm nghẽn:** Với từng Combo, tìm linh kiện có tỷ số $Stock_i / QtyPerSet_i$ nhỏ nhất. Linh kiện này là nguyên nhân chính kìm hãm số lượng bộ Combo có thể lắp ráp.
+- **Cảnh báo:** Nếu số bộ lắp ráp tối đa nhỏ hơn mức tồn an toàn của Combo ($MinStock_{Combo}$), hệ thống phát cảnh báo "Linh kiện cổ chai", đề xuất ưu tiên đặt hàng chính xác linh kiện đang thiếu hụt.
+
+### 8.4. Năng lực Trợ lý AI Copilot tương tác tự nhiên & RAG Grounding
+- **Mã yêu cầu:** `REQ-AI-04`.
+- **Mô tả:** Tích hợp hộp hội thoại AI Copilot tại thanh điều hướng hệ thống, hỗ trợ hỏi đáp nghiệp vụ kho bằng tiếng Việt tự nhiên.
+- **Cơ chế RAG Grounding thời gian thực (`AiChatGroundingService`):**
+  - Trước khi gửi câu hỏi đến mô hình LLM Ollama, hệ thống tự động truy xuất snapshot dữ liệu thực tế: Tổng số SKU, Tổng tồn `GOOD`, Tổng tồn `DAMAGED`, Thống kê chi tiết số lượng phiếu Nhập/Xuất/Chuyển theo từng trạng thái (`APPROVED`, `PENDING`, `REJECTED`, `DRAFT`).
+  - Gắn snapshot dữ liệu vào System Prompt để LLM trả lời chuẩn xác 100%, loại trừ hoàn toàn ảo giác số liệu.
+- **Cơ chế Rào chắn mã lệnh (Guardrails & Action Function Calling):**
+  - Khi người dùng yêu cầu tạo chứng từ (VD: "Tạo giúp tôi đơn nhập 20 bàn ăn"), AI sinh mã lệnh chuẩn hóa:
+    `[ACTION: CREATE_DRAFT_INBOUND: {"counterparty": "...", "sku": "...", "quantity": 20}]`
+  - Backend phân tích bằng Regex, tự động khởi tạo bản ghi `InventoryVoucher` thật vào SQL Server ở trạng thái `DRAFT` với mã phiếu thực tế (VD: `PN-20261029040012`), tuyệt đối không để AI tự bịa mã phiếu ảo.
+
+### 8.5. Nguyên tắc con người phê duyệt (Human-in-the-loop)
+- **Mã yêu cầu:** `REQ-AI-05`.
+- **Nguyên tắc cốt lõi:**
+  1. AI không có thẩm quyền trực tiếp ghi nhận tăng/giảm tồn kho.
+  2. Mọi phiếu do AI sinh ra chỉ dừng lại ở trạng thái **Bản nháp (`DRAFT`)**.
+  3. Mọi đề xuất phân tích của AI dừng lại ở trạng thái **Chờ xem xét (`PENDING_REVIEW`)**.
+  4. Chỉ khi Quản lý kho, Kế toán và Giám đốc kiểm tra thông tin và bấm nút duyệt chính thức trên giao diện Web, các biến động kho mới được ghi nhận vào CSDL.
+
+---
+
+## 9. Yêu cầu phi chức năng người dùng (User Non-Functional Requirements)
+
+| Mã yêu cầu | Nhóm yêu cầu | Nội dung đặc tả phi chức năng |
+| :--- | :--- | :--- |
+| **REQ-NF-01** | **Bảo mật & Danh tính** | Sử dụng ASP.NET Core Identity; mật khẩu băm theo thuật toán PBKDF2; chống tấn công CSRF qua token Anti-Forgery trên 100% biểu mẫu. |
+| **REQ-NF-02** | **Bảo mật AI On-Premise** | Mô hình AI chạy Local 100% qua Ollama trên máy chủ nội bộ. Không gửi dữ liệu kinh doanh, giá vốn và danh sách nhà cung cấp ra bên ngoài. |
+| **REQ-NF-03** | **Toàn vẹn Dữ liệu (Locking)** | Triển khai Khóa bi quan ở cấp CSDL với T-SQL `WITH (UPDLOCK, ROWLOCK)` trong transaction; đảm bảo 0% khả năng xảy ra xuất âm kho. |
+| **REQ-NF-04** | **Lưu vết Kiểm toán (Audit)** | Mọi giao dịch thay đổi dữ liệu kho được ghi log chi tiết (người dùng, thời gian, IP, giá trị trước/sau); lưu trữ tối thiểu 5 năm phục vụ thanh tra. |
+| **REQ-NF-05** | **Hiệu năng & Tốc độ** | Thời gian phản hồi tra cứu dữ liệu màn hình chính $\le 1$ giây; giao dịch nhập/xuất có khóa hoàn tất $\le 2$ giây ở điều kiện bình thường. |
+| **REQ-NF-06** | **Tính sẵn sàng & Độ tin cậy** | Độ sẵn sàng hệ thống đạt $\ge 99.5\%$ trong giờ làm việc; hỗ trợ sao lưu tự động định kỳ hàng ngày. |
+| **REQ-NF-07** | **Giao diện & Trải nghiệm (UX)**| Giao diện Web 100% ngôn ngữ tiếng Việt thân thiện, responsive, hỗ trợ tooltip giải thích các thuật ngữ chuyên môn nội thất và chỉ số AI. |
+| **REQ-NF-08** | **Khả năng phục hồi (RPO/RTO)** | Chỉ số RPO (mất mát dữ liệu tối đa) $\le 1$ giờ; RTO (thời gian khôi phục sự cố) $\le 4$ giờ nhờ hệ thống Backup/Restore tích hợp. |
+
+---
+
+## 10. Mô hình dữ liệu nghiệp vụ & Cấu trúc chứng từ
+
+Hệ thống quản lý thống nhất 32 thực thể CSDL (chuẩn 3NF), trong đó các thực thể cốt lõi bao gồm:
+
+```
+┌─────────────────┐       1:N       ┌─────────────────┐       1:N       ┌─────────────────┐
+│  ProductModel   │ ─────────────── │   SkuVariant    │ ─────────────── │   StockLedger   │
+│ (Mã gốc, Tên,   │                 │ (Mã SKU, Màu,   │                 │ (Kho, SKU, Qty, │
+│  ĐVT, MinStock) │                 │  CBM, Đơn giá)  │                 │  Status GOOD/DMG│
+└─────────────────┘                 └─────────────────┘                 └─────────────────┘
+         │                                   │ 1:N                               ▲
+         │                                   ▼                                   │
+         │                          ┌─────────────────┐                          │
+         │                          │  BomComponent   │                          │
+         │                          │ (ComboId, SkuId,│                          │
+         │                          │  QuantityPerSet)│                          │
+         │                          └─────────────────┘                          │
+         │                                   ▲                                   │
+         │ 1:N                               │ N:1                               │
+         ▼                                   │                                   │
+┌─────────────────┐                 ┌─────────────────┐                          │
+│  ComboProduct   │ ─────────────── │  VoucherLine    │                          │
+│ (Mã Combo, Tên, │                 │ (SkuId, Qty,    │                          │
+│  MinStockCombo) │                 │  UnitPrice, D/G)│                          │
+└─────────────────┘                 └─────────────────┘                          │
+                                             ▲                                   │
+                                             │ N:1                               │
+                                    ┌─────────────────┐                          │
+                                    │ InventoryVoucher│ ─────────────────────────┘
+                                    │ (Số phiếu, Ngày,│ Cập nhật số dư qua
+                                    │  IN/OUT, Status)│ Khóa bi quan UPDLOCK
+                                    └─────────────────┘
+```
+
+1. **`ProductModel` & `SkuVariant`:** Quản lý cây sản phẩm nội thất từ gốc đến biến thể. Kích thước 3 chiều được chuẩn hóa dạng số nguyên $mm$, trường $CBM$ lưu dạng `decimal(18, 6)`.
+2. **`ComboProduct` & `BomComponent`:** Quản lý mối quan hệ lắp ghép giữa hàng bộ và các linh kiện thành phần kèm định mức $QuantityPerSet$.
+3. **`StockLedger`:** Sổ cái lưu trữ số dư tồn kho thời gian thực; khóa phức hợp gồm `(SkuId, WarehouseId, Status, BatchNumber)`. Trạng thái phân định `GOOD` và `DAMAGED`.
+4. **`InventoryVoucher` & `VoucherLine`:** Chứng từ kho hợp nhất đa năng xử lý cả Nhập kho (`INBOUND`), Xuất kho (`OUTBOUND`) và Điều chuyển (`TRANSFER`).
+5. **`ApprovalStep`:** Quản lý tiến trình phê duyệt đa cấp theo từng loại chứng từ và hạn mức giá trị tài chính.
+6. **`AiSuggestion`:** Lưu trữ lịch sử phân tích, cảnh báo bất thường và đề xuất nhập bù của Trợ lý AI.
+7. **`AuditLog`:** Nhật ký kiểm toán bảo toàn dấu vết vận hành toàn hệ thống.
+
+---
+
+## 11. Báo cáo & Kết xuất dữ liệu
+
+Hệ thống cung cấp đầy đủ các biểu mẫu báo cáo tiêu chuẩn:
+1. **Báo cáo Nhập - Xuất - Tồn tổng hợp:**
+   - Cột hiển thị: Mã SKU, Tên sản phẩm, Đơn vị tính, Tồn đầu kỳ, Tổng nhập trong kỳ, Tổng xuất trong kỳ, Tồn cuối kỳ (phân tách rõ cột Hàng Đạt chuẩn và Hàng Lỗi).
+   - Kiểm tra cân đối kế toán: $Tồn\_cuối = Tồn\_đầu + Nhập - Xuất$.
+2. **Báo cáo Thể tích CBM và Công suất Kho:**
+   - Cột hiển thị: Mã kho, Tên kho, Sức chứa tối đa ($m^3$), Thể tích hàng hóa đang chiếm chỗ ($m^3$), Tỷ lệ lấp đầy ($FillRate\%$), Cảnh báo quá tải khi tỷ lệ vượt $90\%$.
+3. **Báo cáo Phân tích Biến động & Dự báo AI:**
+   - Danh sách mặt hàng có mức tiêu thụ đột biến $\ge 20\%$ kèm biểu đồ so sánh xu hướng 7 ngày vs 60 ngày.
+4. **Khả năng kết xuất dữ liệu:**
+   - Xuất dữ liệu tức thì ra file Microsoft Excel (.xlsx) với định dạng chuẩn, có tiêu đề, ngày xuất và chữ ký.
+   - Xuất file PDF phục vụ in ấn chứng từ lưu trữ hồ sơ giấy tờ kế toán.
+
+---
+
+## 12. Tiêu chí nghiệm thu người dùng (User Acceptance Criteria - UAC)
+
+Hệ thống được nghiệm thu chính thức dựa trên 10 tiêu chí đo lường định lượng:
+
+| Mã UAC | Tiêu chí nghiệm thu | Kết quả kiểm chứng thực tế | Đánh giá |
+| :---: | :--- | :--- | :---: |
+| **UAC-01** | Tạo SKU mới với đủ 3 kích thước Dài, Rộng, Cao $\rightarrow$ Hệ thống tự động tính chính xác $CBM = (D \times R \times C) / 10^9$. | Đã kiểm thử qua test `CalculateCbm_ShouldReturnCorrectValue` trong `MasterDataAndCbmTests`. | **ĐẠT** |
+| **UAC-02** | Chặn lưu SKU nếu nhập kích thước âm hoặc bằng 0 với thông báo lỗi rõ ràng. | Đã kiểm thử chặn ngoại lệ trong `MasterDataAndCbmTests`. | **ĐẠT** |
+| **UAC-03** | Tồn khả dụng của Combo tự động tính đúng theo linh kiện tối thiểu $\min \lfloor Stock_i / BOM_i \rfloor$. | Đã kiểm thử qua `GetComboAvailableAsync` trong `OutboundWorkflowTests`. | **ĐẠT** |
+| **UAC-04** | Khi xuất kho Combo, nếu thiếu bất kỳ 1 linh kiện nào, hệ thống từ chối toàn bộ giao dịch, không trừ một phần. | Đã kiểm chứng qua test `DeductCombo_InsufficientComponent_ShouldRollback`. | **ĐẠT** |
+| **UAC-05** | Nhập kho có phân loại QC: Hàng `DAMAGED` được cách ly riêng, không bị cộng dồn vào tồn `GOOD` xuất bán. | Đã kiểm chứng qua test suite `DamagedStockTests`. | **ĐẠT** |
+| **UAC-06** | Nhiều giao dịch xuất đồng thời trên cùng SKU: Cơ chế khóa bi quan `UPDLOCK, ROWLOCK` loại trừ 100% xuất âm kho. | Đã kiểm chứng qua kiểm thử giao dịch có khóa trong `OutboundWorkflowTests`. | **ĐẠT** |
+| **UAC-07** | Phiếu xuất có giá trị $> 100.000.000$ VNĐ bắt buộc phải qua bước phê duyệt Cấp 3 của Giám đốc mới được xuất kho. | Đã kiểm chứng trong `ApprovalWorkflowService` và kiểm thử tích hợp. | **ĐẠT** |
+| **UAC-08** | Kiểm kê có chênh lệch $> 5\%$ bắt buộc sinh phiếu cân chỉnh kho có lưu vết kiểm toán đầy đủ. | Đã kiểm chứng trong `InventoryAuditWorkflowTests`. | **ĐẠT** |
+| **UAC-09** | AI phát hiện chính xác biến động nhu cầu $\ge 20\%$ giữa 7 ngày và 60 ngày; tự tạo đề xuất nhập nháp khi $Stock < MinStock$. | Đã kiểm chứng trong `AiServiceAndMonitoringTests`. | **ĐẠT** |
+| **UAC-10** | Trọn bộ 36 ca kiểm thử tự động xUnit chạy thành công 100% không có lỗi phát sinh. | Thực thi `dotnet test`: 36/36 Passed, 0 Failed, 0 Skipped (Thời gian thực thi 1s). | **ĐẠT** |
+
+---
+
+## 13. Sơ đồ quy trình nghiệp vụ trực quan (Mermaid Diagrams)
+
+### 13.1. Sơ đồ Use Case tổng thể hệ thống WMS
 
 ```mermaid
-erDiagram
-    SUPPLIER ||--o{ PURCHASE_ORDER : "cung cấp"
-    PRODUCT_MODEL ||--o{ SKU_VARIANT : "có biến thể"
-    SKU_VARIANT ||--o{ STOCK_LEDGER : "có tồn"
-    SKU_VARIANT }o--o{ BOM_COMPONENT : "là cấu kiện của"
-    COMBO_PRODUCT ||--o{ BOM_COMPONENT : "định nghĩa bởi"
-    PURCHASE_ORDER ||--o{ PURCHASE_ORDER_LINE : "gồm"
-    PURCHASE_ORDER_LINE }o--|| SKU_VARIANT : "tham chiếu"
-    SALES_ORDER ||--o{ SALES_ORDER_LINE : "gồm"
-    SALES_ORDER_LINE }o--|| SKU_VARIANT : "tham chiếu"
-    SALES_ORDER_LINE }o--o| COMBO_PRODUCT : "hoặc tham chiếu Combo"
-    STOCK_LEDGER ||--o{ AUDIT_LOG : "sinh ra"
-    STOCK_LEDGER ||--o{ DAMAGED_RECORD : "có thể phát sinh"
-    WAREHOUSE ||--o{ STOCK_LEDGER : "quản lý tại"
+flowchart LR
+    subgraph ACTORS["CÁC TÁC NHÂN HỆ THỐNG"]
+        TK["Thủ kho / Nhân viên"]
+        QC["Nhân viên QC"]
+        KT["Kế toán kho"]
+        QL["Quản lý kho"]
+        GD["Giám đốc"]
+        AD["Quản trị viên (Admin)"]
+        AI["Hệ thống AI / Copilot"]
+    end
 
-    PRODUCT_MODEL {
-        string product_model_id PK
-        string product_name
-        string category
-        string unit
-        int min_stock
-    }
-    SKU_VARIANT {
-        string sku_id PK
-        string product_model_id FK
-        string color
-        string material
-        int length_mm
-        int width_mm
-        int height_mm
-        decimal cbm
-        decimal unit_price
-    }
-    COMBO_PRODUCT {
-        string combo_id PK
-        string combo_name
-        decimal cbm_override
-    }
-    BOM_COMPONENT {
-        string combo_id FK
-        string sku_id FK
-        int quantity_per_set
-    }
-    SUPPLIER {
-        string supplier_id PK
-        string tax_code
-        string address
-        string email
-        string phone
-    }
-    WAREHOUSE {
-        string warehouse_id PK
-        string warehouse_name
-        string warehouse_type
-    }
-    PURCHASE_ORDER {
-        string po_id PK
-        date po_date
-        string supplier_id FK
-        string warehouse_id FK
-        string status
-        string created_by
-    }
-    PURCHASE_ORDER_LINE {
-        string po_id FK
-        string sku_id FK
-        int qty_document
-        int qty_actual_good
-        int qty_actual_damaged
-        decimal unit_cost
-    }
-    SALES_ORDER {
-        string so_id PK
-        date so_date
-        string warehouse_id FK
-        string status
-        string created_by
-    }
-    SALES_ORDER_LINE {
-        string so_id FK
-        string sku_id FK
-        string combo_id FK
-        int qty
-        decimal unit_price
-    }
-    STOCK_LEDGER {
-        string sku_id FK
-        string warehouse_id FK
-        string status
-        int quantity
-        boolean is_locked
-        string locked_by_txn
-        datetime locked_at
-    }
-    DAMAGED_RECORD {
-        string damaged_id PK
-        string sku_id FK
-        int quantity
-        string reason
-        string resolution
-        string approved_by
-        datetime created_at
-    }
-    AUDIT_LOG {
-        string log_id PK
-        string entity_type
-        string entity_id
-        string action
-        string performed_by
-        datetime performed_at
-        string reason
-    }
+    subgraph USECASES["CÁC PHÂN HỆ USE CASE NGHIỆP VỤ"]
+        direction TB
+        UC_MD["UC-01..05: Quản lý Master Data (CBM, Combo BOM, SKU)"]
+        UC_IN["UC-06..08: Nhập kho & Phân loại Kiểm định QC"]
+        UC_OUT["UC-09..11: Xuất kho, Bóc tách BOM & Khóa bi quan"]
+        UC_TR["UC-12: Điều chuyển kho nội bộ"]
+        UC_AU["UC-13: Kiểm kê kho & Cân chỉnh tồn"]
+        UC_DM["UC-14: Quản lý & Xử lý Hàng lỗi Damaged"]
+        UC_RP["UC-15..16: Báo cáo N-X-T, Dung tích CBM & Xuất Excel"]
+        UC_AI["UC-17..18: Chatbot AI Copilot & Duyệt Đề xuất Nhập hàng"]
+        UC_SYS["UC-19..20: Quản trị Người dùng, RBAC & Sao lưu CSDL"]
+    end
+
+    TK --> UC_IN
+    TK --> UC_OUT
+    TK --> UC_TR
+    TK --> UC_AU
+    TK --> UC_AI
+
+    QC --> UC_IN
+    QC --> UC_DM
+
+    KT --> UC_IN
+    KT --> UC_OUT
+    KT --> UC_RP
+
+    QL --> UC_MD
+    QL --> UC_IN
+    QL --> UC_OUT
+    QL --> UC_TR
+    QL --> UC_AU
+    QL --> UC_DM
+    QL --> UC_AI
+    QL --> UC_RP
+
+    GD --> UC_OUT
+    GD --> UC_RP
+
+    AD --> UC_SYS
+    AD --> UC_MD
+
+    AI -.-> UC_AI
+    AI -.-> UC_IN
 ```
 
-### 19.2. Sequence Diagram – Luồng Xuất kho với Pessimistic Locking
+### 13.2. Sequence Diagram: Quy trình Xuất kho & Khóa bi quan (Pessimistic Locking)
 
 ```mermaid
 sequenceDiagram
+    autonumber
     actor TK as Thủ kho
-    participant UI as Giao diện WMS
-    participant SVC as Service Xuất kho
-    participant DB as CSDL (Stock_Ledger)
-    participant AUD as Audit Log
+    actor KT as Kế toán
+    actor QL as Quản lý kho
+    actor GD as Giám đốc
+    participant UI as Giao diện Web MVC
+    participant SVC as Inventory & Outbound Service
+    participant DB as SQL Server (StockLedgers)
+    participant AUD as AuditLog Engine
 
-    TK->>UI: Lập phiếu xuất (SKU/Combo, số lượng)
-    UI->>SVC: Gửi yêu cầu xử lý phiếu xuất
+    TK->>UI: Lập phiếu xuất bán (Chọn SKU/Combo, Số lượng)
+    UI->>SVC: Gửi yêu cầu khởi tạo phiếu xuất
+    SVC->>DB: Lưu InventoryVoucher (Status = DRAFT)
+    SVC-->>UI: Thông báo tạo thành công, chuyển duyệt C1
+
+    KT->>UI: Kiểm tra chứng từ đối tác, bấm Duyệt Cấp 1
+    UI->>SVC: ApproveLevel1Async(VoucherId)
+    SVC->>AUD: Ghi log APPROVE_L1
+    SVC-->>UI: Cập nhật Status = PENDING_L2
+
+    QL->>UI: Kiểm tra tính hợp lệ kho, bấm Duyệt Cấp 2
+    UI->>SVC: ApproveLevel2Async(VoucherId)
+    SVC->>AUD: Ghi log APPROVE_L2
+
+    alt Tổng giá trị phiếu > 100.000.000 VNĐ
+        SVC-->>UI: Yêu cầu phê duyệt Cấp 3 từ Giám đốc
+        GD->>UI: Xem xét giá trị tài chính, bấm Duyệt Cấp 3
+        UI->>SVC: ApproveLevel3Async(VoucherId)
+        SVC->>AUD: Ghi log APPROVE_L3
+    else Tổng giá trị phiếu <= 100.000.000 VNĐ
+        Note over SVC: Đủ điều kiện xuất kho ngay sau Cấp 2
+    end
+
+    Note over SVC,DB: BẮT ĐẦU GIAO DỊCH TRỪ TỒN CÓ KHÓA BI QUAN
     SVC->>DB: BEGIN TRANSACTION
-    SVC->>DB: SELECT tồn FOR UPDATE (khóa bản ghi SKU liên quan)
-    alt Bản ghi đang bị khóa bởi giao dịch khác
-        DB-->>SVC: Chờ tối đa timeout (5-10s)
-        DB-->>SVC: Timeout vượt quá
-        SVC-->>UI: Báo lỗi "Mặt hàng đang được xử lý, thử lại sau"
-        SVC->>DB: ROLLBACK
-    else Lấy được khóa thành công
-        DB-->>SVC: Trả về tồn khả dụng (GOOD, đã trừ Damaged)
-        alt Là hàng Combo
-            SVC->>DB: Kiểm tra tồn từng cấu kiện theo BOM
-            alt Thiếu ít nhất 1 cấu kiện
-                DB-->>SVC: Không đủ tồn cấu kiện
-                SVC-->>UI: Từ chối toàn bộ giao dịch
-                SVC->>DB: ROLLBACK (mở khóa)
-            else Đủ tồn tất cả cấu kiện
-                SVC->>DB: Trừ tồn từng cấu kiện theo định mức
-            end
-        else Là SKU đơn lẻ
-            alt Số lượng xuất > Tồn khả dụng
-                SVC-->>UI: Từ chối - không đủ tồn
-                SVC->>DB: ROLLBACK (mở khóa)
-            else Đủ tồn
-                SVC->>DB: Trừ tồn SKU
-            end
+    SVC->>DB: SELECT * FROM StockLedgers WITH (UPDLOCK, ROWLOCK)<br/>WHERE SkuId IN (...) ORDER BY SkuId ASC
+
+    alt Bản ghi đang bị khóa bởi thủ kho khác
+        DB-->>SVC: Chờ tối đa Timeout (5-10s)
+        alt Quá thời gian Timeout
+            SVC-->>UI: Báo lỗi "Mặt hàng đang được xử lý bởi giao dịch khác"
+            SVC->>DB: ROLLBACK TRANSACTION
         end
-        SVC->>AUD: Ghi log (người thực hiện, thời điểm, số lượng, SKU)
-        SVC->>DB: COMMIT (mở khóa bản ghi)
-        DB-->>SVC: Xác nhận thành công
-        SVC-->>UI: Phiếu xuất hoàn tất
-        UI-->>TK: Thông báo xuất kho thành công
+    else Lấy khóa thành công
+        DB-->>SVC: Trả về dòng dữ liệu tồn kho hiện tại
+        SVC->>SVC: Tính tồn khả dụng GOOD (loại trừ DAMAGED)
+        alt Không đủ tồn khả dụng (hoặc thiếu linh kiện Combo BOM)
+            SVC-->>UI: Từ chối giao dịch: ERR-STOCK-001 (Thiếu tồn khả dụng)
+            SVC->>DB: ROLLBACK TRANSACTION (Mở khóa dòng)
+        else Đủ tồn khả dụng
+            SVC->>DB: UPDATE StockLedgers SET Quantity = Quantity - @Qty
+            SVC->>DB: INSERT INTO StockMovements (Type = OUTBOUND, Status = GOOD)
+            SVC->>AUD: Ghi log DEDUCT_STOCK_SUCCESS
+            SVC->>DB: COMMIT TRANSACTION (Lưu vĩnh viễn & Tự động mở khóa)
+            SVC-->>UI: Xuất kho thành công, chuyển Status = APPROVED
+            UI-->>TK: Hiển thị thông báo xuất kho thành công
+        end
     end
 ```
 
-### 19.3. Sequence Diagram – Luồng Nhập kho kèm phân loại Damaged
+### 13.3. Sequence Diagram: Quy trình Nhập kho & Kiểm định chất lượng QC
 
 ```mermaid
 sequenceDiagram
+    autonumber
     actor TK as Thủ kho
     actor QC as Nhân viên QC
-    participant UI as Giao diện WMS
-    participant SVC as Service Nhập kho
-    participant DB as CSDL (Stock_Ledger)
+    actor KT as Kế toán
+    actor QL as Quản lý kho
+    participant UI as Giao diện Web MVC
+    participant SVC as Inbound & Quality Service
+    participant DB as SQL Server (StockLedgers)
 
-    TK->>UI: Nhận hàng, kiểm đếm số lượng thực tế
-    UI->>QC: Yêu cầu kiểm tra chất lượng (QC)
-    QC->>UI: Phân loại: Số lượng Tốt / Số lượng Damaged (kèm lý do)
-    TK->>UI: Lập phiếu nhập (SKU, NCC, số lượng Tốt, số lượng Damaged)
-    UI->>SVC: Gửi phiếu nhập chờ duyệt
+    TK->>UI: Lập phiếu nhập kho từ NCC (Nhập số lượng chứng từ)
+    UI->>SVC: Tạo InventoryVoucher (Type = INBOUND, Status = DRAFT)
+    SVC-->>UI: Phiếu nhập khởi tạo, chờ kiểm định QC
+
+    QC->>UI: Mở giao diện kiểm định chất lượng lô hàng
+    QC->>QC: Kiểm tra thực tế: ngoại quan, mối ghép gỗ, trầy xước
+    QC->>UI: Nhập phân loại: Số lượng GOOD và Số lượng DAMAGED (kèm lý do)
+    UI->>SVC: SubmitQualityCheckAsync(GoodQty, DamagedQty, Reason)
+    SVC->>SVC: Kiểm tra: GoodQty + DamagedQty == ActualQty
+    SVC->>DB: Lưu chi tiết kiểm định vào VoucherLines
+    SVC-->>UI: Xác nhận kết quả QC, chuyển sang chờ duyệt tài chính
+
+    KT->>UI: Kế toán đối chiếu hóa đơn NCC, bấm Duyệt Cấp 1
+    UI->>SVC: ApproveInboundLevel1Async()
+    SVC-->>UI: Chuyển sang chờ Quản lý kho duyệt
+
+    QL->>UI: Quản lý kho kiểm tra tổng thể, bấm Duyệt Cấp 2
+    UI->>SVC: ApproveInboundLevel2Async()
+    
+    Note over SVC,DB: BẮT ĐẦU CẬP NHẬT TỒN THEO KẾT QUẢ QC
     SVC->>DB: BEGIN TRANSACTION
-    SVC->>DB: SELECT tồn FOR UPDATE (khóa bản ghi SKU)
-    SVC->>SVC: Kiểm tra dữ liệu phiếu (mã hàng, số lượng hợp lệ)
-    alt Dữ liệu không hợp lệ
-        SVC-->>UI: Từ chối, yêu cầu chỉnh sửa
-        SVC->>DB: ROLLBACK
-    else Dữ liệu hợp lệ, phiếu được duyệt (Kế toán → Quản lý)
-        SVC->>DB: Tăng tồn GOOD += số lượng Tốt
-        SVC->>DB: Tăng tồn DAMAGED += số lượng Damaged
-        SVC->>DB: Ghi audit log
-        SVC->>DB: COMMIT (mở khóa)
-        DB-->>SVC: Xác nhận
-        SVC-->>UI: Phiếu nhập hoàn tất, tồn đã cập nhật
+    SVC->>DB: Tăng tồn kho đạt chuẩn: StockLedgers(Status='GOOD') += GoodQty
+    alt Có phát sinh hàng lỗi Damaged
+        SVC->>DB: Tăng tồn kho hàng lỗi: StockLedgers(Status='DAMAGED') += DamagedQty
+        SVC->>DB: INSERT INTO DamagedRecords (SkuId, DamagedQty, Reason)
     end
-    UI-->>TK: Thông báo kết quả nhập kho
+    SVC->>DB: INSERT INTO StockMovements (MovementType='INBOUND')
+    SVC->>DB: COMMIT TRANSACTION
+    SVC-->>UI: Nhập kho hoàn tất, hàng GOOD sẵn sàng xuất bán, hàng DAMAGED được cách ly!
 ```
 
-### 19.4. Flowchart – Luồng xử lý AI (Sinh báo cáo / Gợi ý nhập / Phát hiện biến động)
+### 13.4. Flowchart: Luồng xử lý AI Phân tích nhu cầu & Replenishment
 
 ```mermaid
 flowchart TD
-    A[Bắt đầu chu kỳ báo cáo tuần/tháng] --> B[Tổng hợp dữ liệu N-X-T theo SKU]
-    B --> C{Loại trừ tồn Damaged?}
-    C -->|Có| D[Chỉ giữ lại tồn & giao dịch trạng thái GOOD]
-    D --> E[Tính tồn đầu, tổng nhập, tổng xuất, tồn cuối]
-    E --> F[AI-01: Sinh nhận xét báo cáo N-X-T]
-    E --> G[AI-02: Tính nhu cầu TB 60 ngày và hệ số mùa vụ]
-    G --> H[Áp dụng công thức: Nhu cầu TB60 x Hệ số mùa vụ + Biến động gần nhất - Tồn hiện tại]
-    H --> I[Sinh danh sách gợi ý nhập theo SKU/biến thể]
-    E --> J[AI-03: So sánh nhu cầu 7 ngày gần nhất với TB 60 ngày]
-    J --> K{Chênh lệch >= 20%?}
-    K -->|Có| L[Tạo cảnh báo biến động bất thường]
-    K -->|Không| M[Không tạo cảnh báo]
-    I --> N{SKU thuộc Combo?}
-    N -->|Có| O[AI-04: Kiểm tra cấu kiện BOM giới hạn - bottleneck]
-    O --> P[Bổ sung cảnh báo ưu tiên nhập cấu kiện nghẽn cổ chai]
-    N -->|Không| Q[Giữ nguyên gợi ý đơn lẻ]
-    F --> R[Tổng hợp kết quả AI kèm dữ liệu căn cứ]
-    L --> R
-    M --> R
-    P --> R
-    Q --> R
-    R --> S[Hiển thị cho Quản lý/Kế toán trên Dashboard]
-    S --> T{Quản lý duyệt gợi ý AI?}
-    T -->|Duyệt| U[Tạo đề xuất nhập hàng / xử lý cảnh báo chính thức]
-    T -->|Từ chối/Chỉnh sửa| V[Lưu phản hồi, không áp dụng vào nghiệp vụ]
-    U --> W[Kết thúc]
-    V --> W[Kết thúc]
+    START([Bắt đầu chu kỳ quét AI - Chạy ngầm hoặc Thủ công]) --> READ_DB[Đọc dữ liệu lịch sử xuất kho 60 ngày & Tồn kho thực tế]
+    READ_DB --> FILTER_GOOD[Lọc dữ liệu: Chỉ tính xuất kho hàng trạng thái GOOD]
+    
+    FILTER_GOOD --> CALC_AVG[Tính trung bình ngày: Avg60 = Sum60 / 60 & Avg7 = Sum7 / 7]
+    CALC_AVG --> CHECK_DIFF{Sai lệch |Avg7 - Avg60| / Avg60 >= 20%?}
+    
+    CHECK_DIFF -->|ĐÚNG: Biến động đột biến| CREATE_ANOMALY[Tạo cảnh báo ANOMALY - PENDING_REVIEW<br/>Ghi nhận % tăng/giảm và gợi ý lượng bù đắp 30 ngày]
+    CHECK_DIFF -->|SAI: Bình thường| CHECK_MIN[Kiểm tra tồn an toàn]
+    
+    CREATE_ANOMALY --> CHECK_MIN
+    
+    CHECK_MIN --> IS_LOW{Tồn khả dụng GOOD < MinStock?}
+    IS_LOW -->|ĐÚNG: Tồn thấp| CREATE_LOWSTOCK[Tạo đề xuất LOW_STOCK - PENDING_REVIEW<br/>Số lượng đề xuất = Max(MinStock - Tồn, MinStock)]
+    IS_LOW -->|SAI: Đủ tồn| CHECK_COMBO[Kiểm tra Combo BOM]
+    
+    CREATE_LOWSTOCK --> CHECK_COMBO
+    
+    CHECK_COMBO --> FIND_BOTTLENECK[Tính tồn khả dụng Combo = MIN floor Ti / BOMi]
+    FIND_BOTTLENECK --> IS_BOTTLENECK{Tồn Combo < MinStockCombo?}
+    IS_BOTTLENECK -->|ĐÚNG: Tắc nghẽn| CREATE_BOTTLENECK[Tạo cảnh báo BOTTLENECK - PENDING_REVIEW<br/>Chỉ rõ linh kiện cổ chai cần ưu tiên nhập]
+    IS_BOTTLENECK -->|SAI: Không tắc| DISPLAY_DASHBOARD[Hiển thị danh sách đề xuất trên Dashboard /Replenishment]
+    
+    CREATE_BOTTLENECK --> DISPLAY_DASHBOARD
+    
+    DISPLAY_DASHBOARD --> USER_DECISION{Quản lý kho bấm Duyệt gợi ý AI?}
+    USER_DECISION -->|TỪ CHỐI / CHỈNH SỬA| REJECT_SUGGESTION[Lưu trạng thái REJECTED - Không ảnh hưởng CSDL kho]
+    USER_DECISION -->|BẤM DUYỆT GỢI Ý| CREATE_DRAFT_PO[Hệ thống tự động tạo Phiếu nhập nháp DRAFT vào CSDL<br/>Chuyển trạng thái đề xuất thành APPROVED]
+    
+    CREATE_DRAFT_PO --> END([Kết thúc chu kỳ AI - Chờ con người xử lý tiếp])
+    REJECT_SUGGESTION --> END
 ```
 
-### 19.5. Sơ đồ trạng thái tồn kho (State Diagram) – Vòng đời hàng nội thất
+### 13.5. State Diagram: Vòng đời trạng thái tồn kho hàng hóa nội thất
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Nhap_kho_cho_QC
-    Nhap_kho_cho_QC --> GOOD: QC xác nhận đạt chất lượng
-    Nhap_kho_cho_QC --> DAMAGED: QC phát hiện lỗi/hư hỏng
-    GOOD --> Locked_Tam_khoa: Bắt đầu giao dịch xuất/điều chỉnh
-    Locked_Tam_khoa --> GOOD: Giao dịch rollback (thất bại)
-    Locked_Tam_khoa --> Xuat_kho: Giao dịch commit thành công
-    GOOD --> DAMAGED: Phát hiện lỗi trong quá trình lưu kho/kiểm kê (Quản lý duyệt)
-    DAMAGED --> GOOD: Sửa chữa hoàn tất (Quản lý duyệt)
-    DAMAGED --> Thanh_ly: Quản lý duyệt phương án thanh lý
-    DAMAGED --> Tra_NCC: Quản lý duyệt phương án trả hàng NCC
-    Xuat_kho --> [*]
-    Thanh_ly --> [*]
-    Tra_NCC --> [*]
+    [*] --> Tiêp_nhan_chờ_QC: Hàng cập bến kho từ Nhà cung cấp
+    
+    Tiêp_nhan_chờ_QC --> GOOD: QC xác nhận đạt chuẩn chất lượng
+    Tiêp_nhan_chờ_QC --> DAMAGED: QC phát hiện trầy xước / nứt vỡ
+    
+    state GOOD {
+        [*] --> Sẵn_sàng_bán: Lưu trữ trên giá kệ khả dụng
+        Sẵn_sàng_bán --> Tạm_khóa_UPDLOCK: Giao dịch xuất kho bắt đầu
+        Tạm_khóa_UPDLOCK --> Sẵn_sàng_bán: Giao dịch thất bại (Rollback)
+        Tạm_khóa_UPDLOCK --> Đã_xuất_giao: Giao dịch thành công (Commit)
+    }
+
+    GOOD --> DAMAGED: Phát hiện hư hỏng trong quá trình lưu kho / kiểm kê
+    
+    state DAMAGED {
+        [*] --> Cách_ly_kho_hỏng: Cách ly hoàn toàn khỏi tồn bán
+        Cách_ly_kho_hỏng --> Đang_sửa_chữa: Quản lý duyệt phương án sửa chữa
+        Đang_sửa_chữa --> Hoàn_nguyên_GOOD: Sửa chữa hoàn tất & QC nghiệm thu
+        Cách_ly_kho_hỏng --> Thanh_lý: Quản lý duyệt xuất thanh lý giá rẻ
+        Cách_ly_kho_hỏng --> Trả_hàng_NCC: Quản lý duyệt trả lại Nhà cung cấp
+    }
+
+    Hoàn_nguyên_GOOD --> GOOD
+    Đã_xuất_giao --> [*]
+    Thanh_lý --> [*]
+    Trả_hàng_NCC --> [*]
 ```
 
 ---
 
-*Hết tài liệu. Toàn bộ nội dung URD v1.1 được kế thừa nguyên vẹn; các bổ sung dành riêng cho nghiệp vụ Kho Nội thất được đánh dấu **[MỚI – NỘI THẤT]** để tiện đối chiếu khi chuyển sang giai đoạn xây dựng SRS.*
+*Hết tài liệu URD-WMS-AI-FURNITURE-002 (v2.0). Toàn bộ nội dung tài liệu này đã được chuẩn hóa và ánh xạ 1-1 với kiến trúc Clean Architecture, mã nguồn C# .NET 9 và 36 automated tests xUnit của Hệ thống Quản lý Kho Hàng Nội Thất Tích Hợp AI.*
