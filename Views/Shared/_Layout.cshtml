@@ -922,22 +922,141 @@
                     
                     loadChat();
 
+                    // Restore open state across reloads/navigation
+                    let chatBoxStateKey = 'chatBoxOpen_' + currentUser;
+                    let pendingKey = 'pendingChat_' + currentUser;
+
+                    if (localStorage.getItem(chatBoxStateKey) === 'true') {
+                        $('#chatBox').removeClass('d-none').addClass('d-flex flex-column');
+                        $('#openChatBtn').addClass('d-none');
+                    }
+
                     $('#openChatBtn').click(function() {
                         $('#chatBox').removeClass('d-none').addClass('d-flex flex-column');
                         $(this).addClass('d-none');
+                        localStorage.setItem(chatBoxStateKey, 'true');
                         $('#chatInput').focus();
                     });
                     $('#closeChat').click(function() {
                         $('#chatBox').addClass('d-none').removeClass('d-flex flex-column');
                         $('#openChatBtn').removeClass('d-none');
+                        localStorage.setItem(chatBoxStateKey, 'false');
                     });
 
                     $('#clearChatHistory').click(function() {
                         if (confirm('Bạn có muốn xóa toàn bộ lịch sử cuộc trò chuyện này?')) {
                             localStorage.removeItem(chatKey);
+                            localStorage.removeItem(pendingKey);
                             $('#chatMessages').html('<div class="text-muted text-center small mb-3"><span class="badge bg-light text-secondary border"><i class="fa-solid fa-circle-check text-success me-1"></i>Trợ lý AI đã sẵn sàng</span></div>');
                         }
                     });
+
+                    // Check if there was a pending AI thinking request before the page reloaded
+                    let pendingRaw = localStorage.getItem(pendingKey);
+                    if (pendingRaw) {
+                        let pending = null;
+                        try { pending = JSON.parse(pendingRaw); } catch(e) {}
+                        if (pending && pending.requestId && (Date.now() - (pending.timestamp || 0) < 360000)) {
+                            // Keep chatBox open so user sees ongoing thinking process
+                            $('#chatBox').removeClass('d-none').addClass('d-flex flex-column');
+                            $('#openChatBtn').addClass('d-none');
+                            localStorage.setItem(chatBoxStateKey, 'true');
+
+                            let pendingLoadingId = 'loading-pending-' + Date.now();
+                            $('#chatMessages').append('<div id="' + pendingLoadingId + '" class="d-flex justify-content-start mb-2"><div class="bg-light border p-2 rounded text-muted small"><i class="fa-solid fa-circle-notch fa-spin text-primary me-2"></i>AI đang tiếp tục suy nghĩ... (phiên được duy trì sau khi tải lại)</div></div>');
+                            scrollToBottom();
+                            $('#sendChatBtn').prop('disabled', true);
+
+                            pollPendingChat(pending, pendingLoadingId);
+                        } else {
+                            localStorage.removeItem(pendingKey);
+                        }
+                    }
+
+                    function pollPendingChat(pending, loadingId) {
+                        $.ajax({
+                            url: '/api/AiChat/poll?requestId=' + encodeURIComponent(pending.requestId),
+                            method: 'GET',
+                            success: function(res) {
+                                if (res.completed) {
+                                    $('#' + loadingId).remove();
+                                    localStorage.removeItem(pendingKey);
+                                    $('#sendChatBtn').prop('disabled', false);
+
+                                    if (res.error) {
+                                        $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-danger text-white border p-2 rounded small"><i class="fa-solid fa-triangle-exclamation me-1"></i> ' + escapeHtml(res.error) + '</div></div>');
+                                    } else if (res.reply) {
+                                        processChatResponse(res.reply);
+                                    }
+                                    scrollToBottom();
+                                } else if (res.notFound) {
+                                    // If session not found (e.g. server restarted), re-send seamlessly
+                                    $('#' + loadingId).remove();
+                                    executeChat(pending.prompt, pending.history || [], pending.requestId);
+                                } else {
+                                    // Still thinking... poll again
+                                    setTimeout(function() {
+                                        let stillPending = localStorage.getItem(pendingKey);
+                                        if (stillPending) {
+                                            pollPendingChat(pending, loadingId);
+                                        }
+                                    }, 1800);
+                                }
+                            },
+                            error: function() {
+                                setTimeout(function() {
+                                    let stillPending = localStorage.getItem(pendingKey);
+                                    if (stillPending) {
+                                        pollPendingChat(pending, loadingId);
+                                    }
+                                }, 3000);
+                            }
+                        });
+                    }
+
+                    function executeChat(prompt, historyPayload, existingRequestId) {
+                        let reqId = existingRequestId || ('req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
+
+                        localStorage.setItem(pendingKey, JSON.stringify({
+                            requestId: reqId,
+                            prompt: prompt,
+                            history: historyPayload,
+                            timestamp: Date.now()
+                        }));
+
+                        let loadingId = 'loading-' + Date.now();
+                        $('#chatMessages').append('<div id="' + loadingId + '" class="d-flex justify-content-start mb-2"><div class="bg-light border p-2 rounded text-muted small"><i class="fa-solid fa-circle-notch fa-spin text-primary me-2"></i>AI đang suy nghĩ...</div></div>');
+                        scrollToBottom();
+                        $('#sendChatBtn').prop('disabled', true);
+
+                        $.ajax({
+                            url: '/api/AiChat/chat',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ prompt: prompt, history: historyPayload, requestId: reqId }),
+                            success: function(res) {
+                                $('#' + loadingId).remove();
+                                localStorage.removeItem(pendingKey);
+                                $('#sendChatBtn').prop('disabled', false);
+                                $('#chatInput').focus();
+                                processChatResponse(res.reply || '');
+                            },
+                            error: function(xhr) {
+                                // If aborted due to page reload or link navigation, preserve pendingKey so new page resumes
+                                if (xhr.statusText === 'abort' || xhr.readyState === 0) {
+                                    console.log('Chat request aborted by page navigation; state preserved.');
+                                    return;
+                                }
+                                $('#' + loadingId).remove();
+                                localStorage.removeItem(pendingKey);
+                                $('#sendChatBtn').prop('disabled', false);
+                                $('#chatInput').focus();
+                                let errTxt = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : xhr.responseText || 'Lỗi kết nối AI: Không thể kết nối máy chủ.';
+                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-danger text-white p-2 rounded small">' + escapeHtml(errTxt) + '</div></div>');
+                                scrollToBottom();
+                            }
+                        });
+                    }
 
                     $('#chatForm').submit(function(e) {
                         e.preventDefault();
@@ -957,189 +1076,170 @@
                         $('#chatInput').val('');
                         scrollToBottom();
 
-                        let loadingId = 'loading-' + Date.now();
-                        $('#chatMessages').append('<div id="' + loadingId + '" class="d-flex justify-content-start mb-2"><div class="bg-light border p-2 rounded text-muted small">AI đang suy nghĩ <i class="fa-solid fa-circle-notch fa-spin ms-1"></i></div></div>');
+                        executeChat(prompt, historyPayload, null);
+                    });
+
+                    function processChatResponse(replyText) {
+                        replyText = replyText || '';
+                        
+                        // Parse NAVIGATE command
+                        let navMatch = replyText.match(/\[NAVIGATE:\s*([^\]]+)\]/);
+                        let actionMatch = replyText.match(/\[ACTION:\s*([^\]]+)\]/);
+                        
+                        let navUrl = null;
+                        if (navMatch) {
+                            navUrl = navMatch[1].trim();
+                            replyText = replyText.replace(navMatch[0], '').trim();
+                        }
+                        
+                        let actionCmd = null;
+                        let actionData = null;
+                        if (actionMatch) {
+                            let fullAction = actionMatch[1].trim();
+                            replyText = replyText.replace(actionMatch[0], '').trim();
+                            
+                            if (fullAction.startsWith('CREATE_DRAFT_INBOUND:')) {
+                                actionCmd = 'CREATE_DRAFT_INBOUND';
+                                let jsonStr = fullAction.substring('CREATE_DRAFT_INBOUND:'.length).trim();
+                                try { actionData = JSON.parse(jsonStr); } catch(e) { console.warn('JSON parse error:', jsonStr); }
+                            } else if (fullAction.startsWith('CREATE_DRAFT_OUTBOUND:')) {
+                                actionCmd = 'CREATE_DRAFT_OUTBOUND';
+                                let jsonStr = fullAction.substring('CREATE_DRAFT_OUTBOUND:'.length).trim();
+                                try { actionData = JSON.parse(jsonStr); } catch(e) { console.warn('JSON parse error:', jsonStr); }
+                            } else {
+                                actionCmd = fullAction;
+                            }
+                        }
+                        
+                        saveChat('ai', replyText);
+                        let replyHtml = renderFormattedMessage(replyText);
+                        $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-white border p-2 rounded shadow-sm" style="max-width: 85%; font-size: 0.9em;">' + replyHtml + '</div></div>');
                         scrollToBottom();
-                        $('#sendChatBtn').prop('disabled', true);
-
-                        $.ajax({
-                            url: '/api/AiChat/chat',
-                            method: 'POST',
-                            contentType: 'application/json',
-                            data: JSON.stringify({ prompt: prompt, history: historyPayload }),
-                            success: function(res) {
-                                $('#' + loadingId).remove();
-                                let replyText = res.reply || '';
-                                
-                                // Parse NAVIGATE command
-                                let navMatch = replyText.match(/\[NAVIGATE:\s*([^\]]+)\]/);
-                                let actionMatch = replyText.match(/\[ACTION:\s*([^\]]+)\]/);
-                                
-                                let navUrl = null;
-                                if (navMatch) {
-                                    navUrl = navMatch[1].trim();
-                                    replyText = replyText.replace(navMatch[0], '').trim();
+                        
+                        if (navUrl) {
+                            if (isSafeNavUrl(navUrl)) {
+                                let currentFull = window.location.pathname + window.location.search;
+                                let isSamePage = currentFull.toLowerCase() === navUrl.toLowerCase();
+                                if (!isSamePage) {
+                                    $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-info bg-opacity-10 text-primary border border-info p-2 rounded small"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Đang chuyển hướng tới ' + escapeHtml(navUrl) + '...</div></div>');
+                                    scrollToBottom();
+                                    setTimeout(function() {
+                                        window.location.href = navUrl;
+                                    }, 1800);
                                 }
-                                
-                                let actionCmd = null;
-                                let actionData = null;
-                                if (actionMatch) {
-                                    let fullAction = actionMatch[1].trim();
-                                    replyText = replyText.replace(actionMatch[0], '').trim();
-                                    
-                                    if (fullAction.startsWith('CREATE_DRAFT_INBOUND:')) {
-                                        actionCmd = 'CREATE_DRAFT_INBOUND';
-                                        let jsonStr = fullAction.substring('CREATE_DRAFT_INBOUND:'.length).trim();
-                                        try { actionData = JSON.parse(jsonStr); } catch(e) { console.warn('JSON parse error:', jsonStr); }
-                                    } else if (fullAction.startsWith('CREATE_DRAFT_OUTBOUND:')) {
-                                        actionCmd = 'CREATE_DRAFT_OUTBOUND';
-                                        let jsonStr = fullAction.substring('CREATE_DRAFT_OUTBOUND:'.length).trim();
-                                        try { actionData = JSON.parse(jsonStr); } catch(e) { console.warn('JSON parse error:', jsonStr); }
-                                    } else {
-                                        actionCmd = fullAction;
-                                    }
-                                }
-                                
-                                saveChat('ai', replyText);
-                                let replyHtml = renderFormattedMessage(replyText);
-                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-white border p-2 rounded shadow-sm" style="max-width: 85%; font-size: 0.9em;">' + replyHtml + '</div></div>');
+                            } else {
+                                console.warn('Blocked untrusted navigation target:', navUrl);
+                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-warning text-dark border p-2 rounded small"><i class="fa-solid fa-shield-halved me-1"></i> Đã chặn chuyển hướng không an toàn (' + escapeHtml(navUrl) + ').</div></div>');
                                 scrollToBottom();
-                                $('#sendChatBtn').prop('disabled', false);
-                                $('#chatInput').focus();
-                                
-                                if (navUrl) {
-                                    if (isSafeNavUrl(navUrl)) {
-                                        let currentFull = window.location.pathname + window.location.search;
-                                        let isSamePage = currentFull.toLowerCase() === navUrl.toLowerCase();
-                                        if (!isSamePage) {
-                                            $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-info bg-opacity-10 text-primary border border-info p-2 rounded small"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Đang chuyển hướng tới ' + escapeHtml(navUrl) + '...</div></div>');
-                                            scrollToBottom();
-                                            setTimeout(function() {
-                                                window.location.href = navUrl;
-                                            }, 1800);
-                                        }
-                                    } else {
-                                        console.warn('Blocked untrusted navigation target:', navUrl);
-                                        $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-warning text-dark border p-2 rounded small"><i class="fa-solid fa-shield-halved me-1"></i> Đã chặn chuyển hướng không an toàn (' + escapeHtml(navUrl) + ').</div></div>');
+                            }
+                        }
+                        
+                        if (actionCmd === 'TRIGGER_REPLENISHMENT') {
+                            $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-warning text-dark border p-2 rounded small"><i class="fa fa-spinner fa-spin me-1"></i> Hệ thống đang chạy quét phân tích AI trên toàn bộ kho...</div></div>');
+                            scrollToBottom();
+                            $.post('/api/AiChat/trigger-replenishment')
+                                .done(function(res) {
+                                    setTimeout(function() {
+                                        $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-success text-white border p-2 rounded small"><i class="fa fa-check me-1"></i> ' + escapeHtml(res.message || 'Hoàn tất phân tích!') + ' Đang mở trang Đề xuất nhập...</div></div>');
                                         scrollToBottom();
-                                    }
-                                }
-                                
-                                if (actionCmd === 'TRIGGER_REPLENISHMENT') {
-                                    $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-warning text-dark border p-2 rounded small"><i class="fa fa-spinner fa-spin me-1"></i> Hệ thống đang chạy quét phân tích AI trên toàn bộ kho...</div></div>');
+                                        setTimeout(function() { window.location.href = '/Replenishment'; }, 1500);
+                                    }, 1000);
+                                })
+                                .fail(function(xhr) {
+                                    let err = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : xhr.responseText;
+                                    $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-danger text-white border p-2 rounded small"><i class="fa fa-triangle-exclamation me-1"></i> ' + escapeHtml(err || 'Lỗi khi kích hoạt phân tích.') + '</div></div>');
                                     scrollToBottom();
-                                    $.post('/api/AiChat/trigger-replenishment')
-                                        .done(function(res) {
-                                            setTimeout(function() {
-                                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-success text-white border p-2 rounded small"><i class="fa fa-check me-1"></i> ' + escapeHtml(res.message || 'Hoàn tất phân tích!') + ' Đang mở trang Đề xuất nhập...</div></div>');
-                                                scrollToBottom();
-                                                setTimeout(function() { window.location.href = '/Replenishment'; }, 1500);
-                                            }, 1000);
-                                        })
-                                        .fail(function(xhr) {
-                                            let err = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : xhr.responseText;
-                                            $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-danger text-white border p-2 rounded small"><i class="fa fa-triangle-exclamation me-1"></i> ' + escapeHtml(err || 'Lỗi khi kích hoạt phân tích.') + '</div></div>');
-                                            scrollToBottom();
-                                        });
-                                } else if (actionCmd === 'TRIGGER_BACKUP') {
-                                    $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-warning text-dark border p-2 rounded small"><i class="fa fa-spinner fa-spin me-1"></i> Hệ thống đang trích xuất snapshot và khởi tạo bản sao lưu dữ liệu...</div></div>');
+                                });
+                        } else if (actionCmd === 'TRIGGER_BACKUP') {
+                            $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-warning text-dark border p-2 rounded small"><i class="fa fa-spinner fa-spin me-1"></i> Hệ thống đang trích xuất snapshot và khởi tạo bản sao lưu dữ liệu...</div></div>');
+                            scrollToBottom();
+                            $.post('/api/AiChat/trigger-backup')
+                                .done(function(res) {
+                                    setTimeout(function() {
+                                        let downloadUrl = '/Admin/DownloadBackup?name=' + encodeURIComponent(res.file);
+                                        $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-success text-white border p-2 rounded small"><i class="fa fa-check me-1"></i> ' + escapeHtml(res.message || 'Đã tạo bản sao lưu thành công!') + '<br><div class="mt-2"><a href="' + downloadUrl + '" class="btn btn-sm btn-light text-dark fw-bold me-2"><i class="fa-solid fa-download me-1"></i>Tải file sao lưu</a><a href="/Admin/Backup" class="btn btn-sm btn-outline-light"><i class="fa-solid fa-database me-1"></i>Xem trang Backup</a></div></div></div>');
+                                        scrollToBottom();
+                                    }, 800);
+                                })
+                                .fail(function(xhr) {
+                                    let err = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : xhr.responseText;
+                                    $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-danger text-white border p-2 rounded small"><i class="fa fa-triangle-exclamation me-1"></i> ' + escapeHtml(err || 'Lỗi khi tạo bản sao lưu. Vui lòng kiểm tra quyền Admin.') + ' <a href="/Admin/Backup" class="text-white text-decoration-underline ms-1">Mở trang Backup</a></div></div>');
                                     scrollToBottom();
-                                    $.post('/api/AiChat/trigger-backup')
-                                        .done(function(res) {
-                                            setTimeout(function() {
-                                                let downloadUrl = '/Admin/DownloadBackup?name=' + encodeURIComponent(res.file);
-                                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-success text-white border p-2 rounded small"><i class="fa fa-check me-1"></i> ' + escapeHtml(res.message || 'Đã tạo bản sao lưu thành công!') + '<br><div class="mt-2"><a href="' + downloadUrl + '" class="btn btn-sm btn-light text-dark fw-bold me-2"><i class="fa-solid fa-download me-1"></i>Tải file sao lưu</a><a href="/Admin/Backup" class="btn btn-sm btn-outline-light"><i class="fa-solid fa-database me-1"></i>Xem trang Backup</a></div></div></div>');
-                                                scrollToBottom();
-                                            }, 800);
-                                        })
-                                        .fail(function(xhr) {
-                                            let err = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : xhr.responseText;
-                                            $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-danger text-white border p-2 rounded small"><i class="fa fa-triangle-exclamation me-1"></i> ' + escapeHtml(err || 'Lỗi khi tạo bản sao lưu. Vui lòng kiểm tra quyền Admin.') + ' <a href="/Admin/Backup" class="text-white text-decoration-underline ms-1">Mở trang Backup</a></div></div>');
-                                            scrollToBottom();
-                                        });
-                                } else if (actionCmd === 'CREATE_DRAFT_INBOUND' || actionCmd === 'CREATE_DRAFT_OUTBOUND') {
-                                    let isOut = actionCmd === 'CREATE_DRAFT_OUTBOUND';
-                                    let vType = isOut ? 'OUTBOUND' : 'INBOUND';
-                                    let vTitle = isOut ? 'Phiếu Xuất kho' : 'Phiếu Nhập kho';
-                                    let vPartner = (actionData && actionData.counterparty) ? actionData.counterparty : (isOut ? 'Khách hàng' : 'Nhà cung cấp');
-                                    let vSku = (actionData && actionData.sku) ? actionData.sku : 'SKU-001';
-                                    let vQty = (actionData && actionData.quantity) ? actionData.quantity : 10;
-                                    let cardId = 'actionCard-' + Date.now();
+                                });
+                        } else if (actionCmd === 'CREATE_DRAFT_INBOUND' || actionCmd === 'CREATE_DRAFT_OUTBOUND') {
+                            let isOut = actionCmd === 'CREATE_DRAFT_OUTBOUND';
+                            let vType = isOut ? 'OUTBOUND' : 'INBOUND';
+                            let vTitle = isOut ? 'Phiếu Xuất kho' : 'Phiếu Nhập kho';
+                            let vPartner = (actionData && actionData.counterparty) ? actionData.counterparty : (isOut ? 'Khách hàng' : 'Nhà cung cấp');
+                            let vSku = (actionData && actionData.sku) ? actionData.sku : 'SKU-001';
+                            let vQty = (actionData && actionData.quantity) ? actionData.quantity : 10;
+                            let cardId = 'actionCard-' + Date.now();
 
-                                    let cardHtml = `
-                                        <div id="${cardId}" class="d-flex justify-content-start mb-2">
-                                            <div class="card border-primary shadow-sm" style="max-width: 88%; font-size: 0.88em;">
-                                                <div class="card-header bg-primary bg-opacity-10 text-primary py-1 px-2 fw-bold">
-                                                    <i class="fa-solid fa-file-pen me-1"></i> Xác nhận tạo bản nháp ${vTitle}
-                                                </div>
-                                                <div class="card-body p-2">
-                                                    <div><b>Đối tác:</b> ${escapeHtml(vPartner)}</div>
-                                                    <div><b>Mặt hàng:</b> <code>${escapeHtml(vSku)}</code></div>
-                                                    <div><b>Số lượng:</b> <span class="badge bg-secondary">${vQty}</span></div>
-                                                    <div class="mt-2 pt-2 border-top d-flex gap-2">
-                                                        <button class="btn btn-primary btn-sm py-0 px-2 confirm-btn"><i class="fa-solid fa-check me-1"></i>Tạo phiếu</button>
-                                                        <button class="btn btn-outline-secondary btn-sm py-0 px-2 cancel-btn"><i class="fa-solid fa-xmark me-1"></i>Hủy</button>
-                                                    </div>
-                                                </div>
+                            let cardHtml = `
+                                <div id="${cardId}" class="d-flex justify-content-start mb-2">
+                                    <div class="card border-primary shadow-sm" style="max-width: 88%; font-size: 0.88em;">
+                                        <div class="card-header bg-primary bg-opacity-10 text-primary py-1 px-2 fw-bold">
+                                            <i class="fa-solid fa-file-pen me-1"></i> Xác nhận tạo bản nháp ${vTitle}
+                                        </div>
+                                        <div class="card-body p-2">
+                                            <div><b>Đối tác:</b> ${escapeHtml(vPartner)}</div>
+                                            <div><b>Mặt hàng:</b> <code>${escapeHtml(vSku)}</code></div>
+                                            <div><b>Số lượng:</b> <span class="badge bg-secondary">${vQty}</span></div>
+                                            <div class="mt-2 pt-2 border-top d-flex gap-2">
+                                                <button class="btn btn-primary btn-sm py-0 px-2 confirm-btn"><i class="fa-solid fa-check me-1"></i>Tạo phiếu</button>
+                                                <button class="btn btn-outline-secondary btn-sm py-0 px-2 cancel-btn"><i class="fa-solid fa-xmark me-1"></i>Hủy</button>
                                             </div>
                                         </div>
-                                    `;
-                                    $('#chatMessages').append(cardHtml);
-                                    scrollToBottom();
+                                    </div>
+                                </div>
+                            `;
+                            $('#chatMessages').append(cardHtml);
+                            scrollToBottom();
 
-                                    let $card = $('#' + cardId);
-                                    $card.find('.confirm-btn').click(function() {
-                                        let $btn = $(this);
-                                        $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Đang tạo...');
-                                        $card.find('.cancel-btn').remove();
+                            let $card = $('#' + cardId);
+                            $card.find('.confirm-btn').click(function() {
+                                let $btn = $(this);
+                                $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Đang tạo...');
+                                $card.find('.cancel-btn').remove();
 
-                                        $.ajax({
-                                            url: '/api/AiChat/create-draft-voucher',
-                                            method: 'POST',
-                                            contentType: 'application/json',
-                                            data: JSON.stringify({
-                                                type: vType,
-                                                counterparty: vPartner,
-                                                sku: vSku,
-                                                quantity: parseInt(vQty) || 10
-                                            }),
-                                            success: function(r) {
-                                                $card.find('.card-body').html(`
-                                                    <div class="text-success fw-bold mb-1"><i class="fa fa-circle-check me-1"></i>${escapeHtml(r.message)}</div>
-                                                    <div class="small text-muted mb-2">Số phiếu: <b>${escapeHtml(r.voucherNumber)}</b> (${escapeHtml(r.quantity)} đơn vị)</div>
-                                                    <div class="d-flex gap-2">
-                                                        <a href="${escapeHtml(r.directUrl || r.targetUrl)}" class="btn btn-primary btn-sm py-1 px-2"><i class="fa-solid fa-file-pen me-1"></i>Mở & Sửa phiếu ngay</a>
-                                                        <a href="${escapeHtml(r.targetUrl)}" class="btn btn-outline-secondary btn-sm py-1 px-2"><i class="fa-solid fa-eye me-1"></i>Xem danh sách</a>
-                                                    </div>
-                                                `);
-                                                scrollToBottom();
-                                            },
-                                            error: function(xhr) {
-                                                let errTxt = xhr.status === 403 
-                                                    ? 'Bạn không đủ quyền thực hiện (chỉ Quản lý kho / Giám đốc / Admin).' 
-                                                    : (xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : xhr.responseText || 'Lỗi khi tạo phiếu.');
-                                                $card.find('.card-body').html(`
-                                                    <div class="text-danger small"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(errTxt)}</div>
-                                                `);
-                                                scrollToBottom();
-                                            }
-                                        });
-                                    });
+                                $.ajax({
+                                    url: '/api/AiChat/create-draft-voucher',
+                                    method: 'POST',
+                                    contentType: 'application/json',
+                                    data: JSON.stringify({
+                                        type: vType,
+                                        counterparty: vPartner,
+                                        sku: vSku,
+                                        quantity: parseInt(vQty) || 10
+                                    }),
+                                    success: function(r) {
+                                        $card.find('.card-body').html(`
+                                            <div class="text-success fw-bold mb-1"><i class="fa fa-circle-check me-1"></i>${escapeHtml(r.message)}</div>
+                                            <div class="small text-muted mb-2">Số phiếu: <b>${escapeHtml(r.voucherNumber)}</b> (${escapeHtml(r.quantity)} đơn vị)</div>
+                                            <div class="d-flex gap-2">
+                                                <a href="${escapeHtml(r.directUrl || r.targetUrl)}" class="btn btn-primary btn-sm py-1 px-2"><i class="fa-solid fa-file-pen me-1"></i>Mở & Sửa phiếu ngay</a>
+                                                <a href="${escapeHtml(r.targetUrl)}" class="btn btn-outline-secondary btn-sm py-1 px-2"><i class="fa-solid fa-eye me-1"></i>Xem danh sách</a>
+                                            </div>
+                                        `);
+                                        scrollToBottom();
+                                    },
+                                    error: function(xhr) {
+                                        let errTxt = xhr.status === 403 
+                                            ? 'Bạn không đủ quyền thực hiện (chỉ Quản lý kho / Giám đốc / Admin).' 
+                                            : (xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : xhr.responseText || 'Lỗi khi tạo phiếu.');
+                                        $card.find('.card-body').html(`
+                                            <div class="text-danger small"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(errTxt)}</div>
+                                        `);
+                                        scrollToBottom();
+                                    }
+                                });
+                            });
 
-                                    $card.find('.cancel-btn').click(function() {
-                                        $card.find('.card-body').html('<div class="text-muted small fst-italic"><i class="fa-solid fa-ban me-1"></i>Đã hủy yêu cầu tạo phiếu.</div>');
-                                    });
-                                }
-                            },
-                            error: function(xhr) {
-                                $('#' + loadingId).remove();
-                                $('#chatMessages').append('<div class="d-flex justify-content-start mb-2"><div class="bg-danger text-white p-2 rounded small">Lỗi kết nối AI: ' + escapeHtml(xhr.responseText || 'Không thể kết nối máy chủ.') + '</div></div>');
-                                scrollToBottom();
-                                $('#sendChatBtn').prop('disabled', false);
-                                $('#chatInput').focus();
-                            }
-                        });
-                    });
+                            $card.find('.cancel-btn').click(function() {
+                                $card.find('.card-body').html('<div class="text-muted small fst-italic"><i class="fa-solid fa-ban me-1"></i>Đã hủy yêu cầu tạo phiếu.</div>');
+                            });
+                        }
+                    }
 
                     function escapeHtml(text) {
                         return $('<div>').text(text).html();
